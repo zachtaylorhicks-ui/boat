@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>indaboat Live HUD</title>
+  <title>indaboat Dual-Telemetry Live HUD</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -81,7 +81,10 @@
 <body>
 
 <div id="topbar">
-  <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
+    <span id="nodeBadge" style="font-size:10px; font-weight:bold; background:#1b202c; border:1px solid #2e3547; color:#88a0cc; padding:2px 6px; border-radius:3px;">NODES: 1 (STANDALONE)</span>
+  </div>
   <span id="bleStatus" style="font-size: 12px; color: #ff4444; font-weight: bold; letter-spacing: 1px;">DISCONNECTED</span>
   <div style="display: flex; gap: 6px;">
     <button class="btn-export" onclick="exportDatabase()">EXPORT (<span id="dbCount">0</span>)</button>
@@ -104,21 +107,21 @@
 
   <!-- LOAD CELL STRIP CHART -->
   <div class="card">
-    <div class="card-title">Dynamic Drive Force (kg)</div>
+    <div class="card-title" id="chartForceTitle">Dynamic Drive Force (kg)</div>
     <canvas id="chartForce"></canvas>
   </div>
 
   <!-- PLANAR SURGE ACCEL CHART -->
   <div class="card">
-    <div class="card-title">Planar Surge Accel (m/s²)</div>
+    <div class="card-title" id="chartAccelTitle">Planar Surge Accel (m/s²)</div>
     <canvas id="chartAccel"></canvas>
   </div>
 
   <!-- 7 METRIC BADGES -->
   <div id="hud">
-    <div class="badge"><div class="badge-val" id="valRaw" style="color: #ffaa00;">--</div><div class="badge-lbl">Raw Load (kg)</div></div>
-    <div class="badge"><div class="badge-val" id="valNet" style="color: #00ffcc;">--</div><div class="badge-lbl">Drive Force (kg)</div></div>
-    <div class="badge"><div class="badge-val" id="valSurge" style="color: #00e5ff;">--</div><div class="badge-lbl">Surge (m/s²)</div></div>
+    <div class="badge"><div class="badge-val" id="valRaw" style="color: #ffaa00;">--</div><div class="badge-lbl" id="lblRaw">Raw Load (kg)</div></div>
+    <div class="badge"><div class="badge-val" id="valNet" style="color: #00ffcc;">--</div><div class="badge-lbl" id="lblNet">Drive Force (kg)</div></div>
+    <div class="badge"><div class="badge-val" id="valSurge" style="color: #00e5ff;">--</div><div class="badge-lbl">Clean Surge (m/s²)</div></div>
     <div class="badge"><div class="badge-val" id="valSpd" style="color: #ffff00;">--</div><div class="badge-lbl">Speed (km/h)</div></div>
     <div class="badge"><div class="badge-val" id="valPitch" style="color: #ff66cc;">--</div><div class="badge-lbl">Pitch</div></div>
     <div class="badge"><div class="badge-val" id="valRoll" style="color: #cc66ff;">--</div><div class="badge-lbl">Roll</div></div>
@@ -274,10 +277,70 @@ function handleChunk(event) {
 }
 
 // ==============================================================================
-// 3. TELEMETRY MATH (IDENTICAL TO PYTHON SECTION 1 & 2)
+// 3. TELEMETRY MATH & DUAL-IMU OPPOSITE-SWING FUSION
 // ==============================================================================
-let baselineWeight = null;
-let pitch_est = 0.0, roll_est = 0.0;
+class NodeState {
+  constructor(id) {
+    this.id = id;
+    this.lastSeen = 0;
+    this.raw_w = 0;
+    this.baseline_w = null;
+    this.net_force = 0;
+    this.a_raw = [0, 0, 0]; // ax, ay, az
+    this.g_raw = [0, 0, 0]; // gx, gy, gz (rad/s)
+    this.gravity_k = [0, -1, 0]; // Dynamic vertical orientation vector
+    this.pitch_est = 0;
+    this.roll_est = 0;
+    this.swing_rate = 0;
+  }
+
+  update(raw_w, ax, ay, az, gx, gy, gz, dt) {
+    this.lastSeen = Date.now();
+    this.raw_w = raw_w;
+    this.a_raw = [ax, ay, az];
+    this.g_raw = [gx, gy, gz];
+
+    // Asymmetric baseline for load cell
+    if (this.baseline_w === null) {
+      this.baseline_w = raw_w;
+    }
+    const rate = raw_w > this.baseline_w ? 0.003 : 0.04;
+    this.baseline_w = (1.0 - rate) * this.baseline_w + rate * raw_w;
+    this.net_force = raw_w - this.baseline_w;
+
+    // Self-aligning Gravity Vector: extracts the true 'Up' axis regardless of chip orientation
+    const normA = Math.hypot(ax, ay, az);
+    if (normA > 0.001) {
+      const alphaG = 0.02; // Slow low-pass to find gravity
+      this.gravity_k[0] = (1.0 - alphaG) * this.gravity_k[0] + alphaG * (ax / normA);
+      this.gravity_k[1] = (1.0 - alphaG) * this.gravity_k[1] + alphaG * (ay / normA);
+      this.gravity_k[2] = (1.0 - alphaG) * this.gravity_k[2] + alphaG * (az / normA);
+      const magK = Math.hypot(this.gravity_k[0], this.gravity_k[1], this.gravity_k[2]);
+      this.gravity_k = [this.gravity_k[0] / magK, this.gravity_k[1] / magK, this.gravity_k[2] / magK];
+    }
+
+    // Python axis mapping: FORWARD = X, LATERAL = Z, GRAVITY_UP = -Y
+    const a_fwd = ax;
+    const a_lat = az;
+    const a_up  = -ay;
+
+    const wx = gz;
+    const wy = gx;
+
+    const acc_pitch = Math.atan2(a_fwd, Math.sqrt(a_lat * a_lat + a_up * a_up));
+    const acc_roll  = Math.atan2(a_lat, Math.max(0.05, a_up));
+
+    this.pitch_est = 0.93 * (this.pitch_est + wx * dt) + 0.07 * acc_pitch;
+    this.roll_est  = 0.93 * (this.roll_est  + wy * dt) + 0.07 * acc_roll;
+
+    // Planar swing rate (angular velocity projected along normal vector)
+    this.swing_rate = gx * this.gravity_k[0] + gy * this.gravity_k[1] + gz * this.gravity_k[2];
+  }
+}
+
+const node1 = new NodeState(1);
+const node2 = new NodeState(2);
+
 let lastTimeSec = null;
 let current_d = { pitch_deg: 0, roll_deg: 0, force_net: 0, a_surge: 0 };
 
@@ -318,61 +381,101 @@ function parseTelemetry(row) {
   const spd   = parseFloat(parts[12]);
   const sats  = parseInt(parts[13], 10);
 
-  if (isNaN(raw_w) || isNaN(ax)) return;
-
-  // Asymmetric baseline (Python exact)
-  if (baselineWeight === null) {
-    baselineWeight = raw_w;
+  // Optional 15th column for Multi-Node ID ("1" or "2")
+  let nodeId = 1;
+  if (parts.length >= 15) {
+    const parsedId = parseInt(parts[14], 10);
+    if (parsedId === 2) nodeId = 2;
   }
-  const rate = raw_w > baselineWeight ? 0.003 : 0.04;
-  baselineWeight = (1.0 - rate) * baselineWeight + rate * raw_w;
-  const net_force = raw_w - baselineWeight;
+
+  if (isNaN(raw_w) || isNaN(ax)) return;
 
   const t_sec = ms / 1000.0;
   const dt = lastTimeSec === null ? 0.033 : Math.min(0.2, Math.max(0.001, t_sec - lastTimeSec));
   lastTimeSec = t_sec;
 
-  // Python axis mapping:
-  // FORWARD = X, LATERAL = Z, UP = -Y
-  const a_fwd = ax;
-  const a_lat = az;
-  const a_up  = -ay;
+  // Ingest into target node
+  if (nodeId === 1) {
+    node1.update(raw_w, ax, ay, az, gx, gy, gz, dt);
+  } else {
+    node2.update(raw_w, ax, ay, az, gx, gy, gz, dt);
+  }
 
-  // Python:
-  // wx = math.radians(resolve_axis(r, LATERAL_AXIS, 'g')) -> 'Z' -> gz
-  // wy = math.radians(resolve_axis(r, FORWARD_AXIS, 'g')) -> 'X' -> gx
-  const wx = gz;
-  const wy = gx;
+  // Determine if Node 2 is actively streaming (received data within the last 1500ms)
+  const isDual = (Date.now() - node2.lastSeen) < 1500;
+  document.getElementById('nodeBadge').innerText = isDual ? "NODES: 2 (KINEMATIC FUSED)" : "NODES: 1 (STANDALONE)";
+  document.getElementById('nodeBadge').style.color = isDual ? "#00ffcc" : "#88a0cc";
 
-  const acc_pitch = Math.atan2(a_fwd, Math.sqrt(a_lat * a_lat + a_up * a_up));
-  const acc_roll  = Math.atan2(a_lat, Math.max(0.05, a_up));
+  let fusedPitch = 0.0;
+  let fusedRoll  = 0.0;
+  let fusedSurge = 0.0;
+  let totalNetForce = 0.0;
 
-  pitch_est = 0.93 * (pitch_est + wx * dt) + 0.07 * acc_pitch;
-  roll_est  = 0.93 * (roll_est  + wy * dt) + 0.07 * acc_roll;
+  if (isDual) {
+    // =========================================================================
+    // DUAL-NODE FUSION: SHARED HEAVE/ROLL + OPPOSITE SWING CANCELLATION
+    // =========================================================================
+    // 1. Common-mode locked axis (Pitch and Roll are mechanically tied to hull)
+    fusedPitch = (node1.pitch_est + node2.pitch_est) / 2.0;
+    fusedRoll  = (node1.roll_est  + node2.roll_est)  / 2.0;
 
-  const u_up_x = Math.sin(pitch_est);
-  const u_up_y = Math.sin(roll_est);
-  const u_up_z = Math.cos(pitch_est) * Math.cos(roll_est);
-  const norm_u = Math.hypot(u_up_x, u_up_y, u_up_z) || 1.0;
+    // 2. Relative scissor swing between the two articulated members
+    const diffSwingRate = (node1.swing_rate - node2.swing_rate) / 2.0;
 
-  const surge = a_fwd - (9.80665 * (u_up_x / norm_u));
+    // 3. Isolate Boat Surge:
+    // Centripetal and tangential whip cancel in the common-mode acceleration sum
+    const u_up_x = Math.sin(fusedPitch);
+    const a1_fwd = node1.a_raw[0];
+    const a2_fwd = node2.a_raw[0];
+    const commonFwd = (a1_fwd + a2_fwd) / 2.0;
+
+    // Clean hull surge without arm whip artifacts
+    fusedSurge = commonFwd - (9.80665 * u_up_x);
+
+    // 4. Dual Load Cell Sum & Balance
+    totalNetForce = node1.net_force + node2.net_force;
+
+    document.getElementById('lblRaw').innerText = "L1 / L2 Raw";
+    document.getElementById('valRaw').innerText = `${node1.raw_w.toFixed(0)} / ${node2.raw_w.toFixed(0)}`;
+    document.getElementById('lblNet').innerText = "Total Drive (kg)";
+    document.getElementById('valNet').innerText = (totalNetForce >= 0 ? "+" : "") + totalNetForce.toFixed(1);
+    document.getElementById('chartForceTitle').innerText = `Dual Drive Force (${node1.net_force.toFixed(1)}kg : ${node2.net_force.toFixed(1)}kg)`;
+  } else {
+    // =========================================================================
+    // SINGLE-NODE FALLBACK: 100% IDENTICAL TO ORIGINAL STANDALONE LOGIC
+    // =========================================================================
+    fusedPitch = node1.pitch_est;
+    fusedRoll  = node1.roll_est;
+
+    const u_up_x = Math.sin(fusedPitch);
+    const u_up_y = Math.sin(fusedRoll);
+    const u_up_z = Math.cos(fusedPitch) * Math.cos(fusedRoll);
+    const norm_u = Math.hypot(u_up_x, u_up_y, u_up_z) || 1.0;
+
+    fusedSurge = node1.a_raw[0] - (9.80665 * (u_up_x / norm_u));
+    totalNetForce = node1.net_force;
+
+    document.getElementById('lblRaw').innerText = "Raw Load (kg)";
+    document.getElementById('valRaw').innerText = node1.raw_w.toFixed(1);
+    document.getElementById('lblNet').innerText = "Drive Force (kg)";
+    document.getElementById('valNet').innerText = (totalNetForce >= 0 ? "+" : "") + totalNetForce.toFixed(1);
+    document.getElementById('chartForceTitle').innerText = "Dynamic Drive Force (kg)";
+  }
 
   current_d = {
-    pitch_deg: pitch_est * (180.0 / Math.PI),
-    roll_deg:  roll_est  * (180.0 / Math.PI),
-    force_net: net_force,
-    a_surge:   surge
+    pitch_deg: fusedPitch * (180.0 / Math.PI),
+    roll_deg:  fusedRoll  * (180.0 / Math.PI),
+    force_net: totalNetForce,
+    a_surge:   fusedSurge
   };
 
-  forceHistory.push(net_force);
+  forceHistory.push(totalNetForce);
   forceHistory.shift();
-  surgeHistory.push(surge);
+  surgeHistory.push(fusedSurge);
   surgeHistory.shift();
 
-  // Update HUD
-  document.getElementById('valRaw').innerText   = raw_w.toFixed(1);
-  document.getElementById('valNet').innerText   = (net_force >= 0 ? "+" : "") + net_force.toFixed(1);
-  document.getElementById('valSurge').innerText = (surge >= 0 ? "+" : "") + surge.toFixed(2);
+  // Update Remaining HUD
+  document.getElementById('valSurge').innerText = (fusedSurge >= 0 ? "+" : "") + fusedSurge.toFixed(2);
   document.getElementById('valSpd').innerText   = spd.toFixed(1);
   document.getElementById('valPitch').innerText = current_d.pitch_deg.toFixed(1) + "°";
   document.getElementById('valRoll').innerText  = current_d.roll_deg.toFixed(1) + "°";
@@ -412,7 +515,6 @@ function renderPlateCanvas() {
   const pitch = current_d.pitch_deg * (Math.PI / 180.0);
   const roll  = current_d.roll_deg  * (Math.PI / 180.0);
 
-  // Scaled dimensions matching canvas size
   const pw = w * 0.22;
   const pl = h * 0.20;
   const pth = 10;
@@ -442,8 +544,6 @@ function renderPlateCanvas() {
   const centerY = h / 2 + 10;
   const vert_shift = Math.max(-45, Math.min(45, (current_d.force_net * -0.65) + (current_d.a_surge * 2.0)));
 
-  // Exact Python screen projection:
-  // (cx + p[0]*0.85 - p[1]*0.40, cy + p[1]*0.45 + p[2] + vert_shift)
   const pts = rot.map(p => [
     centerX + p[0] * 0.85 - p[1] * 0.40,
     centerY + p[1] * 0.45 + p[2] + vert_shift
@@ -468,11 +568,10 @@ function renderPlateCanvas() {
   drawPoly([1, 2, 6, 5], '#5a5a5a', '#828282'); // Side face
   drawPoly([0, 1, 2, 3], '#b4961e', '#ffffff'); // Top face (gold)
 
-  // Top plate center
   const plate_cx = (pts[0][0] + pts[2][0]) / 2;
   const plate_cy = (pts[0][1] + pts[2][1]) / 2;
 
-  // Force vector arrow (points straight down from plate center, length proportional to load)
+  // Force vector arrow
   const arrow_len = Math.max(10, Math.min(75, Math.abs(current_d.force_net) * 1.5));
   cx.beginPath();
   cx.moveTo(plate_cx, plate_cy);
