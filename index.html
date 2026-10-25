@@ -9,29 +9,73 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0a0b0e; color: #eee; font-family: -apple-system, BlinkMacSystemFont, monospace; overflow: hidden; height: 100vh; }
-    #topbar { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; background: #14161d; border-bottom: 1px solid #282c37; }
-    button { background: #0077ff; border: none; color: #fff; font-weight: bold; padding: 6px 12px; border-radius: 4px; font-size: 12px; }
+    body { background: #08090b; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow: hidden; height: 100vh; }
+    #topbar { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #111317; border-bottom: 1px solid #232731; }
+    button { background: #0070e0; border: none; color: #fff; font-weight: bold; padding: 6px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; }
     button:active { filter: brightness(1.2); }
-    .btn-export { background: #00aa66; }
-    .btn-clear { background: #555; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 210px 170px 1fr; gap: 5px; padding: 5px; height: calc(100vh - 42px); }
-    .card { background: #111318; border: 1px solid #222631; border-radius: 5px; position: relative; overflow: hidden; }
-    .card-title { position: absolute; top: 4px; left: 6px; font-size: 10px; text-transform: uppercase; color: #888; z-index: 10; font-weight: bold; }
+    .btn-export { background: #009955; }
+    .btn-clear { background: #444; }
+    .btn-tare { background: #d97706; }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 240px 1fr 90px;
+      gap: 6px;
+      padding: 6px;
+      height: calc(100vh - 42px);
+    }
+    
+    .card { background: #0f1116; border: 1px solid #1f232c; border-radius: 5px; position: relative; overflow: hidden; }
+    .card-title {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #aaa;
+      z-index: 10;
+      font-weight: 700;
+      background: rgba(15,17,22,0.7);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    
     #map { width: 100%; height: 100%; }
     canvas { width: 100%; height: 100%; display: block; }
-    #hud { grid-column: span 2; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; background: #0e1015; border: 1px solid #222631; border-radius: 5px; padding: 4px; }
-    .badge { text-align: center; }
-    .badge-val { font-size: 18px; font-weight: bold; color: #00ffcc; }
-    .badge-lbl { font-size: 9px; color: #666; text-transform: uppercase; }
+    
+    #hud {
+      grid-column: span 2;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      background: transparent;
+      padding: 0;
+    }
+    .badge {
+      background: #0f1116;
+      border: 1px solid #1f232c;
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+    }
+    .badge-val { font-size: 20px; font-weight: 800; color: #00ffcc; line-height: 1.1; }
+    .badge-lbl { font-size: 9px; color: #777; text-transform: uppercase; margin-top: 3px; font-weight: 600; }
   </style>
 </head>
 <body>
 
 <div id="topbar">
-  <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
-  <span id="bleStatus" style="font-size: 11px; color: #ff4444; font-weight: bold;">DISCONNECTED</span>
-  <div>
+  <div style="display: flex; gap: 8px; align-items: center;">
+    <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
+    <button class="btn-tare" onclick="tareLoadCell()">TARE</button>
+  </div>
+  <span id="bleStatus" style="font-size: 12px; color: #ff4444; font-weight: bold; letter-spacing: 1px;">DISCONNECTED</span>
+  <div style="display: flex; gap: 6px;">
     <button class="btn-export" onclick="exportDatabase()">EXPORT (<span id="dbCount">0</span>)</button>
     <button class="btn-clear" onclick="clearDatabase()">CLEAR</button>
   </div>
@@ -40,41 +84,43 @@
 <div class="grid">
   <!-- 3D ATTITUDE FORCE PLATE -->
   <div class="card">
-    <div class="card-title">3D Force Plate</div>
+    <div class="card-title">3D Force Plate & Orientation</div>
     <div id="threeContainer" style="width: 100%; height: 100%;"></div>
   </div>
 
   <!-- GPS SATELLITE MAP -->
   <div class="card">
-    <div class="card-title">GPS Track</div>
+    <div class="card-title" id="mapTitle">GPS Satellite Track</div>
     <div id="map"></div>
   </div>
 
   <!-- LOAD CELL STRIP CHART -->
   <div class="card">
-    <div class="card-title">Net Dynamic Force (kg)</div>
+    <div class="card-title">Dynamic Drive Force (kg)</div>
     <canvas id="chartForce"></canvas>
   </div>
 
-  <!-- PLANAR SURGE CHART -->
+  <!-- PLANAR SURGE ACCEL CHART -->
   <div class="card">
     <div class="card-title">Planar Surge Accel (m/s²)</div>
     <canvas id="chartAccel"></canvas>
   </div>
 
-  <!-- SENSOR READOUTS -->
+  <!-- FULL ROW HUD METRICS -->
   <div id="hud">
-    <div class="badge"><div class="badge-val" id="valRaw">0.0</div><div class="badge-lbl">Raw Force</div></div>
-    <div class="badge"><div class="badge-val" id="valNet">0.0</div><div class="badge-lbl">Net Drive</div></div>
-    <div class="badge"><div class="badge-val" id="valSpd">0.0</div><div class="badge-lbl">Speed km/h</div></div>
-    <div class="badge"><div class="badge-val" id="valPitch">0.0°</div><div class="badge-lbl">Pitch</div></div>
-    <div class="badge"><div class="badge-val" id="valRoll">0.0°</div><div class="badge-lbl">Roll</div></div>
+    <div class="badge"><div class="badge-val" id="valRaw" style="color: #ffaa00;">0.0</div><div class="badge-lbl">Raw Load (kg)</div></div>
+    <div class="badge"><div class="badge-val" id="valNet" style="color: #00ffcc;">0.0</div><div class="badge-lbl">Drive Force (kg)</div></div>
+    <div class="badge"><div class="badge-val" id="valSurge" style="color: #00e5ff;">0.00</div><div class="badge-lbl">Surge (m/s²)</div></div>
+    <div class="badge"><div class="badge-val" id="valSpd" style="color: #ffff00;">0.0</div><div class="badge-lbl">Speed (km/h)</div></div>
+    <div class="badge"><div class="badge-val" id="valPitch" style="color: #ff66cc;">0.0°</div><div class="badge-lbl">Pitch</div></div>
+    <div class="badge"><div class="badge-val" id="valRoll" style="color: #cc66ff;">0.0°</div><div class="badge-lbl">Roll</div></div>
+    <div class="badge"><div class="badge-val" id="valSats" style="color: #aaa;">0</div><div class="badge-lbl">GPS Sats</div></div>
   </div>
 </div>
 
 <script>
 // ==============================================================================
-// 1. INDEXEDDB PERSISTENT STORAGE (Survives reloads and disconnects)
+// 1. INDEXEDDB PERSISTENT STORAGE
 // ==============================================================================
 let db;
 const DB_NAME = "IndaBoatTelemetryDB";
@@ -127,7 +173,7 @@ function exportDatabase() {
 }
 
 function clearDatabase() {
-  if (!confirm("Clear all recorded session points from this phone?")) return;
+  if (!confirm("Clear all recorded session data?")) return;
   const tx = db.transaction([STORE_NAME], "readwrite");
   tx.objectStore(STORE_NAME).clear().onsuccess = () => {
     updateRecordCountDisplay();
@@ -135,7 +181,7 @@ function clearDatabase() {
 }
 
 // ==============================================================================
-// 2. BLUETOOTH NORDIC UART (Matches your ESP32 exact UUIDs)
+// 2. BLUETOOTH NORDIC UART
 // ==============================================================================
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
@@ -166,7 +212,6 @@ async function toggleConnect() {
     document.getElementById('bleStatus').style.color = "#00ff88";
     document.getElementById('btnConnect').innerText = "DISCONNECT";
 
-    // Request wake-lock to prevent iPhone sleeping during paddle
     if ('wakeLock' in navigator) {
       navigator.wakeLock.request('screen').catch(() => {});
     }
@@ -180,7 +225,6 @@ function onDisconnected() {
   document.getElementById('bleStatus').innerText = "RECONNECTING...";
   document.getElementById('bleStatus').style.color = "#ff9900";
   document.getElementById('btnConnect').innerText = "CONNECT";
-  // Auto-reconnect if device goes out of range and comes back
   setTimeout(attemptAutoReconnect, 2000);
 }
 
@@ -201,13 +245,12 @@ async function attemptAutoReconnect() {
   }
 }
 
-// Stitches partial BLE packets split across MTU limits
 function handleChunk(event) {
   const text = new TextDecoder().decode(event.target.value);
   rxBuffer += text;
 
   let lines = rxBuffer.split('\n');
-  rxBuffer = lines.pop(); // Keep un-terminated line fragment
+  rxBuffer = lines.pop();
 
   for (let line of lines) {
     const clean = line.trim();
@@ -219,102 +262,135 @@ function handleChunk(event) {
 }
 
 // ==============================================================================
-// 3. TELEMETRY MATH & FILTERING (Identical to your Python Pipeline)
+// 3. TELEMETRY MATH, AUTO-ZERO & FUSION
 // ==============================================================================
-let baselineWeight = 0.0;
+let tareOffset = 0.0;
+let baselineWeight = null;
 let pitch_est = 0.0, roll_est = 0.0;
-let lastTimeMs = null;
+let lastTimeSec = null;
 
-const HIST_SIZE = 100;
+const HIST_SIZE = 120;
 let forceHistory = new Array(HIST_SIZE).fill(0);
 let surgeHistory = new Array(HIST_SIZE).fill(0);
 
+function tareLoadCell() {
+  if (lastRawWeight !== null) {
+    tareOffset = lastRawWeight;
+    baselineWeight = 0.0;
+  }
+}
+
+let lastRawWeight = null;
+
 function parseTelemetry(row) {
-  // Regex handles CSV format from your ESP32 snprintf exactly
   const m = row.match(/^(\d+),\s*"([^"]+)",\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*(\d+)/);
   if (!m) return;
 
   const ms = parseInt(m[1]);
-  const raw_w = parseFloat(m[3]);
+  let raw_w = parseFloat(m[3]);
   const ax = parseFloat(m[4]);
   const ay = parseFloat(m[5]);
   const az = parseFloat(m[6]);
+
+  // Rad/s to deg/s
   const gx_deg = parseFloat(m[7]) * (180.0 / Math.PI);
   const gy_deg = parseFloat(m[8]) * (180.0 / Math.PI);
   const gz_deg = parseFloat(m[9]) * (180.0 / Math.PI);
+
   const lat = parseFloat(m[10]);
   const lng = parseFloat(m[11]);
   const spd = parseFloat(m[13]);
+  const sats = parseInt(m[14]);
 
-  // 1. Dynamic Asymmetric Baseline
-  if (baselineWeight === 0.0) baselineWeight = raw_w;
+  lastRawWeight = raw_w;
+  raw_w = raw_w - tareOffset;
+
+  // Dynamic Asymmetric Baseline
+  if (baselineWeight === null) baselineWeight = raw_w;
   const rate = raw_w > baselineWeight ? 0.003 : 0.04;
   baselineWeight = (1.0 - rate) * baselineWeight + rate * raw_w;
   const net_force = raw_w - baselineWeight;
 
-  // 2. Complementary Filter
-  const dt = (lastTimeMs === null) ? 0.05 : Math.max(0.01, (ms - lastTimeMs) / 1000.0);
-  lastTimeMs = ms;
+  // Time delta
+  const t_sec = ms / 1000.0;
+  const dt = lastTimeSec === null ? 0.033 : Math.min(0.2, Math.max(0.001, t_sec - lastTimeSec));
+  lastTimeSec = t_sec;
 
+  // MPU-6050 Hardware Alignment matching Python suite:
+  // FORWARD_AXIS = 'X', LATERAL_AXIS = 'Z', GRAVITY_AXIS_UP = '-Y'
   const a_fwd = ax;
   const a_lat = az;
   const a_up  = -ay;
 
+  const wx = az * (Math.PI / 180.0);
+  const wy = ax * (Math.PI / 180.0);
+
   const acc_pitch = Math.atan2(a_fwd, Math.sqrt(a_lat * a_lat + a_up * a_up));
   const acc_roll  = Math.atan2(a_lat, Math.max(0.05, a_up));
 
-  pitch_est = 0.93 * (pitch_est + Math.radians(gy_deg) * dt) + 0.07 * acc_pitch;
-  roll_est  = 0.93 * (roll_est  + Math.radians(gx_deg) * dt) + 0.07 * acc_roll;
+  pitch_est = 0.93 * (pitch_est + wx * dt) + 0.07 * acc_pitch;
+  roll_est  = 0.93 * (roll_est  + wy * dt) + 0.07 * acc_roll;
 
-  const surge = a_fwd - (9.80665 * Math.sin(pitch_est));
+  const u_up_x = Math.sin(pitch_est);
+  const u_up_y = Math.sin(roll_est);
+  const u_up_z = Math.cos(pitch_est) * Math.cos(roll_est);
+  const norm_u = Math.hypot(u_up_x, u_up_y, u_up_z) || 1.0;
 
-  // Push to Rolling Strips
+  const surge = a_fwd - (9.80665 * (u_up_x / norm_u));
+
+  // Push to history
   forceHistory.push(net_force);
   forceHistory.shift();
   surgeHistory.push(surge);
   surgeHistory.shift();
 
-  // Update DOM Numbers
+  // Update HUD
   document.getElementById('valRaw').innerText = raw_w.toFixed(1);
   document.getElementById('valNet').innerText = (net_force >= 0 ? "+" : "") + net_force.toFixed(1);
+  document.getElementById('valSurge').innerText = (surge >= 0 ? "+" : "") + surge.toFixed(2);
   document.getElementById('valSpd').innerText = spd.toFixed(1);
-  document.getElementById('valPitch').innerText = (pitch_est * (180 / Math.PI)).toFixed(1) + "°";
-  document.getElementById('valRoll').innerText  = (roll_est * (180 / Math.PI)).toFixed(1) + "°";
+  document.getElementById('valPitch').innerText = (pitch_est * (180.0 / Math.PI)).toFixed(1) + "°";
+  document.getElementById('valRoll').innerText  = (roll_est * (180.0 / Math.PI)).toFixed(1) + "°";
+  document.getElementById('valSats').innerText  = sats;
 
-  // Update 3D Plate
+  // Update 3D Plate: X is pitch, Z is roll
   plateMesh.rotation.x = -pitch_est;
   plateMesh.rotation.z = roll_est;
-  const arrowLen = Math.min(2.5, Math.max(0.1, Math.abs(net_force) * 0.06));
-  arrow.setLength(arrowLen);
 
-  // Update GPS Map
+  const clampedF = Math.min(60.0, Math.max(-20.0, net_force));
+  plateMesh.position.y = (clampedF * -0.015) + (surge * 0.04);
+
+  const arrowLen = Math.min(2.5, Math.max(0.1, Math.abs(net_force) * 0.05));
+  arrow.setLength(arrowLen, arrowLen * 0.25, arrowLen * 0.15);
+
+  // Update Map
   if (lat !== 0.0 && lng !== 0.0) {
     const coord = [lat, lng];
     marker.setLatLng(coord);
     track.addLatLng(coord);
-    map.panTo(coord, { animate: true, duration: 0.2 });
+    map.panTo(coord, { animate: true, duration: 0.1 });
+    document.getElementById('mapTitle').innerText = `GPS Satellite Track (${spd.toFixed(1)} km/h | ${sats} Sats)`;
   }
 }
-Math.radians = function(deg) { return deg * (Math.PI / 180); };
 
 // ==============================================================================
-// 4. THREE.JS 3D PHYSICAL PLATE
+// 4. THREE.JS 3D FORCE PLATE
 // ==============================================================================
 const c3d = document.getElementById('threeContainer');
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, c3d.clientWidth / c3d.clientHeight, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(40, c3d.clientWidth / c3d.clientHeight, 0.1, 100);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(c3d.clientWidth, c3d.clientHeight);
 c3d.appendChild(renderer.domElement);
 
-const boxGeo = new THREE.BoxGeometry(2.4, 0.2, 1.4);
+const boxGeo = new THREE.BoxGeometry(2.2, 0.15, 1.3);
 const boxMats = [
-  new THREE.MeshBasicMaterial({ color: 0x444444 }),
-  new THREE.MeshBasicMaterial({ color: 0x444444 }),
-  new THREE.MeshBasicMaterial({ color: 0xb4961e }), // Gold surface
-  new THREE.MeshBasicMaterial({ color: 0x222222 }),
-  new THREE.MeshBasicMaterial({ color: 0x555555 }),
-  new THREE.MeshBasicMaterial({ color: 0x555555 })
+  new THREE.MeshBasicMaterial({ color: 0x404040 }),
+  new THREE.MeshBasicMaterial({ color: 0x404040 }),
+  new THREE.MeshBasicMaterial({ color: 0xd4a017 }), // Top face (gold)
+  new THREE.MeshBasicMaterial({ color: 0x202020 }),
+  new THREE.MeshBasicMaterial({ color: 0x505050 }),
+  new THREE.MeshBasicMaterial({ color: 0x505050 })
 ];
 const plateMesh = new THREE.Mesh(boxGeo, boxMats);
 scene.add(plateMesh);
@@ -322,58 +398,126 @@ scene.add(plateMesh);
 const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 0), 0.5, 0x00ff88);
 scene.add(arrow);
 
-camera.position.set(2.4, 2.4, 3.2);
-camera.lookAt(0, 0, 0);
+// Grid reference
+const gridHelper = new THREE.GridHelper(4, 10, 0x333333, 0x1a1a1a);
+gridHelper.position.y = -0.8;
+scene.add(gridHelper);
+
+camera.position.set(2.8, 2.2, 3.4);
+camera.lookAt(0, -0.2, 0);
+
+window.addEventListener('resize', () => {
+  camera.aspect = c3d.clientWidth / c3d.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(c3d.clientWidth, c3d.clientHeight);
+});
 
 // ==============================================================================
-// 5. LEAFLET SATELLITE MAP (ArcGIS World Imagery matching Desktop suite)
+// 5. LEAFLET SATELLITE MAP
 // ==============================================================================
 const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 19
 }).addTo(map);
 
-const track = L.polyline([], { color: '#00ffff', weight: 3 }).addTo(map);
-const marker = L.circleMarker([0, 0], { radius: 5, color: '#ff0000', fillColor: '#ffff00', fillOpacity: 1 }).addTo(map);
+const track = L.polyline([], { color: '#00e5ff', weight: 3 }).addTo(map);
+const marker = L.circleMarker([0, 0], { radius: 6, color: '#ff1100', fillColor: '#ffff00', fillOpacity: 1 }).addTo(map);
 
 // ==============================================================================
-// 6. 60FPS STRIP CHARTS RENDER LOOP
+// 6. AUTO-SCALING STRIP CHARTS WITH LABELS & TICK MARKS
 // ==============================================================================
 function renderLoop() {
-  drawStrip('chartForce', forceHistory, '#00ffcc', -5, 45);
-  drawStrip('chartAccel', surgeHistory, '#ffaa00', -4, 4);
+  drawAutoScaledChart('chartForce', forceHistory, '#00ffcc', 'kg', 5.0);
+  drawAutoScaledChart('chartAccel', surgeHistory, '#ffaa00', 'm/s²', 1.0);
   renderer.render(scene, camera);
   requestAnimationFrame(renderLoop);
 }
 
-function drawStrip(id, arr, col, yMin, yMax) {
+function drawAutoScaledChart(id, arr, col, unit, minSpan) {
   const cn = document.getElementById(id);
   const cx = cn.getContext('2d');
-  cn.width = cn.clientWidth;
-  cn.height = cn.clientHeight;
+  
+  // Handle high-DPI displays
+  const dpr = window.devicePixelRatio || 1;
+  const w = cn.clientWidth;
+  const h = cn.clientHeight;
+  
+  if (cn.width !== w * dpr || cn.height !== h * dpr) {
+    cn.width = w * dpr;
+    cn.height = h * dpr;
+  }
+  
+  cx.save();
+  cx.scale(dpr, dpr);
+  cx.clearRect(0, 0, w, h);
 
-  cx.clearRect(0, 0, cn.width, cn.height);
+  const gutter = 48;
+  const chartW = w - gutter - 10;
+  const chartH = h - 24;
+  const topPad = 16;
 
-  // Center reference line
-  cx.strokeStyle = '#222631';
-  cx.beginPath();
-  const zeroY = cn.height - ((0 - yMin) / (yMax - yMin)) * cn.height;
-  cx.moveTo(0, zeroY);
-  cx.lineTo(cn.width, zeroY);
-  cx.stroke();
+  // Auto-scale bounds
+  let vMin = Infinity, vMax = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] < vMin) vMin = arr[i];
+    if (arr[i] > vMax) vMax = arr[i];
+  }
+  if (!isFinite(vMin) || !isFinite(vMax)) { vMin = -1; vMax = 1; }
 
-  // Waveform
+  // Pad margins
+  let span = vMax - vMin;
+  if (span < minSpan) {
+    const mid = (vMax + vMin) / 2.0;
+    vMin = mid - (minSpan / 2.0);
+    vMax = mid + (minSpan / 2.0);
+  } else {
+    vMin -= span * 0.15;
+    vMax += span * 0.15;
+  }
+
+  // Draw Horizontal Gridlines & Y-Axis Labels
+  const ticks = 4;
+  cx.font = '10px monospace';
+  cx.textAlign = 'right';
+  cx.textBaseline = 'middle';
+
+  for (let i = 0; i <= ticks; i++) {
+    const val = vMin + (i / ticks) * (vMax - vMin);
+    const y = topPad + chartH - (i / ticks) * chartH;
+
+    cx.strokeStyle = (Math.abs(val) < (vMax - vMin) / 20.0) ? '#384050' : '#1a1f28';
+    cx.lineWidth = (Math.abs(val) < (vMax - vMin) / 20.0) ? 1.5 : 1;
+    cx.beginPath();
+    cx.moveTo(gutter, y);
+    cx.lineTo(gutter + chartW, y);
+    cx.stroke();
+
+    cx.fillStyle = '#778899';
+    cx.fillText((val >= 0 ? '+' : '') + val.toFixed(1), gutter - 6, y);
+  }
+
+  // Trace waveform
   cx.strokeStyle = col;
   cx.lineWidth = 2;
   cx.beginPath();
-  const dx = cn.width / (arr.length - 1);
+  const step = chartW / (arr.length - 1);
+
   for (let i = 0; i < arr.length; i++) {
-    const ny = Math.max(0, Math.min(1, (arr[i] - yMin) / (yMax - yMin)));
-    const y = cn.height - (ny * cn.height);
-    if (i === 0) cx.moveTo(0, y);
-    else cx.lineTo(i * dx, y);
+    const norm = (arr[i] - vMin) / (vMax - vMin);
+    const x = gutter + i * step;
+    const y = topPad + chartH - Math.max(0, Math.min(1, norm)) * chartH;
+
+    if (i === 0) cx.moveTo(x, y);
+    else cx.lineTo(x, y);
   }
   cx.stroke();
+
+  // Unit tag
+  cx.fillStyle = '#556677';
+  cx.textAlign = 'left';
+  cx.fillText(unit, gutter + 4, topPad + 10);
+
+  cx.restore();
 }
 
 requestAnimationFrame(renderLoop);
