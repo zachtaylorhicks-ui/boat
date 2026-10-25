@@ -6,7 +6,6 @@
   <title>indaboat Live HUD</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #08090b; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow: hidden; height: 100vh; }
@@ -19,7 +18,7 @@
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      grid-template-rows: 230px 1fr 75px 24px;
+      grid-template-rows: 240px 1fr 75px 22px;
       gap: 6px;
       padding: 6px;
       height: calc(100vh - 42px);
@@ -91,10 +90,10 @@
 </div>
 
 <div class="grid">
-  <!-- 3D ATTITUDE FORCE PLATE -->
+  <!-- DYNAMIC 3D FORCE PLATE (CANVAS PROJECTION) -->
   <div class="card">
-    <div class="card-title">3D Force Plate & Orientation</div>
-    <div id="threeContainer" style="width: 100%; height: 100%;"></div>
+    <div class="card-title">3D Attitude Force Plate</div>
+    <canvas id="plateCanvas"></canvas>
   </div>
 
   <!-- GPS SATELLITE MAP -->
@@ -126,7 +125,7 @@
     <div class="badge"><div class="badge-val" id="valSats" style="color: #aaa;">--</div><div class="badge-lbl">GPS Sats</div></div>
   </div>
 
-  <!-- REAL-TIME DEBUG BAR (Shows exactly what the phone receives) -->
+  <!-- RAW BLE PACKET MONITOR -->
   <div id="debugBar">Awaiting BLE Connection...</div>
 </div>
 
@@ -193,7 +192,7 @@ function clearDatabase() {
 }
 
 // ==============================================================================
-// 2. BULLETPROOF BLE STREAM REASSEMBLER
+// 2. BLE PACKET STREAM REASSEMBLER
 // ==============================================================================
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
@@ -261,18 +260,13 @@ function handleChunk(event) {
   const text = new TextDecoder().decode(event.target.value);
   streamBuffer += text;
 
-  // Split on newlines
   const lines = streamBuffer.split(/\r?\n/);
-  // Keep the unfinished tail in the buffer
   streamBuffer = lines.pop();
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-
-    // Show raw incoming text in debug bar
     document.getElementById('debugBar').innerText = `RX [${trimmed.length}b]: ${trimmed}`;
-
     saveRowToDB(trimmed);
     parseTelemetry(trimmed);
   }
@@ -280,19 +274,18 @@ function handleChunk(event) {
 }
 
 // ==============================================================================
-// 3. TELEMETRY PARSER (Matches Python CSV Token Extraction Exactly)
+// 3. TELEMETRY MATH (IDENTICAL TO PYTHON SECTION 1 & 2)
 // ==============================================================================
 let baselineWeight = null;
 let pitch_est = 0.0, roll_est = 0.0;
 let lastTimeSec = null;
+let current_d = { pitch_deg: 0, roll_deg: 0, force_net: 0, a_surge: 0 };
 
 const HIST_SIZE = 120;
 let forceHistory = new Array(HIST_SIZE).fill(0);
 let surgeHistory = new Array(HIST_SIZE).fill(0);
 
 function parseTelemetry(row) {
-  // Direct tokenization - handles "NO_GPS_TIME" or any valid ISO UTC date
-  // Schema: ms, utc, weight, ax, ay, az, gx, gy, gz, lat, lng, alt, spd, sats
   const parts = [];
   let inQuotes = false;
   let currentToken = '';
@@ -310,16 +303,16 @@ function parseTelemetry(row) {
   }
   parts.push(currentToken.trim());
 
-  if (parts.length < 14) return; // Incomplete line
+  if (parts.length < 14) return;
 
   const ms    = parseInt(parts[0], 10);
   const raw_w = parseFloat(parts[2]);
   const ax    = parseFloat(parts[3]);
   const ay    = parseFloat(parts[4]);
   const az    = parseFloat(parts[5]);
-  const gx    = parseFloat(parts[6]); // rad/s
-  const gy    = parseFloat(parts[7]); // rad/s
-  const gz    = parseFloat(parts[8]); // rad/s
+  const gx    = parseFloat(parts[6]); // rad/s from Nano
+  const gy    = parseFloat(parts[7]); // rad/s from Nano
+  const gz    = parseFloat(parts[8]); // rad/s from Nano
   const lat   = parseFloat(parts[9]);
   const lng   = parseFloat(parts[10]);
   const spd   = parseFloat(parts[12]);
@@ -327,7 +320,7 @@ function parseTelemetry(row) {
 
   if (isNaN(raw_w) || isNaN(ax)) return;
 
-  // Asymmetric Baseline (matches Python exactly)
+  // Asymmetric baseline (Python exact)
   if (baselineWeight === null) {
     baselineWeight = raw_w;
   }
@@ -335,20 +328,21 @@ function parseTelemetry(row) {
   baselineWeight = (1.0 - rate) * baselineWeight + rate * raw_w;
   const net_force = raw_w - baselineWeight;
 
-  // Time delta
   const t_sec = ms / 1000.0;
   const dt = lastTimeSec === null ? 0.033 : Math.min(0.2, Math.max(0.001, t_sec - lastTimeSec));
   lastTimeSec = t_sec;
 
-  // Axis mapping matching your Python script:
-  // FORWARD = X, LATERAL = Z, GRAVITY_UP = -Y
+  // Python axis mapping:
+  // FORWARD = X, LATERAL = Z, UP = -Y
   const a_fwd = ax;
   const a_lat = az;
   const a_up  = -ay;
 
-  // Gyro: Python passes rad/s to math.degrees then back to math.radians -> net effect is gyro in rad/s
-  const wx = az * 0.01745;
-  const wy = ax * 0.01745;
+  // Python:
+  // wx = math.radians(resolve_axis(r, LATERAL_AXIS, 'g')) -> 'Z' -> gz
+  // wy = math.radians(resolve_axis(r, FORWARD_AXIS, 'g')) -> 'X' -> gx
+  const wx = gz;
+  const wy = gx;
 
   const acc_pitch = Math.atan2(a_fwd, Math.sqrt(a_lat * a_lat + a_up * a_up));
   const acc_roll  = Math.atan2(a_lat, Math.max(0.05, a_up));
@@ -363,7 +357,13 @@ function parseTelemetry(row) {
 
   const surge = a_fwd - (9.80665 * (u_up_x / norm_u));
 
-  // Push to history
+  current_d = {
+    pitch_deg: pitch_est * (180.0 / Math.PI),
+    roll_deg:  roll_est  * (180.0 / Math.PI),
+    force_net: net_force,
+    a_surge:   surge
+  };
+
   forceHistory.push(net_force);
   forceHistory.shift();
   surgeHistory.push(surge);
@@ -374,19 +374,9 @@ function parseTelemetry(row) {
   document.getElementById('valNet').innerText   = (net_force >= 0 ? "+" : "") + net_force.toFixed(1);
   document.getElementById('valSurge').innerText = (surge >= 0 ? "+" : "") + surge.toFixed(2);
   document.getElementById('valSpd').innerText   = spd.toFixed(1);
-  document.getElementById('valPitch').innerText = (pitch_est * (180.0 / Math.PI)).toFixed(1) + "°";
-  document.getElementById('valRoll').innerText  = (roll_est * (180.0 / Math.PI)).toFixed(1) + "°";
+  document.getElementById('valPitch').innerText = current_d.pitch_deg.toFixed(1) + "°";
+  document.getElementById('valRoll').innerText  = current_d.roll_deg.toFixed(1) + "°";
   document.getElementById('valSats').innerText  = isNaN(sats) ? 0 : sats;
-
-  // 3D Plate updates
-  plateMesh.rotation.x = -pitch_est;
-  plateMesh.rotation.z = roll_est;
-
-  const clampedF = Math.min(60.0, Math.max(-20.0, net_force));
-  plateMesh.position.y = (clampedF * -0.015) + (surge * 0.04);
-
-  const arrowLen = Math.min(2.5, Math.max(0.1, Math.abs(net_force) * 0.05));
-  arrow.setLength(arrowLen, arrowLen * 0.25, arrowLen * 0.15);
 
   // GPS Map updates
   if (lat !== 0.0 && lng !== 0.0) {
@@ -399,42 +389,115 @@ function parseTelemetry(row) {
 }
 
 // ==============================================================================
-// 4. THREE.JS 3D FORCE PLATE
+// 4. DYNAMIC 3D MOVING FORCE PLATE (LINE-FOR-LINE PYTHON SECTION 5 PORT)
 // ==============================================================================
-const c3d = document.getElementById('threeContainer');
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(40, c3d.clientWidth / c3d.clientHeight, 0.1, 100);
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setSize(c3d.clientWidth, c3d.clientHeight);
-c3d.appendChild(renderer.domElement);
+function renderPlateCanvas() {
+  const cn = document.getElementById('plateCanvas');
+  const cx = cn.getContext('2d');
 
-const boxGeo = new THREE.BoxGeometry(2.2, 0.15, 1.3);
-const boxMats = [
-  new THREE.MeshBasicMaterial({ color: 0x404040 }),
-  new THREE.MeshBasicMaterial({ color: 0x404040 }),
-  new THREE.MeshBasicMaterial({ color: 0xd4a017 }),
-  new THREE.MeshBasicMaterial({ color: 0x202020 }),
-  new THREE.MeshBasicMaterial({ color: 0x505050 }),
-  new THREE.MeshBasicMaterial({ color: 0x505050 })
-];
-const plateMesh = new THREE.Mesh(boxGeo, boxMats);
-scene.add(plateMesh);
+  const dpr = window.devicePixelRatio || 1;
+  const w = cn.clientWidth;
+  const h = cn.clientHeight;
 
-const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 0), 0.5, 0x00ff88);
-scene.add(arrow);
+  if (cn.width !== w * dpr || cn.height !== h * dpr) {
+    cn.width = w * dpr;
+    cn.height = h * dpr;
+  }
 
-const gridHelper = new THREE.GridHelper(4, 10, 0x333333, 0x1a1a1a);
-gridHelper.position.y = -0.8;
-scene.add(gridHelper);
+  cx.save();
+  cx.scale(dpr, dpr);
+  cx.fillStyle = '#101010';
+  cx.fillRect(0, 0, w, h);
 
-camera.position.set(2.8, 2.2, 3.4);
-camera.lookAt(0, -0.2, 0);
+  const pitch = current_d.pitch_deg * (Math.PI / 180.0);
+  const roll  = current_d.roll_deg  * (Math.PI / 180.0);
 
-window.addEventListener('resize', () => {
-  camera.aspect = c3d.clientWidth / c3d.clientHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(c3d.clientWidth, c3d.clientHeight);
-});
+  // Scaled dimensions matching canvas size
+  const pw = w * 0.22;
+  const pl = h * 0.20;
+  const pth = 10;
+
+  const corners = [
+    [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth],
+    [-pw, -pl, pth],  [pw, -pl, pth],  [pw, pl, pth],  [-pw, pl, pth]
+  ];
+
+  // Rotation Matrix: Ry @ Rx
+  const cosR = Math.cos(roll),  sinR = Math.sin(roll);
+  const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+
+  const rot = corners.map(c => {
+    // 1. Rx
+    const x1 = c[0];
+    const y1 = c[1] * cosR - c[2] * sinR;
+    const z1 = c[1] * sinR + c[2] * cosR;
+    // 2. Ry
+    const x2 = x1 * cosP + z1 * sinP;
+    const y2 = y1;
+    const z2 = -x1 * sinP + z1 * cosP;
+    return [x2, y2, z2];
+  });
+
+  const centerX = w / 2;
+  const centerY = h / 2 + 10;
+  const vert_shift = Math.max(-45, Math.min(45, (current_d.force_net * -0.65) + (current_d.a_surge * 2.0)));
+
+  // Exact Python screen projection:
+  // (cx + p[0]*0.85 - p[1]*0.40, cy + p[1]*0.45 + p[2] + vert_shift)
+  const pts = rot.map(p => [
+    centerX + p[0] * 0.85 - p[1] * 0.40,
+    centerY + p[1] * 0.45 + p[2] + vert_shift
+  ]);
+
+  function drawPoly(indices, fillColor, strokeColor) {
+    cx.beginPath();
+    cx.moveTo(pts[indices[0]][0], pts[indices[0]][1]);
+    for (let i = 1; i < indices.length; i++) {
+      cx.lineTo(pts[indices[i]][0], pts[indices[i]][1]);
+    }
+    cx.closePath();
+    cx.fillStyle = fillColor;
+    cx.fill();
+    cx.strokeStyle = strokeColor;
+    cx.lineWidth = 1;
+    cx.stroke();
+  }
+
+  // Draw Faces
+  drawPoly([3, 2, 6, 7], '#414141', '#828282'); // Front face
+  drawPoly([1, 2, 6, 5], '#5a5a5a', '#828282'); // Side face
+  drawPoly([0, 1, 2, 3], '#b4961e', '#ffffff'); // Top face (gold)
+
+  // Top plate center
+  const plate_cx = (pts[0][0] + pts[2][0]) / 2;
+  const plate_cy = (pts[0][1] + pts[2][1]) / 2;
+
+  // Force vector arrow (points straight down from plate center, length proportional to load)
+  const arrow_len = Math.max(10, Math.min(75, Math.abs(current_d.force_net) * 1.5));
+  cx.beginPath();
+  cx.moveTo(plate_cx, plate_cy);
+  cx.lineTo(plate_cx, plate_cy + arrow_len);
+  cx.strokeStyle = '#00ff00';
+  cx.lineWidth = 3;
+  cx.stroke();
+
+  // Arrowhead
+  cx.beginPath();
+  cx.moveTo(plate_cx - 5, plate_cy + arrow_len - 8);
+  cx.lineTo(plate_cx, plate_cy + arrow_len);
+  cx.lineTo(plate_cx + 5, plate_cy + arrow_len - 8);
+  cx.fillStyle = '#00ff00';
+  cx.fill();
+
+  // Corner readouts matching Python
+  cx.font = '10px monospace';
+  cx.fillStyle = '#00e6ff';
+  cx.fillText(`PITCH: ${(current_d.pitch_deg >= 0 ? '+' : '') + current_d.pitch_deg.toFixed(1)}°`, 10, h - 10);
+  cx.fillStyle = '#ff64ff';
+  cx.fillText(`ROLL:  ${(current_d.roll_deg >= 0 ? '+' : '') + current_d.roll_deg.toFixed(1)}°`, 120, h - 10);
+
+  cx.restore();
+}
 
 // ==============================================================================
 // 5. LEAFLET SATELLITE MAP
@@ -451,9 +514,9 @@ const marker = L.circleMarker([0, 0], { radius: 6, color: '#ff1100', fillColor: 
 // 6. AUTO-SCALING STRIP CHARTS
 // ==============================================================================
 function renderLoop() {
+  renderPlateCanvas();
   drawAutoScaledChart('chartForce', forceHistory, '#00ffcc', 'kg', 5.0);
   drawAutoScaledChart('chartAccel', surgeHistory, '#ffaa00', 'm/s²', 1.0);
-  renderer.render(scene, camera);
   requestAnimationFrame(renderLoop);
 }
 
