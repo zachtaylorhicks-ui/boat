@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>indaboat Live HUD</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0b0e; color: #eee; font-family: -apple-system, BlinkMacSystemFont, monospace; overflow: hidden; height: 100vh; }
+    #topbar { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; background: #14161d; border-bottom: 1px solid #282c37; }
+    button { background: #0077ff; border: none; color: #fff; font-weight: bold; padding: 6px 12px; border-radius: 4px; font-size: 12px; }
+    button:active { filter: brightness(1.2); }
+    .btn-export { background: #00aa66; }
+    .btn-clear { background: #555; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 210px 170px 1fr; gap: 5px; padding: 5px; height: calc(100vh - 42px); }
+    .card { background: #111318; border: 1px solid #222631; border-radius: 5px; position: relative; overflow: hidden; }
+    .card-title { position: absolute; top: 4px; left: 6px; font-size: 10px; text-transform: uppercase; color: #888; z-index: 10; font-weight: bold; }
+    #map { width: 100%; height: 100%; }
+    canvas { width: 100%; height: 100%; display: block; }
+    #hud { grid-column: span 2; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; background: #0e1015; border: 1px solid #222631; border-radius: 5px; padding: 4px; }
+    .badge { text-align: center; }
+    .badge-val { font-size: 18px; font-weight: bold; color: #00ffcc; }
+    .badge-lbl { font-size: 9px; color: #666; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+
+<div id="topbar">
+  <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
+  <span id="bleStatus" style="font-size: 11px; color: #ff4444; font-weight: bold;">DISCONNECTED</span>
+  <div>
+    <button class="btn-export" onclick="exportDatabase()">EXPORT (<span id="dbCount">0</span>)</button>
+    <button class="btn-clear" onclick="clearDatabase()">CLEAR</button>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- 3D ATTITUDE FORCE PLATE -->
+  <div class="card">
+    <div class="card-title">3D Force Plate</div>
+    <div id="threeContainer" style="width: 100%; height: 100%;"></div>
+  </div>
+
+  <!-- GPS SATELLITE MAP -->
+  <div class="card">
+    <div class="card-title">GPS Track</div>
+    <div id="map"></div>
+  </div>
+
+  <!-- LOAD CELL STRIP CHART -->
+  <div class="card">
+    <div class="card-title">Net Dynamic Force (kg)</div>
+    <canvas id="chartForce"></canvas>
+  </div>
+
+  <!-- PLANAR SURGE CHART -->
+  <div class="card">
+    <div class="card-title">Planar Surge Accel (m/s²)</div>
+    <canvas id="chartAccel"></canvas>
+  </div>
+
+  <!-- SENSOR READOUTS -->
+  <div id="hud">
+    <div class="badge"><div class="badge-val" id="valRaw">0.0</div><div class="badge-lbl">Raw Force</div></div>
+    <div class="badge"><div class="badge-val" id="valNet">0.0</div><div class="badge-lbl">Net Drive</div></div>
+    <div class="badge"><div class="badge-val" id="valSpd">0.0</div><div class="badge-lbl">Speed km/h</div></div>
+    <div class="badge"><div class="badge-val" id="valPitch">0.0°</div><div class="badge-lbl">Pitch</div></div>
+    <div class="badge"><div class="badge-val" id="valRoll">0.0°</div><div class="badge-lbl">Roll</div></div>
+  </div>
+</div>
+
+<script>
+// ==============================================================================
+// 1. INDEXEDDB PERSISTENT STORAGE (Survives reloads and disconnects)
+// ==============================================================================
+let db;
+const DB_NAME = "IndaBoatTelemetryDB";
+const STORE_NAME = "records";
+
+const dbReq = indexedDB.open(DB_NAME, 1);
+dbReq.onupgradeneeded = (e) => {
+  const d = e.target.result;
+  if (!d.objectStoreNames.contains(STORE_NAME)) {
+    d.createObjectStore(STORE_NAME, { autoIncrement: true });
+  }
+};
+dbReq.onsuccess = (e) => {
+  db = e.target.result;
+  updateRecordCountDisplay();
+};
+
+function saveRowToDB(rowStr) {
+  if (!db) return;
+  const tx = db.transaction([STORE_NAME], "readwrite");
+  tx.objectStore(STORE_NAME).add(rowStr);
+}
+
+function updateRecordCountDisplay() {
+  if (!db) return;
+  const tx = db.transaction([STORE_NAME], "readonly");
+  const countReq = tx.objectStore(STORE_NAME).count();
+  countReq.onsuccess = () => {
+    document.getElementById('dbCount').innerText = countReq.result;
+  };
+}
+
+function exportDatabase() {
+  if (!db) return;
+  const tx = db.transaction([STORE_NAME], "readonly");
+  const req = tx.objectStore(STORE_NAME).getAll();
+  req.onsuccess = () => {
+    const rows = req.result;
+    if (rows.length === 0) {
+      alert("No data recorded yet.");
+      return;
+    }
+    const blob = new Blob([rows.join('\n') + '\n'], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `indaboat_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+    a.click();
+  };
+}
+
+function clearDatabase() {
+  if (!confirm("Clear all recorded session points from this phone?")) return;
+  const tx = db.transaction([STORE_NAME], "readwrite");
+  tx.objectStore(STORE_NAME).clear().onsuccess = () => {
+    updateRecordCountDisplay();
+  };
+}
+
+// ==============================================================================
+// 2. BLUETOOTH NORDIC UART (Matches your ESP32 exact UUIDs)
+// ==============================================================================
+const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+
+let device = null;
+let txChar = null;
+let rxBuffer = "";
+
+async function toggleConnect() {
+  if (device && device.gatt.connected) {
+    device.gatt.disconnect();
+    return;
+  }
+  try {
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: "indaboat" }],
+      optionalServices: [SERVICE_UUID]
+    });
+
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    txChar = await service.getCharacteristic(TX_CHAR_UUID);
+    await txChar.startNotifications();
+    txChar.addEventListener('characteristicvaluechanged', handleChunk);
+
+    document.getElementById('bleStatus').innerText = "CONNECTED";
+    document.getElementById('bleStatus').style.color = "#00ff88";
+    document.getElementById('btnConnect').innerText = "DISCONNECT";
+
+    // Request wake-lock to prevent iPhone sleeping during paddle
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').catch(() => {});
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Connection failed: " + err.message);
+  }
+}
+
+function onDisconnected() {
+  document.getElementById('bleStatus').innerText = "RECONNECTING...";
+  document.getElementById('bleStatus').style.color = "#ff9900";
+  document.getElementById('btnConnect').innerText = "CONNECT";
+  // Auto-reconnect if device goes out of range and comes back
+  setTimeout(attemptAutoReconnect, 2000);
+}
+
+async function attemptAutoReconnect() {
+  if (!device || device.gatt.connected) return;
+  try {
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    txChar = await service.getCharacteristic(TX_CHAR_UUID);
+    await txChar.startNotifications();
+    txChar.addEventListener('characteristicvaluechanged', handleChunk);
+
+    document.getElementById('bleStatus').innerText = "CONNECTED";
+    document.getElementById('bleStatus').style.color = "#00ff88";
+    document.getElementById('btnConnect').innerText = "DISCONNECT";
+  } catch (e) {
+    setTimeout(attemptAutoReconnect, 2500);
+  }
+}
+
+// Stitches partial BLE packets split across MTU limits
+function handleChunk(event) {
+  const text = new TextDecoder().decode(event.target.value);
+  rxBuffer += text;
+
+  let lines = rxBuffer.split('\n');
+  rxBuffer = lines.pop(); // Keep un-terminated line fragment
+
+  for (let line of lines) {
+    const clean = line.trim();
+    if (!clean) continue;
+    saveRowToDB(clean);
+    parseTelemetry(clean);
+  }
+  updateRecordCountDisplay();
+}
+
+// ==============================================================================
+// 3. TELEMETRY MATH & FILTERING (Identical to your Python Pipeline)
+// ==============================================================================
+let baselineWeight = 0.0;
+let pitch_est = 0.0, roll_est = 0.0;
+let lastTimeMs = null;
+
+const HIST_SIZE = 100;
+let forceHistory = new Array(HIST_SIZE).fill(0);
+let surgeHistory = new Array(HIST_SIZE).fill(0);
+
+function parseTelemetry(row) {
+  // Regex handles CSV format from your ESP32 snprintf exactly
+  const m = row.match(/^(\d+),\s*"([^"]+)",\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*([-+]?\d*\.?\d+),\s*(\d+)/);
+  if (!m) return;
+
+  const ms = parseInt(m[1]);
+  const raw_w = parseFloat(m[3]);
+  const ax = parseFloat(m[4]);
+  const ay = parseFloat(m[5]);
+  const az = parseFloat(m[6]);
+  const gx_deg = parseFloat(m[7]) * (180.0 / Math.PI);
+  const gy_deg = parseFloat(m[8]) * (180.0 / Math.PI);
+  const gz_deg = parseFloat(m[9]) * (180.0 / Math.PI);
+  const lat = parseFloat(m[10]);
+  const lng = parseFloat(m[11]);
+  const spd = parseFloat(m[13]);
+
+  // 1. Dynamic Asymmetric Baseline
+  if (baselineWeight === 0.0) baselineWeight = raw_w;
+  const rate = raw_w > baselineWeight ? 0.003 : 0.04;
+  baselineWeight = (1.0 - rate) * baselineWeight + rate * raw_w;
+  const net_force = raw_w - baselineWeight;
+
+  // 2. Complementary Filter
+  const dt = (lastTimeMs === null) ? 0.05 : Math.max(0.01, (ms - lastTimeMs) / 1000.0);
+  lastTimeMs = ms;
+
+  const a_fwd = ax;
+  const a_lat = az;
+  const a_up  = -ay;
+
+  const acc_pitch = Math.atan2(a_fwd, Math.sqrt(a_lat * a_lat + a_up * a_up));
+  const acc_roll  = Math.atan2(a_lat, Math.max(0.05, a_up));
+
+  pitch_est = 0.93 * (pitch_est + Math.radians(gy_deg) * dt) + 0.07 * acc_pitch;
+  roll_est  = 0.93 * (roll_est  + Math.radians(gx_deg) * dt) + 0.07 * acc_roll;
+
+  const surge = a_fwd - (9.80665 * Math.sin(pitch_est));
+
+  // Push to Rolling Strips
+  forceHistory.push(net_force);
+  forceHistory.shift();
+  surgeHistory.push(surge);
+  surgeHistory.shift();
+
+  // Update DOM Numbers
+  document.getElementById('valRaw').innerText = raw_w.toFixed(1);
+  document.getElementById('valNet').innerText = (net_force >= 0 ? "+" : "") + net_force.toFixed(1);
+  document.getElementById('valSpd').innerText = spd.toFixed(1);
+  document.getElementById('valPitch').innerText = (pitch_est * (180 / Math.PI)).toFixed(1) + "°";
+  document.getElementById('valRoll').innerText  = (roll_est * (180 / Math.PI)).toFixed(1) + "°";
+
+  // Update 3D Plate
+  plateMesh.rotation.x = -pitch_est;
+  plateMesh.rotation.z = roll_est;
+  const arrowLen = Math.min(2.5, Math.max(0.1, Math.abs(net_force) * 0.06));
+  arrow.setLength(arrowLen);
+
+  // Update GPS Map
+  if (lat !== 0.0 && lng !== 0.0) {
+    const coord = [lat, lng];
+    marker.setLatLng(coord);
+    track.addLatLng(coord);
+    map.panTo(coord, { animate: true, duration: 0.2 });
+  }
+}
+Math.radians = function(deg) { return deg * (Math.PI / 180); };
+
+// ==============================================================================
+// 4. THREE.JS 3D PHYSICAL PLATE
+// ==============================================================================
+const c3d = document.getElementById('threeContainer');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, c3d.clientWidth / c3d.clientHeight, 0.1, 100);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(c3d.clientWidth, c3d.clientHeight);
+c3d.appendChild(renderer.domElement);
+
+const boxGeo = new THREE.BoxGeometry(2.4, 0.2, 1.4);
+const boxMats = [
+  new THREE.MeshBasicMaterial({ color: 0x444444 }),
+  new THREE.MeshBasicMaterial({ color: 0x444444 }),
+  new THREE.MeshBasicMaterial({ color: 0xb4961e }), // Gold surface
+  new THREE.MeshBasicMaterial({ color: 0x222222 }),
+  new THREE.MeshBasicMaterial({ color: 0x555555 }),
+  new THREE.MeshBasicMaterial({ color: 0x555555 })
+];
+const plateMesh = new THREE.Mesh(boxGeo, boxMats);
+scene.add(plateMesh);
+
+const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 0), 0.5, 0x00ff88);
+scene.add(arrow);
+
+camera.position.set(2.4, 2.4, 3.2);
+camera.lookAt(0, 0, 0);
+
+// ==============================================================================
+// 5. LEAFLET SATELLITE MAP (ArcGIS World Imagery matching Desktop suite)
+// ==============================================================================
+const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19
+}).addTo(map);
+
+const track = L.polyline([], { color: '#00ffff', weight: 3 }).addTo(map);
+const marker = L.circleMarker([0, 0], { radius: 5, color: '#ff0000', fillColor: '#ffff00', fillOpacity: 1 }).addTo(map);
+
+// ==============================================================================
+// 6. 60FPS STRIP CHARTS RENDER LOOP
+// ==============================================================================
+function renderLoop() {
+  drawStrip('chartForce', forceHistory, '#00ffcc', -5, 45);
+  drawStrip('chartAccel', surgeHistory, '#ffaa00', -4, 4);
+  renderer.render(scene, camera);
+  requestAnimationFrame(renderLoop);
+}
+
+function drawStrip(id, arr, col, yMin, yMax) {
+  const cn = document.getElementById(id);
+  const cx = cn.getContext('2d');
+  cn.width = cn.clientWidth;
+  cn.height = cn.clientHeight;
+
+  cx.clearRect(0, 0, cn.width, cn.height);
+
+  // Center reference line
+  cx.strokeStyle = '#222631';
+  cx.beginPath();
+  const zeroY = cn.height - ((0 - yMin) / (yMax - yMin)) * cn.height;
+  cx.moveTo(0, zeroY);
+  cx.lineTo(cn.width, zeroY);
+  cx.stroke();
+
+  // Waveform
+  cx.strokeStyle = col;
+  cx.lineWidth = 2;
+  cx.beginPath();
+  const dx = cn.width / (arr.length - 1);
+  for (let i = 0; i < arr.length; i++) {
+    const ny = Math.max(0, Math.min(1, (arr[i] - yMin) / (yMax - yMin)));
+    const y = cn.height - (ny * cn.height);
+    if (i === 0) cx.moveTo(0, y);
+    else cx.lineTo(i * dx, y);
+  }
+  cx.stroke();
+}
+
+requestAnimationFrame(renderLoop);
+</script>
+</body>
+</html>
