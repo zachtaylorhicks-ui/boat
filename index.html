@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,7 +11,7 @@
 
   <style>
     /* ==========================================================================
-       1. CORE STYLING & MASTER ARCHITECTURE
+       1. GLOBAL RESET & MASTER DESIGN SYSTEM
        ========================================================================== */
     *, *::before, *::after {
       box-sizing: border-box;
@@ -82,7 +81,7 @@
     .btn-ctrl:hover { background: #202838; color: #fff; }
     .btn-ctrl.active { background: #0070e0; border-color: #00bbff; color: #fff; }
 
-    /* Master Top Bar */
+    /* Master Top Header */
     #masterHeader {
       height: 44px;
       min-height: 44px;
@@ -128,7 +127,7 @@
     .status-dot.red { background: #ff3344; box-shadow: 0 0 8px #ff3344; }
     .status-dot.yellow { background: #ffaa00; box-shadow: 0 0 8px #ffaa00; }
 
-    /* Views */
+    /* View Containers */
     .view-container {
       flex: 1;
       display: none;
@@ -168,7 +167,7 @@
     canvas { width: 100%; height: 100%; display: block; }
 
     /* ==========================================================================
-       2. VIEW 1: MOBILE-FIRST LIVE TELEMETRY HOMEPAGE
+       2. VIEW 1: MOBILE-FIRST LIVE HOMEPAGE LAYOUT
        ========================================================================== */
     #liveHomepageView { padding: 6px; gap: 6px; }
 
@@ -526,20 +525,18 @@
   <!-- VIEW 1: MOBILE-FIRST LIVE HOMEPAGE -->
   <main class="view-container active" id="liveHomepageView">
 
-    <!-- LAYER 1: DUAL 3D MECHANICAL FORCE PLATES & REAL LIVE SATELLITE GPS -->
+    <!-- LAYER 1: DUAL 3D MECHANICAL FORCE PLATES & SATELLITE GPS -->
     <section class="layer-top-grid">
-      <!-- DUAL 3D FORCE PLATES CANVAS -->
       <div class="card">
         <div class="card-title">Dual Mechanical Force Plates & Force Vectors</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
           <span style="font-size:9px; background:#121824; border:1px solid #1f2b40; color:#00ffcc; padding:2px 6px; border-radius:3px; font-weight:bold;">
-            6-DOF GRAVITY STABILIZED
+            6-DOF QUATERNION STABILIZED
           </span>
         </div>
         <canvas id="dualPlatesCanvas"></canvas>
       </div>
 
-      <!-- REAL LIVE SATELLITE GPS MAP -->
       <div class="card">
         <div class="card-title" id="liveMapTitle">Live Satellite Track</div>
         <div style="position:absolute; top:6px; right:8px; z-index:400;">
@@ -569,7 +566,7 @@
       </div>
     </section>
 
-    <!-- LAYER 3: LIVE TELEMETRY FLOW STRIP CHART (DUAL Y-AXIS: FORCE & SURGE) -->
+    <!-- LAYER 3: LIVE TELEMETRY FLOW STRIP CHART (DUAL Y-AXIS) -->
     <section class="card layer-flow-chart">
       <div class="card-title">Live Telemetry Flow (Plates Left Axis & Clean Surge Right Axis)</div>
       <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
@@ -580,9 +577,8 @@
       <canvas id="liveFlowCanvas"></canvas>
     </section>
 
-    <!-- LAYER 4: TWO SEPARATE INDIVIDUAL STROKE OVERLAYS -->
+    <!-- LAYER 4: TWO INDIVIDUAL STROKE OVERLAYS -->
     <section class="layer-individual-overlays">
-      <!-- PLATE 1 INDIVIDUAL OVERLAY -->
       <div class="card">
         <div class="card-title">Plate 1 Stroke Profile (Equalized Baseline)</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
@@ -593,7 +589,6 @@
         <canvas id="strokeCanvasP1"></canvas>
       </div>
 
-      <!-- PLATE 2 INDIVIDUAL OVERLAY -->
       <div class="card">
         <div class="card-title">Plate 2 Stroke Profile (Equalized Baseline)</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
@@ -647,12 +642,10 @@
     </div>
 
     <div class="grid-top">
-      <!-- 2.5D ISOMETRIC ATTITUDE CANVAS (ORIGINAL) -->
       <div class="card">
         <div class="card-title">Accelerometer Plate Orientation (Original)</div>
         <canvas id="plateCanvas"></canvas>
       </div>
-      <!-- SATELLITE GPS MAP (ORIGINAL) -->
       <div class="card">
         <div class="card-title" id="mapTitle">GPS Satellite Track (Original)</div>
         <div style="position:absolute; top:6px; right:8px; z-index:400;">
@@ -712,7 +705,6 @@
       </div>
     </div>
 
-    <!-- HERO METRICS -->
     <div class="strava-hero">
       <div class="strava-stat"><div class="strava-val" id="stTime">00:00</div><div class="strava-lbl">Total Time</div></div>
       <div class="strava-stat"><div class="strava-val" id="stDist">0m</div><div class="strava-lbl">Total Distance</div></div>
@@ -727,7 +719,6 @@
       <div class="card"><canvas id="recallOverviewCanvas"></canvas></div>
     </div>
 
-    <!-- CROP STRIP -->
     <div class="crop-bar">
       <div style="display:flex; align-items:center; gap:8px; flex:1;">
         <span style="font-weight:bold; color:#ffaa00;">CROP WORKOUT:</span>
@@ -817,15 +808,56 @@
     </div>
   </div>
 
-  <!-- JAVASCRIPT LOGIC ENGINE -->
+  <!-- JAVASCRIPT MASTER TELEMETRY CORE -->
   <script>
     "use strict";
 
     // ==========================================================================
-    // 1. DATA STATE & INDEXEDDB PERSISTENT STORAGE
+    // 1. DATA RING BUFFER & INDEXEDDB BATCH MANAGER
     // ==========================================================================
+    class TelemetryRingBuffer {
+      constructor(capacity = 5000) {
+        this.capacity = capacity;
+        this.buffer = new Array(capacity);
+        this.writePtr = 0;
+        this.count = 0;
+      }
+      push(item) {
+        this.buffer[this.writePtr] = item;
+        this.writePtr = (this.writePtr + 1) % this.capacity;
+        if (this.count < this.capacity) this.count++;
+      }
+      get length() { return this.count; }
+      get(idx) {
+        if (idx < 0 || idx >= this.count) return null;
+        const start = this.count < this.capacity ? 0 : this.writePtr;
+        return this.buffer[(start + idx) % this.capacity];
+      }
+      slice(startIdx, endIdx) {
+        if (startIdx === undefined) startIdx = 0;
+        if (endIdx === undefined) endIdx = this.count;
+        startIdx = Math.max(0, startIdx);
+        endIdx = Math.min(this.count, endIdx);
+        const res = [];
+        for (let i = startIdx; i < endIdx; i++) {
+          res.push(this.get(i));
+        }
+        return res;
+      }
+      sliceTail(n) {
+        const count = Math.min(this.count, n);
+        return this.slice(this.count - count, this.count);
+      }
+      clear() {
+        this.buffer = new Array(this.capacity);
+        this.writePtr = 0;
+        this.count = 0;
+      }
+    }
+
+    const chartRing = new TelemetryRingBuffer(5000);
     let inMemoryLog = [];
-    let chartData = [];
+    let pendingDbBatch = [];
     let flatlines = [];
     let isFlatlineSelecting = false;
     let flatlineDragStart = null;
@@ -837,7 +869,7 @@
     let activeElapsedSec = 0;
     let totalDistanceMeters = 0;
 
-    // IndexedDB Persistent Store
+    // IndexedDB Persistent Store (Batched I/O)
     let db = null;
     const DB_NAME = "IndaBoat_MasterDB";
     const STORE_NAME = "telemetry_rows";
@@ -854,27 +886,40 @@
       updateDBCount();
     };
 
-    function saveRowToStorage(rowStr) {
+    function queueRowForStorage(rowStr) {
       inMemoryLog.push(rowStr);
+      pendingDbBatch.push(rowStr);
       document.getElementById('lblMemCount').innerText = inMemoryLog.length;
-      if (db) {
-        const tx = db.transaction([STORE_NAME], "readwrite");
-        tx.objectStore(STORE_NAME).add(rowStr);
+
+      // Commit to IndexedDB in batches of 50 to prevent I/O thread lock
+      if (pendingDbBatch.length >= 50) {
+        flushDbBatch();
       }
+    }
+
+    function flushDbBatch() {
+      if (!db || pendingDbBatch.length === 0) return;
+      const tx = db.transaction([STORE_NAME], "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      for (let i = 0; i < pendingDbBatch.length; i++) {
+        store.add(pendingDbBatch[i]);
+      }
+      pendingDbBatch = [];
       updateDBCount();
     }
+    setInterval(flushDbBatch, 2000); // Periodic flush
 
     function updateDBCount() {
       if (!db) return;
       const tx = db.transaction([STORE_NAME], "readonly");
       const req = tx.objectStore(STORE_NAME).count();
       req.onsuccess = () => {
-        const count = req.result;
-        document.getElementById('dbCountAdv').innerText = count;
+        document.getElementById('dbCountAdv').innerText = req.result;
       };
     }
 
     function exportDatabase() {
+      flushDbBatch();
       if (inMemoryLog.length === 0) { alert("No recorded data to export."); return; }
       const csv = "ms,utc,w1,ax1,ay1,az1,gx1,gy1,gz1,lat,lng,alt,spd,sats,w2,ax2,ay2,az2,gx2,gy2,gz2\n" + inMemoryLog.join("\n") + "\n";
       downloadCsvBlob(csv, `indaboat_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
@@ -883,7 +928,8 @@
     function clearDatabase() {
       if (!confirm("Clear all stored session logs from device memory?")) return;
       inMemoryLog = [];
-      chartData = [];
+      pendingDbBatch = [];
+      chartRing.clear();
       flatlines = [];
       detectedStrokes = [];
       if (db) {
@@ -897,7 +943,7 @@
       redrawInteractiveChart();
     }
 
-    // Web Audio Synthesizer: 880 Hz Crystal Tone for Valid Catches
+    // Web Audio Synthesizer: 880 Hz Crystal Tone
     let audioCtx = null;
     function playStrokeBeep() {
       try {
@@ -907,7 +953,7 @@
         const gain = audioCtx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
@@ -916,6 +962,7 @@
       } catch(e) {}
     }
 
+    // View Navigation
     function switchView(target) {
       document.getElementById('tabLive').classList.toggle('active', target === 'live');
       document.getElementById('tabAdvanced').classList.toggle('active', target === 'advanced');
@@ -939,54 +986,114 @@
     }
 
     // ==========================================================================
-    // 2. DRIFT-FREE DUAL-IMU ATTITUDE SOLVER (NO UNCONTROLLABLE SPINNING)
+    // 2. 6-DOF QUATERNION & TRUE LINEAR ACCELERATION KINEMATICS
     // ==========================================================================
-    class IMUOrientationSolver {
+    class QuaternionKinematics {
       constructor() {
+        this.q = [1, 0, 0, 0]; // [qw, qx, qy, qz]
         this.pitch = 0;
         this.roll = 0;
-        this.yaw = 0; // Bound oar swing (leaky-integrated around 0)
+        this.yaw = 0;
+        this.linAcc = [0, 0, 0];
       }
+
       update(ax, ay, az, gx, gy, gz, dt) {
-        // Accelerometer absolute attitude references (gravity tethered)
-        const accPitch = Math.atan2(ax, Math.sqrt(az * az + ay * ay));
-        const accRoll  = Math.atan2(az, Math.max(0.05, -ay));
+        // Normalize accelerometer vector
+        let normA = Math.hypot(ax, ay, az);
+        if (normA > 0.001) {
+          ax /= normA; ay /= normA; az /= normA;
+        }
 
-        // Complementary filter on Pitch and Roll: CANNOT drift or spin to infinity
-        this.pitch = 0.92 * (this.pitch + gz * dt) + 0.08 * accPitch;
-        this.roll  = 0.92 * (this.roll  + gx * dt) + 0.08 * accRoll;
+        // Madgwick 6-DOF gradient descent step
+        let qw = this.q[0], qx = this.q[1], qy = this.q[2], qz = this.q[3];
+        const f1 = 2 * (qx * qz - qw * qy) - ax;
+        const f2 = 2 * (qw * qx + qy * qz) - ay;
+        const f3 = 2 * (0.5 - qx * qx - qy * qy) - az;
 
-        // Leaky integrator for Yaw (Swing): tracks dynamic movement without runaway DC spin
-        this.yaw = 0.985 * (this.yaw + gy * dt);
+        const j11 = -2 * qy, j12 = 2 * qz,  j13 = -2 * qw, j14 = 2 * qx;
+        const j21 = 2 * qx,  j22 = 2 * qw,  j23 = 2 * qz,   j24 = 2 * qy;
+        const j31 = 0,       j32 = -4 * qx, j33 = -4 * qy,  j34 = 0;
+
+        let s0 = j11 * f1 + j21 * f2 + j31 * f3;
+        let s1 = j12 * f1 + j22 * f2 + j32 * f3;
+        let s2 = j13 * f1 + j23 * f2 + j33 * f3;
+        let s3 = j14 * f1 + j24 * f2 + j34 * f3;
+
+        let normS = Math.hypot(s0, s1, s2, s3);
+        if (normS > 0.001) {
+          s0 /= normS; s1 /= normS; s2 /= normS; s3 /= normS;
+        }
+
+        // Gyroscope quaternion derivative
+        const beta = 0.08;
+        const qDotOmega0 = 0.5 * (-qx * gx - qy * gy - qz * gz);
+        const qDotOmega1 = 0.5 * ( qw * gx + qy * gz - qz * gy);
+        const qDotOmega2 = 0.5 * ( qw * gy - qx * gz + qz * gx);
+        const qDotOmega3 = 0.5 * ( qw * gz + qx * gy - qy * gx);
+
+        qw += (qDotOmega0 - beta * s0) * dt;
+        qx += (qDotOmega1 - beta * s1) * dt;
+        qy += (qDotOmega2 - beta * s2) * dt;
+        qz += (qDotOmega3 - beta * s3) * dt;
+
+        let normQ = Math.hypot(qw, qx, qy, qz);
+        this.q = [qw / normQ, qx / normQ, qy / normQ, qz / normQ];
+
+        // Euler Angles (Tethered to gravity - no runaway spinning)
+        this.roll  = Math.atan2(2 * (qw * qx + qy * qz), 1 - 2 * (qx * qx + qy * qy));
+        this.pitch = Math.asin(Math.max(-1, Math.min(1, 2 * (qw * qy - qz * qx))));
+        this.yaw   = 0.985 * (this.yaw + gz * dt); // Leaky yaw avoids DC bias runaway
+
+        // Extract Direction Cosine Matrix (DCM)
+        const R = [
+          [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qw * qz), 2 * (qx * qz + qw * qy)],
+          [2 * (qx * qy + qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qw * qx)],
+          [2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx * qx + qy * qy)]
+        ];
+
+        // Gravity Vector Isolation in Body Frame: a_linear = a_measured - R^T * [0, 0, g]
+        const gx_body = R[2][0] * 9.80665;
+        const gy_body = R[2][1] * 9.80665;
+        const gz_body = R[2][2] * 9.80665;
+
+        this.linAcc = [
+          ax * (normA || 9.8) - gx_body,
+          ay * (normA || 9.8) - gy_body,
+          az * (normA || 9.8) - gz_body
+        ];
+      }
+
+      getDCM() {
+        const qw = this.q[0], qx = this.q[1], qy = this.q[2], qz = this.q[3];
+        return [
+          [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qw * qz), 2 * (qx * qz + qw * qy)],
+          [2 * (qx * qy + qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qw * qx)],
+          [2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx * qx + qy * qy)]
+        ];
       }
     }
 
-    const oar1IMU = new IMUOrientationSolver();
-    const oar2IMU = new IMUOrientationSolver();
-    let fusedBoatPitch = 0, fusedBoatRoll = 0;
-    let zeroBoatPitch = 0, zeroBoatRoll = 0;
+    const imuP1 = new QuaternionKinematics();
+    const imuP2 = new QuaternionKinematics();
+    let zeroPitchOffset = 0, zeroRollOffset = 0;
 
     function zeroKinematicsNow() {
-      zeroBoatPitch = fusedBoatPitch;
-      zeroBoatRoll  = fusedBoatRoll;
+      zeroPitchOffset = (imuP1.pitch + imuP2.pitch) / 2.0;
+      zeroRollOffset  = (imuP1.roll  + imuP2.roll)  / 2.0;
     }
 
     // ==========================================================================
-    // 3. AUTONOMOUS RECOVERY ZEROING & ADAPTIVE POLARITY CORRECTION
+    // 3. ZERO-TARE AUTOMATIC EQUALIZATION & MULTI-SENSOR SPM ENGINE
     // ==========================================================================
     let oar1Baseline = 0, oar2Baseline = 0;
     let recoverySamples1 = [], recoverySamples2 = [];
     let isCurrentlyInDrive = false;
-
-    // Automatic polarity detection: flips signs if sensor was wired/mounted backwards
-    let polarityP1 = 1;
-    let polarityP2 = 1;
+    let polarityP1 = 1, polarityP2 = 1;
 
     let strokeDetectionHistory = [];
     let lastValidStrokeTimestamp = 0;
     let lastPacketTimestampMs = null;
 
-    // Separate stroke buffers for Layer 4 overlays
     let currentStrokeP1 = [];
     let currentStrokeP2 = [];
     let ghostLastStrokeP1 = [];
@@ -1041,57 +1148,45 @@
       const dt = lastPacketTimestampMs === null ? 0.05 : Math.max(0.01, Math.min(0.25, (ms - lastPacketTimestampMs) / 1000.0));
       lastPacketTimestampMs = ms;
 
-      // 1. Solve 6-DOF IMU orientations
-      oar1IMU.update(ax1, ay1, az1, gx1, gy1, gz1, dt);
-      oar2IMU.update(ax2, ay2, az2, gx2, gy2, gz2, dt);
+      // 1. Solve 6-DOF Quaternion Orientations
+      imuP1.update(ax1, ay1, az1, gx1, gy1, gz1, dt);
+      imuP2.update(ax2, ay2, az2, gx2, gy2, gz2, dt);
 
-      // Fused boat orientation
-      fusedBoatPitch = (oar1IMU.pitch + oar2IMU.pitch) / 2.0;
-      fusedBoatRoll  = (oar1IMU.roll  + oar2IMU.roll)  / 2.0;
+      // Clean Bow Surge (Earth-Gravity Isolated Hull Vector)
+      const cleanSurge = -((imuP1.linAcc[0] + imuP2.linAcc[0]) / 2.0);
 
-      // Clean forward surge acceleration (m/s²)
-      const u_up = Math.sin(fusedBoatPitch);
-      const cleanSurge = -(((ax1 + ax2) / 2.0) - (9.80665 * u_up));
-
-      // 2. AUTOMATIC RECOVERY EQUALIZATION & AUTO-POLARITY (Zero Tare Buttons)
+      // 2. AUTOMATIC EQUALIZATION & AUTO-POLARITY
       if (!isCurrentlyInDrive) {
         recoverySamples1.push(w1);
         recoverySamples2.push(w2);
-        if (recoverySamples1.length > 35) recoverySamples1.shift();
-        if (recoverySamples2.length > 35) recoverySamples2.shift();
+        if (recoverySamples1.length > 40) recoverySamples1.shift();
+        if (recoverySamples2.length > 40) recoverySamples2.shift();
 
-        // 40th percentile low-median resting baseline
         const s1 = [...recoverySamples1].sort((a,b)=>a-b);
         const s2 = [...recoverySamples2].sort((a,b)=>a-b);
         oar1Baseline = s1[Math.floor(s1.length * 0.4)] || 0;
         oar2Baseline = s2[Math.floor(s2.length * 0.4)] || 0;
       }
 
-      // Check deflection relative to recovery baseline
       const rawDelta1 = w1 - oar1Baseline;
       const rawDelta2 = w2 - oar2Baseline;
 
-      // Auto-Polarity: when boat experiences surge acceleration (>1.2 m/s²), force must be positive.
-      // If rawDelta is negative, auto-flip that plate's polarity!
+      // Auto-detect reversed sensor mounting
       if (cleanSurge > 1.2) {
-        if (rawDelta1 < -1.5) polarityP1 = -1;
-        else if (rawDelta1 > 1.5) polarityP1 = 1;
-
-        if (rawDelta2 < -1.5) polarityP2 = -1;
-        else if (rawDelta2 > 1.5) polarityP2 = 1;
+        if (rawDelta1 < -2.0) polarityP1 = -1; else if (rawDelta1 > 2.0) polarityP1 = 1;
+        if (rawDelta2 < -2.0) polarityP2 = -1; else if (rawDelta2 > 2.0) polarityP2 = 1;
       }
 
-      // Compute Net Dynamic Force (Zeroed cleanly on recovery, never locked at zero)
-      const invMultiplier = invertLoad ? -1 : 1;
-      const netF1 = Math.max(0, invMultiplier * polarityP1 * rawDelta1);
-      const netF2 = Math.max(0, invMultiplier * polarityP2 * rawDelta2);
+      const inv = invertLoad ? -1 : 1;
+      const netF1 = inv * polarityP1 * rawDelta1;
+      const netF2 = inv * polarityP2 * rawDelta2;
 
-      // 3. COHERENT LIVE SPM ENGINE (Surge Jerk + GPS Velocity + 1.25s Refractory Lockout)
+      // 3. COHERENT LIVE SPM ENGINE (Surge Jerk + GPS Velocity + 1.20s Refractory Lockout)
       const surgeJerk = cleanSurge > 1.15;
-      const gpsMovement = spd > 1.0; // Moving > 1 km/h rejects dock handling
-      const refractoryLockout = 1.25; // 48 SPM physiological ceiling
+      const gpsMoving = spd > 1.0;
+      const refractoryLockout = 1.20; // Up to 50 SPM support
 
-      if (surgeJerk && gpsMovement && (t_sec - lastValidStrokeTimestamp > refractoryLockout) && !isCurrentlyInDrive) {
+      if (surgeJerk && gpsMoving && (t_sec - lastValidStrokeTimestamp > refractoryLockout) && !isCurrentlyInDrive) {
         isCurrentlyInDrive = true;
         lastValidStrokeTimestamp = t_sec;
 
@@ -1108,13 +1203,13 @@
         if (strokeDetectionHistory.length > 0) {
           const deltaT = t_sec - strokeDetectionHistory[strokeDetectionHistory.length - 1];
           const rawSpm = 60.0 / deltaT;
-          const clampedSpm = Math.min(46, Math.max(12, rawSpm));
+          const clampedSpm = Math.min(52, Math.max(12, rawSpm));
           document.getElementById('liveSPM').innerText = clampedSpm.toFixed(0);
         }
         strokeDetectionHistory.push(t_sec);
       }
 
-      if (isCurrentlyInDrive && cleanSurge < 0.20) {
+      if (isCurrentlyInDrive && cleanSurge < 0.15) {
         isCurrentlyInDrive = false;
       }
 
@@ -1127,6 +1222,9 @@
         updateLiveWorkoutStats(spd);
       }
 
+      const fusedP = ((imuP1.pitch + imuP2.pitch) / 2.0) - zeroPitchOffset;
+      const fusedR = ((imuP1.roll  + imuP2.roll)  / 2.0) - zeroRollOffset;
+
       const point = {
         ms, timeStr: timeS,
         raw_w: w1,
@@ -1135,13 +1233,12 @@
         surge: cleanSurge,
         ax: ax1, ay: ay1, az: az1, gx: gx1, gy: gy1, gz: gz1,
         lat, lng, spd, sats,
-        pitch_deg: (fusedBoatPitch - zeroBoatPitch) * (180.0 / Math.PI),
-        roll_deg:  (fusedBoatRoll  - zeroBoatRoll)  * (180.0 / Math.PI)
+        pitch_deg: fusedP * (180.0 / Math.PI),
+        roll_deg:  fusedR * (180.0 / Math.PI)
       };
 
       if (updateLiveStreams) {
-        chartData.push(point);
-        if (chartData.length > 4500) chartData.shift();
+        chartRing.push(point);
         updateHUD(point);
         updateLiveGPS(lat, lng, spd);
       }
@@ -1161,10 +1258,8 @@
         for (let i = 0; i < targetLen; i++) {
           const v1 = ghostLastStrokeP1[i] || 0;
           const v2 = ghostLastStrokeP2[i] || 0;
-          runningAverageStrokeP1[i] = runningAverageStrokeP1[i] !== undefined 
-            ? (0.75 * runningAverageStrokeP1[i] + 0.25 * v1) : v1;
-          runningAverageStrokeP2[i] = runningAverageStrokeP2[i] !== undefined 
-            ? (0.75 * runningAverageStrokeP2[i] + 0.25 * v2) : v2;
+          runningAverageStrokeP1[i] = runningAverageStrokeP1[i] !== undefined ? (0.8 * runningAverageStrokeP1[i] + 0.2 * v1) : v1;
+          runningAverageStrokeP2[i] = runningAverageStrokeP2[i] !== undefined ? (0.8 * runningAverageStrokeP2[i] + 0.2 * v2) : v2;
         }
       }
     }
@@ -1260,7 +1355,7 @@
 
         if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
       } catch (err) {
-        alert("Bluetooth connection notice: " + err.message);
+        alert("Bluetooth Connection notice: " + err.message);
       }
     }
 
@@ -1292,7 +1387,7 @@
           handleBleSystemMessage(trimmed);
         } else {
           document.getElementById('debugBar').innerText = `BLE RX [${trimmed.length}b]: ${trimmed}`;
-          saveRowToStorage(trimmed);
+          queueRowForStorage(trimmed);
           ingestTelemetry(trimmed, true);
         }
       }
@@ -1338,16 +1433,25 @@
     }
 
     // ==========================================================================
-    // 5. DUAL 3D MECHANICAL FORCE PLATES WITH DYNAMIC FORCE VECTORS
+    // 5. DUAL 3D MECHANICAL PLATES & SURFACE NORMAL FORCE VECTORS
     // ==========================================================================
     const dualPlatesCanvas = document.getElementById('dualPlatesCanvas');
     const dualPlatesCtx = dualPlatesCanvas.getContext('2d');
+
+    // Cached Canvas Dimensions (ResizeObserver Layout Thrash Elimination)
+    let dualCanvasW = 300, dualCanvasH = 200;
+    new ResizeObserver(entries => {
+      for (const entry of entries) {
+        dualCanvasW = entry.contentRect.width;
+        dualCanvasH = entry.contentRect.height;
+      }
+    }).observe(dualPlatesCanvas);
 
     function renderDualPlates3DCanvas() {
       const cn = dualPlatesCanvas;
       const cx = dualPlatesCtx;
       const dpr = window.devicePixelRatio || 1;
-      const w = cn.clientWidth, h = cn.clientHeight;
+      const w = dualCanvasW, h = dualCanvasH;
 
       if (cn.width !== w * dpr || cn.height !== h * dpr) {
         cn.width = w * dpr; cn.height = h * dpr;
@@ -1356,114 +1460,95 @@
       cx.scale(dpr, dpr);
       cx.clearRect(0, 0, w, h);
 
-      const fov = 190;
-      const dist = 210;
+      const fov = 200, dist = 220;
 
-      // Project 3D point centered around local origin (cx_pt, cy_pt)
-      function project3D(x, y, z, roll, pitch, yaw, cx_pt, cy_pt) {
-        // Yaw
-        const cy = Math.cos(yaw), sy = Math.sin(yaw);
-        let x1 = x * cy - y * sy;
-        let y1 = x * sy + y * cy;
-        let z1 = z;
-        // Pitch
-        const cp = Math.cos(pitch), sp = Math.sin(pitch);
-        let x2 = x1;
-        let y2 = y1 * cp - z1 * sp;
-        let z2 = y1 * sp + z1 * cp;
-        // Roll
-        const cr = Math.cos(roll), sr = Math.sin(roll);
-        let x3 = x2 * cr + z2 * sr;
-        let y3 = y2;
-        let z3 = -x2 * sr + z2 * cr;
-
-        const scale = fov / (dist + z3);
-        return [cx_pt + x3 * scale, cy_pt - y3 * scale];
+      // 3D Object Space to Camera Screen Space Transform
+      function projectPoint3D(R, x, y, z, cx_pt, cy_pt) {
+        const rx = R[0][0] * x + R[0][1] * y + R[0][2] * z;
+        const ry = R[1][0] * x + R[1][1] * y + R[1][2] * z;
+        const rz = R[2][0] * x + R[2][1] * y + R[2][2] * z;
+        const scale = fov / (dist + rz);
+        return [cx_pt + rx * scale, cy_pt - ry * scale, rz];
       }
 
-      // Draw Horizon Lines for both plates
-      cx.strokeStyle = '#121822';
-      cx.lineWidth = 1;
+      // Dividers & Ground Plane
+      cx.strokeStyle = '#121822'; cx.lineWidth = 1;
       cx.beginPath();
-      cx.moveTo(10, h / 2 + 5); cx.lineTo(w / 2 - 15, h / 2 + 5);
-      cx.moveTo(w / 2 + 15, h / 2 + 5); cx.lineTo(w - 10, h / 2 + 5);
+      cx.moveTo(10, h / 2 + 10); cx.lineTo(w / 2 - 15, h / 2 + 10);
+      cx.moveTo(w / 2 + 15, h / 2 + 10); cx.lineTo(w - 10, h / 2 + 10);
       cx.stroke();
 
-      // Divider
       cx.strokeStyle = '#182232';
       cx.beginPath(); cx.moveTo(w / 2, 20); cx.lineTo(w / 2, h - 20); cx.stroke();
 
-      // Plate geometry: width=50, height=70, thickness=12
-      const pw = 28, pl = 38, pth = 6;
-      const boxCorners = [
-        [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth], // Top face
-        [-pw, -pl, pth],  [pw, -pl, pth],  [pw, pl, pth],  [-pw, pl, pth]   // Bottom face
+      // Solid Plate Dimensions (3D Box)
+      const pw = 30, pl = 40, pth = 6;
+      const boxVerts = [
+        [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth], // Top Face
+        [-pw, -pl,  pth], [pw, -pl,  pth], [pw, pl,  pth], [-pw, pl,  pth]  // Bottom Face
       ];
 
-      function renderSinglePlate(imu, forceVal, cx_pt, cy_pt, isP1) {
-        const pR = imu.roll;
-        const pP = imu.pitch;
-        const pY = imu.yaw;
+      function renderSingleMechanicalPlate(imu, forceVal, cx_pt, cy_pt, isP1) {
+        const R = imu.getDCM();
+        const projVerts = boxVerts.map(v => projectPoint3D(R, v[0], v[1], v[2], cx_pt, cy_pt));
 
-        const proj = boxCorners.map(c => project3D(c[0], c[1], c[2], pR, pP, pY, cx_pt, cy_pt));
-
-        function drawFace(indices, fill, stroke) {
-          cx.beginPath();
-          cx.moveTo(proj[indices[0]][0], proj[indices[0]][1]);
-          for (let i = 1; i < indices.length; i++) cx.lineTo(proj[indices[i]][0], proj[indices[i]][1]);
-          cx.closePath();
-          cx.fillStyle = fill; cx.fill();
-          cx.strokeStyle = stroke; cx.lineWidth = 1.2; cx.stroke();
-        }
-
-        // Shaded 3D Body
-        drawFace([4, 5, 6, 7], '#141822', '#263042'); // Bottom
-        drawFace([0, 1, 5, 4], '#1a2230', '#2d3b52'); // Front
-        drawFace([1, 2, 6, 5], '#10151f', '#243044'); // Side
-        drawFace([0, 1, 2, 3], isP1 ? '#42330a' : '#08333d', isP1 ? '#ffd700' : '#00e5ff'); // Top plate
-
-        // 3D DYNAMIC FORCE VECTOR ARROW (Projects out perpendicular to plate face when loaded)
-        const plateCenter = [
-          (proj[0][0] + proj[2][0]) / 2,
-          (proj[0][1] + proj[2][1]) / 2
+        const faces = [
+          { indices: [0, 1, 2, 3], norm: [R[0][2], R[1][2], R[2][2]], color: isP1 ? '#b59218' : '#00a3cc' }, // Top Plate
+          { indices: [4, 5, 6, 7], norm: [-R[0][2], -R[1][2], -R[2][2]], color: '#10151f' },                   // Bottom
+          { indices: [0, 1, 5, 4], norm: [-R[0][1], -R[1][1], -R[2][1]], color: '#1a2230' },                   // Front
+          { indices: [1, 2, 6, 5], norm: [R[0][0], R[1][0], R[2][0]], color: '#151b26' },                     // Right
+          { indices: [2, 3, 7, 6], norm: [R[0][1], R[1][1], R[2][1]], color: '#1a2230' },                     // Back
+          { indices: [3, 0, 4, 7], norm: [-R[0][0], -R[1][0], -R[2][0]], color: '#151b26' }                    // Left
         ];
 
-        if (forceVal > 1.0) {
-          const arrowLen = Math.min(80, 12 + forceVal * 1.2);
-          const arrowTip = project3D(0, 0, -pth - arrowLen, pR, pP, pY, cx_pt, cy_pt);
+        // Backface Culling & Normal Lighting
+        for (const face of faces) {
+          if (face.norm[2] < 0) continue; // Face pointing away from camera
+          cx.beginPath();
+          cx.moveTo(projVerts[face.indices[0]][0], projVerts[face.indices[0]][1]);
+          for (let i = 1; i < face.indices.length; i++) {
+            cx.lineTo(projVerts[face.indices[i]][0], projVerts[face.indices[i]][1]);
+          }
+          cx.closePath();
+          cx.fillStyle = face.color; cx.fill();
+          cx.strokeStyle = isP1 ? '#ffd700' : '#00e5ff'; cx.lineWidth = 1; cx.stroke();
+        }
+
+        // 3D SURFACE-NORMAL FORCE VECTOR ARROW (Anchor mathematically bound to plate top)
+        if (Math.abs(forceVal) > 0.5) {
+          const arrowLen = Math.min(85, Math.abs(forceVal) * 1.4);
+          const base3D = projectPoint3D(R, 0, 0, -pth, cx_pt, cy_pt);
+          const tip3D  = projectPoint3D(R, 0, 0, -pth - arrowLen, cx_pt, cy_pt);
 
           cx.strokeStyle = isP1 ? '#ffd700' : '#00e5ff';
           cx.lineWidth = 3.5;
           cx.beginPath();
-          cx.moveTo(plateCenter[0], plateCenter[1]);
-          cx.lineTo(arrowTip[0], arrowTip[1]);
+          cx.moveTo(base3D[0], base3D[1]);
+          cx.lineTo(tip3D[0], tip3D[1]);
           cx.stroke();
 
-          // 3D Arrowhead
+          // True 3D Arrowhead
           cx.fillStyle = isP1 ? '#ffd700' : '#00e5ff';
           cx.beginPath();
-          cx.arc(arrowTip[0], arrowTip[1], 4.5, 0, Math.PI * 2);
+          cx.arc(tip3D[0], tip3D[1], 4.5, 0, Math.PI * 2);
           cx.fill();
         }
 
-        // Corner Titles & Readouts
+        // Labels
         cx.font = '10px monospace';
         cx.fillStyle = isP1 ? '#ffd700' : '#00e5ff';
         cx.fillText(isP1 ? "PLATE 1 (PORT)" : "PLATE 2 (STARBOARD)", cx_pt - 45, cy_pt - 65);
         cx.fillStyle = '#889bb4';
-        cx.fillText(`P:${((pP * 180)/Math.PI).toFixed(0)}° R:${((pR * 180)/Math.PI).toFixed(0)}°`, cx_pt - 30, cy_pt + 70);
+        cx.fillText(`P:${((imu.pitch * 180)/Math.PI).toFixed(0)}° R:${((imu.roll * 180)/Math.PI).toFixed(0)}°`, cx_pt - 30, cy_pt + 70);
         cx.fillStyle = isP1 ? '#ffd700' : '#00e5ff';
         cx.fillText(`${forceVal.toFixed(1)} kg`, cx_pt - 18, cy_pt + 84);
       }
 
-      const p1Force = chartData[chartData.length - 1]?.w1 || 0;
-      const p2Force = chartData[chartData.length - 1]?.w2 || 0;
+      const p1F = chartRing.get(chartRing.length - 1)?.w1 || 0;
+      const p2F = chartRing.get(chartRing.length - 1)?.w2 || 0;
 
-      // Render Plate 1 (Left side)
-      renderSinglePlate(oar1IMU, p1Force, w * 0.25, h / 2, true);
-
-      // Render Plate 2 (Right side)
-      renderSinglePlate(oar2IMU, p2Force, w * 0.75, h / 2, false);
+      renderSingleMechanicalPlate(imuP1, p1F, w * 0.25, h / 2, true);
+      renderSingleMechanicalPlate(imuP2, p2F, w * 0.75, h / 2, false);
 
       cx.restore();
     }
@@ -1476,12 +1561,17 @@
     const liveTrack = L.polyline([], { color: '#00e5ff', weight: 4 }).addTo(mapLive);
     const liveMarker = L.circleMarker([0,0], { radius: 6, color: '#fff', fillColor: '#ff0044', fillOpacity: 1 }).addTo(mapLive);
 
+    let lastMapCenterTime = 0;
     function updateLiveGPS(lat, lng, spd) {
       if (lat && lng && Math.abs(lat) > 0.001) {
         const c = [lat, lng];
         liveMarker.setLatLng(c);
         liveTrack.addLatLng(c);
-        mapLive.panTo(c, { animate: true, duration: 0.1 });
+        const now = performance.now();
+        if (now - lastMapCenterTime > 1000) {
+          lastMapCenterTime = now;
+          mapLive.panTo(c, { animate: true, duration: 0.2 });
+        }
         document.getElementById('liveMapTitle').innerText = `Live Satellite Track (${spd.toFixed(1)} km/h)`;
       }
     }
@@ -1492,75 +1582,81 @@
     }
 
     // ==========================================================================
-    // 7. LIVE FLOW STRIP CHART (DUAL Y-AXIS: FORCE LEFT, SURGE RIGHT)
+    // 7. LIVE FLOW STRIP CHART (INDEPENDENT DUAL Y-AXES: NO CEILING CLIPPING)
     // ==========================================================================
     const liveFlowCanvas = document.getElementById('liveFlowCanvas');
     const liveFlowCtx = liveFlowCanvas.getContext('2d');
+
+    let flowCanvasW = 600, flowCanvasH = 195;
+    new ResizeObserver(entries => {
+      for (const entry of entries) {
+        flowCanvasW = entry.contentRect.width;
+        flowCanvasH = entry.contentRect.height;
+      }
+    }).observe(liveFlowCanvas);
 
     function renderLiveFlowChart() {
       const cn = liveFlowCanvas;
       const cx = liveFlowCtx;
       const dpr = window.devicePixelRatio || 1;
-      const w = cn.clientWidth, h = cn.clientHeight;
+      const w = flowCanvasW, h = flowCanvasH;
 
       if (cn.width !== w * dpr || cn.height !== h * dpr) {
         cn.width = w * dpr; cn.height = h * dpr;
       }
       cx.save(); cx.scale(dpr, dpr); cx.clearRect(0, 0, w, h);
 
-      if (chartData.length < 2) { cx.restore(); return; }
+      if (chartRing.length < 2) { cx.restore(); return; }
 
       const gutterL = 48, gutterR = 50, padTop = 26, padBottom = 20;
       const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
-      const slice = chartData.slice(-150);
+      const slice = chartRing.sliceTail(160);
 
-      // 1. Force Scale (Left Axis)
+      // 1. Force Bounds (Left Axis: kg)
       let maxF = 40;
       for (const pt of slice) {
         if (pt.w1 > maxF) maxF = pt.w1;
         if (pt.w2 > maxF) maxF = pt.w2;
       }
-      maxF *= 1.18;
+      maxF *= 1.15;
 
-      // 2. Surge Scale (Right Axis: m/s²)
-      let minS = -3.0, maxS = 4.0;
+      // 2. Surge Bounds (Right Axis: m/s²) - Pinned Symmetric Zero Centerline
+      let maxS = 3.0;
       for (const pt of slice) {
-        if (pt.surge < minS) minS = pt.surge;
-        if (pt.surge > maxS) maxS = pt.surge;
+        if (Math.abs(pt.surge) > maxS) maxS = Math.abs(pt.surge);
       }
-      minS = Math.min(-2.5, minS - 0.5);
-      maxS = Math.max(3.0, maxS + 0.5);
+      maxS *= 1.20;
+      const minS = -maxS;
 
-      // Grid Lines & Dual Labels
+      // Draw Grid & Labels
       cx.strokeStyle = '#121722'; cx.lineWidth = 1;
       for (let i = 0; i <= 3; i++) {
         const y = padTop + plotH - (i / 3) * plotH;
         cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
 
-        // Left Ticks (Force kg)
         cx.fillStyle = '#667788'; cx.font = '9px monospace'; cx.textAlign = 'right';
         cx.fillText(((i / 3) * maxF).toFixed(0), gutterL - 5, y + 3);
 
-        // Right Ticks (Surge m/s²)
         cx.fillStyle = '#00ff88'; cx.textAlign = 'left';
         const sVal = minS + (i / 3) * (maxS - minS);
         cx.fillText((sVal >= 0 ? '+' : '') + sVal.toFixed(1), gutterL + plotW + 6, y + 3);
       }
 
-      // Zero-Line for Bow Surge
-      const zeroNormS = (0.0 - minS) / (maxS - minS);
-      const zeroY = padTop + plotH - zeroNormS * plotH;
-      if (zeroY >= padTop && zeroY <= padTop + plotH) {
-        cx.strokeStyle = '#1d2a22'; cx.lineWidth = 1; cx.setLineDash([3, 3]);
-        cx.beginPath(); cx.moveTo(gutterL, zeroY); cx.lineTo(gutterL + plotW, zeroY); cx.stroke();
-        cx.setLineDash([]);
-      }
+      // Explicit Zero Line for Surge
+      const zeroY = padTop + plotH / 2;
+      cx.strokeStyle = '#1c2820'; cx.lineWidth = 1.2; cx.setLineDash([3, 3]);
+      cx.beginPath(); cx.moveTo(gutterL, zeroY); cx.lineTo(gutterL + plotW, zeroY); cx.stroke();
+      cx.setLineDash([]);
+
+      // Scoped Plot Area Clip
+      cx.save();
+      cx.beginPath(); cx.rect(gutterL, padTop, plotW, plotH); cx.clip();
 
       // Plate 1 Force (Cyan)
       cx.strokeStyle = '#00ffcc'; cx.lineWidth = 2.0; cx.beginPath();
       for (let i = 0; i < slice.length; i++) {
         const x = gutterL + (i / (slice.length - 1)) * plotW;
-        const y = padTop + plotH - (slice[i].w1 / maxF) * plotH;
+        const y = padTop + plotH - Math.max(0, slice[i].w1 / maxF) * plotH;
         if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
       }
       cx.stroke();
@@ -1569,26 +1665,27 @@
       cx.strokeStyle = '#ff55aa'; cx.lineWidth = 2.0; cx.beginPath();
       for (let i = 0; i < slice.length; i++) {
         const x = gutterL + (i / (slice.length - 1)) * plotW;
-        const y = padTop + plotH - (slice[i].w2 / maxF) * plotH;
+        const y = padTop + plotH - Math.max(0, slice[i].w2 / maxF) * plotH;
         if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
       }
       cx.stroke();
 
-      // Clean Bow Surge (Continuous Physical Wave - NEVER Clips)
-      cx.strokeStyle = '#00ff88'; cx.lineWidth = 2.4; cx.beginPath();
+      // Clean Bow Surge (Continuous Physical Wave - NEVER CLIPPED)
+      cx.strokeStyle = '#00ff88'; cx.lineWidth = 2.2; cx.beginPath();
       for (let i = 0; i < slice.length; i++) {
         const x = gutterL + (i / (slice.length - 1)) * plotW;
-        const normSurge = (slice[i].surge - minS) / (maxS - minS);
-        const y = padTop + plotH - Math.max(0, Math.min(1, normSurge)) * plotH;
+        const normS = (slice[i].surge - minS) / (maxS - minS);
+        const y = padTop + plotH - normS * plotH;
         if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
       }
       cx.stroke();
 
+      cx.restore(); // Restore clip
       cx.restore();
     }
 
     // ==========================================================================
-    // 8. TWO SEPARATE INDIVIDUAL STROKE OVERLAYS (LAYER 4)
+    // 8. INDIVIDUAL STROKE OVERLAYS (LAYER 4)
     // ==========================================================================
     function renderIndividualStrokeCanvas(cn, currentStroke, ghostStroke, primaryAvg, secondaryAvg, isPlate1) {
       const cx = cn.getContext('2d');
@@ -1605,10 +1702,7 @@
 
       let maxF = 40;
       const checkM = (arr) => arr.forEach(v => { if (v > maxF) maxF = v; });
-      checkM(currentStroke);
-      checkM(ghostStroke);
-      checkM(primaryAvg);
-      checkM(secondaryAvg);
+      checkM(currentStroke); checkM(ghostStroke); checkM(primaryAvg); checkM(secondaryAvg);
       maxF *= 1.15;
 
       cx.strokeStyle = '#121722'; cx.lineWidth = 1;
@@ -1619,7 +1713,10 @@
         cx.fillText(((i / 3) * maxF).toFixed(0), gutterL - 5, y + 3);
       }
 
-      // 1. Ghost of Last Stroke (Grey)
+      cx.save();
+      cx.beginPath(); cx.rect(gutterL, padTop, plotW, plotH); cx.clip();
+
+      // Ghost of Last Stroke (Grey)
       if (ghostStroke.length > 2) {
         cx.strokeStyle = 'rgba(130, 145, 170, 0.40)'; cx.lineWidth = 2.0; cx.beginPath();
         for (let i = 0; i < ghostStroke.length; i++) {
@@ -1630,7 +1727,7 @@
         cx.stroke();
       }
 
-      // 2. Average Stroke Plate 1 (Gold)
+      // Plate 1 Moving Average (Gold)
       if (runningAverageStrokeP1.length > 2) {
         cx.strokeStyle = isPlate1 ? '#ffd700' : 'rgba(255, 215, 0, 0.45)';
         cx.lineWidth = isPlate1 ? 3.0 : 1.5; cx.beginPath();
@@ -1642,7 +1739,7 @@
         cx.stroke();
       }
 
-      // 3. Average Stroke Plate 2 (Cyan)
+      // Plate 2 Moving Average (Cyan)
       if (runningAverageStrokeP2.length > 2) {
         cx.strokeStyle = !isPlate1 ? '#00e5ff' : 'rgba(0, 229, 255, 0.45)';
         cx.lineWidth = !isPlate1 ? 3.0 : 1.5; cx.beginPath();
@@ -1654,16 +1751,18 @@
         cx.stroke();
       }
 
-      // 4. Live Active Developing Stroke (Bright Solid White)
+      // Active Live Stroke (Solid Bright White)
       if (currentStroke.length > 1) {
         cx.strokeStyle = '#ffffff'; cx.lineWidth = 2.2; cx.beginPath();
         for (let i = 0; i < currentStroke.length; i++) {
-          const x = gutterL + (i / Math.max(currentStroke.length - 1, 28)) * plotW;
+          const x = gutterL + (i / Math.max(currentStroke.length - 1, 30)) * plotW;
           const y = padTop + plotH - (currentStroke[i] / maxF) * plotH;
           if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
         }
         cx.stroke();
       }
+
+      cx.restore();
 
       cx.fillStyle = '#88a0cc'; cx.font = '9px monospace'; cx.textAlign = 'left';
       cx.fillText("CATCH", gutterL, h - 5);
@@ -1688,7 +1787,6 @@
       document.getElementById('stSPM').innerText = document.getElementById('avgSPM').innerText;
       document.getElementById('stSplit').innerText = document.getElementById('avgSplit').innerText;
 
-      // Calculate Symmetry Balance
       const s1 = runningAverageStrokeP1.reduce((a,b)=>a+b, 0);
       const s2 = runningAverageStrokeP2.reduce((a,b)=>a+b, 0);
       const tot = s1 + s2 || 1;
@@ -1726,18 +1824,18 @@
       }
       cx.save(); cx.scale(dpr, dpr); cx.clearRect(0,0,w,h);
 
-      if (chartData.length < 2) { cx.restore(); return; }
+      if (inMemoryLog.length < 2) { cx.restore(); return; }
 
       const s = parseInt(document.getElementById('cropStart').value, 10) / 100.0;
       const e = parseInt(document.getElementById('cropEnd').value, 10) / 100.0;
-      const sIdx = Math.floor(s * (chartData.length - 1));
-      const eIdx = Math.ceil(e * (chartData.length - 1));
-      const slice = chartData.slice(sIdx, eIdx + 1);
+      const sIdx = Math.floor(s * (inMemoryLog.length - 1));
+      const eIdx = Math.ceil(e * (inMemoryLog.length - 1));
+      const slice = inMemoryLog.slice(sIdx, eIdx + 1).map(r => parseCsvRow(r));
 
       cx.strokeStyle = '#00ffcc'; cx.lineWidth = 1.8; cx.beginPath();
       for (let i = 0; i < slice.length; i++) {
         const x = (i / (slice.length - 1)) * w;
-        const y = h - (slice[i].w1 / 150) * h;
+        const y = h - ((parseFloat(slice[i][2]) || 0) / 150) * h;
         if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
       }
       cx.stroke();
@@ -1745,7 +1843,7 @@
       cx.strokeStyle = '#00ff88'; cx.lineWidth = 2.0; cx.beginPath();
       for (let i = 0; i < slice.length; i++) {
         const x = (i / (slice.length - 1)) * w;
-        const y = h - ((slice[i].spd || 0) / 25) * h;
+        const y = h - ((parseFloat(slice[i][12]) || 0) / 25) * h;
         if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
       }
       cx.stroke();
@@ -1787,7 +1885,7 @@
     }
 
     // ==========================================================================
-    // 10. PRESERVED ADVANCED ANALYSIS SUITE & 4-CHART ENGINE
+    // 10. ADVANCED ANALYSIS SUITE & 4-CHART ENGINE
     // ==========================================================================
     function toggleLoadInversion() {
       invertLoad = !invertLoad;
@@ -1802,27 +1900,18 @@
     function applyFlatline(idx1, idx2) {
       if (idx1 > idx2) { const t = idx1; idx1 = idx2; idx2 = t; }
       idx1 = Math.max(0, idx1);
-      idx2 = Math.min(chartData.length - 1, idx2);
+      idx2 = Math.min(chartRing.length - 1, idx2);
       if (idx2 - idx1 < 1) return;
 
-      const backup = [];
-      for (let i = idx1; i <= idx2; i++) backup.push({ ...chartData[i] });
-      flatlines.push({ idx1, idx2, backup });
-
-      const pA = chartData[idx1];
-      const pB = chartData[idx2];
+      const pA = chartRing.get(idx1);
+      const pB = chartRing.get(idx2);
       const count = idx2 - idx1;
 
       for (let i = idx1; i <= idx2; i++) {
+        const pt = chartRing.get(i);
         const alpha = (i - idx1) / count;
-        chartData[i].raw_w = pA.raw_w + alpha * (pB.raw_w - pA.raw_w);
-        chartData[i].ax = pA.ax + alpha * (pB.ax - pA.ax);
-        chartData[i].ay = pA.ay + alpha * (pB.ay - pA.ay);
-        chartData[i].az = pA.az + alpha * (pB.az - pA.az);
-        chartData[i].gx = pA.gx + alpha * (pB.gx - pA.gx);
-        chartData[i].gy = pA.gy + alpha * (pB.gy - pA.gy);
-        chartData[i].gz = pA.gz + alpha * (pB.gz - pA.gz);
-        chartData[i].surge = pA.surge + alpha * (pB.surge - pA.surge);
+        pt.raw_w = pA.raw_w + alpha * (pB.raw_w - pA.raw_w);
+        pt.surge = pA.surge + alpha * (pB.surge - pA.surge);
       }
 
       isFlatlineSelecting = false;
@@ -1831,11 +1920,6 @@
     }
 
     function resetFlatlines() {
-      for (let f = flatlines.length - 1; f >= 0; f--) {
-        const { idx1, backup } = flatlines[f];
-        for (let k = 0; k < backup.length; k++) chartData[idx1 + k] = backup[k];
-      }
-      flatlines = [];
       redrawInteractiveChart();
     }
 
@@ -1852,8 +1936,8 @@
       }
       cx.save(); cx.scale(dpr, dpr); cx.fillStyle = '#101010'; cx.fillRect(0, 0, w, h);
 
-      const curP = chartData[chartData.length - 1]?.pitch_deg || 0;
-      const curR = chartData[chartData.length - 1]?.roll_deg || 0;
+      const curP = chartRing.get(chartRing.length - 1)?.pitch_deg || 0;
+      const curR = chartRing.get(chartRing.length - 1)?.roll_deg || 0;
       const pitch = (curP * Math.PI) / 180.0;
       const roll  = (curR * Math.PI) / 180.0;
 
@@ -1896,7 +1980,7 @@
       cx.restore();
     }
 
-    // Advanced Map (Original)
+    // Advanced Map
     const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true }).addTo(map);
     const track = L.polyline([], { color: '#00e5ff', weight: 3.5 }).addTo(map);
@@ -1907,7 +1991,7 @@
       if (pts.length > 0) map.fitBounds(L.latLngBounds(pts), { padding: [25, 25] });
     }
 
-    // Main Interactive Telemetry Chart
+    // Interactive Telemetry Chart
     const chartCanvas = document.getElementById('interactiveCanvas');
     const chartCtx = chartCanvas.getContext('2d');
     const chartTooltip = document.getElementById('chartTooltip');
@@ -1964,8 +2048,8 @@
       const mouseX = e.clientX - rect.left;
       if (isFlatlineSelecting && flatlineDragStart !== null) {
         const gutterL = 60, gutterR = 55, plotW = rect.width - gutterL - gutterR;
-        const sIdx = Math.floor(viewStart * (chartData.length - 1));
-        const eIdx = Math.ceil(viewEnd * (chartData.length - 1));
+        const sIdx = Math.floor(viewStart * (chartRing.length - 1));
+        const eIdx = Math.ceil(viewEnd * (chartRing.length - 1));
         const count = eIdx - sIdx;
         const r1 = Math.max(0, Math.min(1, (flatlineDragStart - gutterL) / plotW));
         const r2 = Math.max(0, Math.min(1, (mouseX - gutterL) / plotW));
@@ -1996,19 +2080,20 @@
     });
 
     function handleChartHover(mouseX, mouseY, w, h) {
-      if (chartData.length === 0) return;
+      if (chartRing.length === 0) return;
       const gutterL = 60, gutterR = 55, plotW = w - gutterL - gutterR;
       if (mouseX < gutterL || mouseX > w - gutterR) {
         chartHoverIndex = null; chartTooltip.style.display = 'none'; redrawInteractiveChart(); return;
       }
-      const sIdx = Math.floor(viewStart * (chartData.length - 1));
-      const eIdx = Math.ceil(viewEnd * (chartData.length - 1));
+      const sIdx = Math.floor(viewStart * (chartRing.length - 1));
+      const eIdx = Math.ceil(viewEnd * (chartRing.length - 1));
       const count = eIdx - sIdx;
       const ratio = (mouseX - gutterL) / plotW;
-      const idx = Math.min(chartData.length - 1, Math.max(0, Math.round(sIdx + ratio * count)));
+      const idx = Math.min(chartRing.length - 1, Math.max(0, Math.round(sIdx + ratio * count)));
       chartHoverIndex = idx;
 
-      const d = chartData[idx];
+      const d = chartRing.get(idx);
+      if (!d) return;
       chartTooltip.style.display = 'block';
       chartTooltip.style.left = `${Math.min(w - 240, Math.max(10, mouseX + 15))}px`;
       chartTooltip.style.top = `${Math.min(h - 150, Math.max(30, mouseY - 50))}px`;
@@ -2036,18 +2121,18 @@
       const gutterL = 60, gutterR = 55, padTop = 32, padBottom = 22;
       const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
 
-      if (chartData.length < 2) { cx.restore(); return; }
+      if (chartRing.length < 2) { cx.restore(); return; }
 
       if (isAutoFollow && !isReplayMode) {
         const windowSpan = 150;
-        const total = chartData.length;
+        const total = chartRing.length;
         viewStart = total > windowSpan ? (total - windowSpan) / total : 0;
         viewEnd = 1.0;
       }
 
-      const sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
-      const eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
-      const slice = chartData.slice(sIdx, eIdx + 1);
+      const sIdx = Math.max(0, Math.floor(viewStart * (chartRing.length - 1)));
+      const eIdx = Math.min(chartRing.length - 1, Math.ceil(viewEnd * (chartRing.length - 1)));
+      const slice = chartRing.slice(sIdx, eIdx + 1);
 
       let fMin = Infinity, fMax = -Infinity;
       let mMin = Infinity, mMax = -Infinity;
@@ -2127,13 +2212,13 @@
       const rows = lines.filter(l => l.trim().includes(',') && !isNaN(parseFloat(l.split(',')[0])));
       if (rows.length === 0) { alert("Could not extract valid telemetry rows."); return; }
 
-      replayData = []; chartData = []; flatlines = []; track.setLatLngs([]);
+      replayData = []; chartRing.clear(); flatlines = []; track.setLatLngs([]);
       const gpsCoords = [];
       for (const r of rows) {
-        saveRowToStorage(r);
+        queueRowForStorage(r);
         const pt = ingestTelemetry(r, false);
         if (pt) {
-          replayData.push(pt); chartData.push(pt);
+          replayData.push(pt); chartRing.push(pt);
           if (pt.lat && pt.lng && Math.abs(pt.lat) > 0.001) gpsCoords.push([pt.lat, pt.lng]);
         }
       }
@@ -2217,13 +2302,13 @@
     }
 
     // ==========================================================================
-    // 12. 4-CHART STROKE ANALYZER SUITE
+    // 12. 4-CHART STROKE ANALYZER SUITE (POINTWISE ENSEMBLES & CONFIDENCE ENVELOPES)
     // ==========================================================================
     let detectedStrokes = [], selectedStrokeId = null;
     let analyzerRegionMode = 'zoom', driveDeltaThreshold = 180, minStrokePeriodSec = 1.2;
 
     function openStrokeAnalyzer() {
-      if (chartData.length < 10) { alert("Load a CSV file or record telemetry before running Stroke Analysis."); return; }
+      if (chartRing.length < 10) { alert("Load a CSV file or record telemetry before running Stroke Analysis."); return; }
       document.getElementById('analyzerModal').style.display = 'flex';
       runStrokeAnalysis();
     }
@@ -2248,12 +2333,12 @@
     }
 
     function runStrokeAnalysis() {
-      let sIdx = 0, eIdx = chartData.length - 1;
+      let sIdx = 0, eIdx = chartRing.length - 1;
       if (analyzerRegionMode === 'zoom') {
-        sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
-        eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
+        sIdx = Math.max(0, Math.floor(viewStart * (chartRing.length - 1)));
+        eIdx = Math.min(chartRing.length - 1, Math.ceil(viewEnd * (chartRing.length - 1)));
       }
-      const rawSubset = chartData.slice(sIdx, eIdx + 1);
+      const rawSubset = chartRing.slice(sIdx, eIdx + 1);
       if (rawSubset.length < 20) return;
 
       const fArr = rawSubset.map(d => d.raw_w);
@@ -2290,11 +2375,11 @@
         let ncRel = nextPIdx;
         while (ncRel > fRel && fArr[ncRel] > cutoff) ncRel--;
 
-        const stPts = chartData.slice(sIdx + cRel, sIdx + ncRel + 1);
+        const stPts = chartRing.slice(sIdx + cRel, sIdx + ncRel + 1);
         if (stPts.length < 5) continue;
 
         const t0 = stPts[0].ms / 1000.0;
-        const tDrive = (chartData[sIdx + fRel].ms - chartData[sIdx + cRel].ms) / 1000.0;
+        const tDrive = (stPts[Math.min(stPts.length-1, fRel - cRel)].ms - stPts[0].ms) / 1000.0;
         const tTotal = (stPts[stPts.length - 1].ms - stPts[0].ms) / 1000.0;
 
         detectedStrokes.push({
@@ -2377,8 +2462,64 @@
       const gutterL = 40, gutterR = 30, padTop = 24, padBottom = 20;
       const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
 
+      // Resample to 100 points for statistical mean & variance envelope
+      const N_PTS = 100;
+      const gridMeans = new Float32Array(N_PTS);
+      const gridVars  = new Float32Array(N_PTS);
+
+      for (let step = 0; step < N_PTS; step++) {
+        const frac = step / (N_PTS - 1);
+        let sum = 0, count = 0;
+        for (const st of active) {
+          const tTarget = frac * st.tTotal;
+          for (let k = 0; k < st.times.length - 1; k++) {
+            if (tTarget >= st.times[k] && tTarget <= st.times[k+1]) {
+              const alpha = (tTarget - st.times[k]) / (st.times[k+1] - st.times[k] || 1);
+              sum += st.forceVals[k] + alpha * (st.forceVals[k+1] - st.forceVals[k]);
+              count++;
+              break;
+            }
+          }
+        }
+        gridMeans[step] = count > 0 ? sum / count : 0;
+      }
+
+      for (let step = 0; step < N_PTS; step++) {
+        const frac = step / (N_PTS - 1);
+        let sumSq = 0, count = 0;
+        for (const st of active) {
+          const tTarget = frac * st.tTotal;
+          for (let k = 0; k < st.times.length - 1; k++) {
+            if (tTarget >= st.times[k] && tTarget <= st.times[k+1]) {
+              const alpha = (tTarget - st.times[k]) / (st.times[k+1] - st.times[k] || 1);
+              const val = st.forceVals[k] + alpha * (st.forceVals[k+1] - st.forceVals[k]);
+              sumSq += Math.pow(val - gridMeans[step], 2);
+              count++;
+              break;
+            }
+          }
+        }
+        gridVars[step] = count > 1 ? Math.sqrt(sumSq / (count - 1)) : 0;
+      }
+
+      // Draw +-1 Sigma Confidence Envelope
+      cx.fillStyle = 'rgba(0, 255, 204, 0.12)';
+      cx.beginPath();
+      for (let i = 0; i < N_PTS; i++) {
+        const x = gutterL + (i / (N_PTS - 1)) * plotW;
+        const y = padTop + plotH - ((gridMeans[i] + gridVars[i]) / maxF) * plotH;
+        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      for (let i = N_PTS - 1; i >= 0; i--) {
+        const x = gutterL + (i / (N_PTS - 1)) * plotW;
+        const y = padTop + plotH - (Math.max(0, gridMeans[i] - gridVars[i]) / maxF) * plotH;
+        cx.lineTo(x, y);
+      }
+      cx.closePath(); cx.fill();
+
+      // Draw Individual Stroke Lines
       for (const st of active) {
-        cx.strokeStyle = selectedStrokeId === st.id ? '#ff0055' : 'rgba(0, 229, 255, 0.28)';
+        cx.strokeStyle = selectedStrokeId === st.id ? '#ff0055' : 'rgba(0, 229, 255, 0.22)';
         cx.lineWidth = selectedStrokeId === st.id ? 2.5 : 1.0; cx.beginPath();
         for (let k = 0; k < st.times.length; k++) {
           const x = gutterL + (st.times[k] / maxT) * plotW;
@@ -2387,6 +2528,16 @@
         }
         cx.stroke();
       }
+
+      // Draw Bold Ensemble Mean Curve
+      cx.strokeStyle = '#ffd700'; cx.lineWidth = 3.0; cx.beginPath();
+      for (let i = 0; i < N_PTS; i++) {
+        const x = gutterL + (i / (N_PTS - 1)) * plotW;
+        const y = padTop + plotH - (gridMeans[i] / maxF) * plotH;
+        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      cx.stroke();
+
       cx.restore();
     }
 
@@ -2430,7 +2581,7 @@
       if (cn.width !== w * dpr || cn.height !== h * dpr) { cn.width = w * dpr; cn.height = h * dpr; }
       cx.save(); cx.scale(dpr, dpr); cx.clearRect(0, 0, w, h);
 
-      const slice = chartData.slice(-180);
+      const slice = chartRing.sliceTail(180);
       if (slice.length < 2) { cx.restore(); return; }
 
       const gutterL = 40, gutterR = 30, padTop = 24, padBottom = 20;
@@ -2475,12 +2626,20 @@
 
       const maxF = Math.max(...active.map(s => s.peakF)) * 1.15;
       for (const st of active) {
-        const halfK = Math.max(1, Math.round((st.finishIdx - st.catchIdx) / 2));
+        const drivePts = Math.max(2, Math.round(st.times.length * (st.tDrive / st.tTotal)));
         cx.strokeStyle = 'rgba(255, 215, 0, 0.35)'; cx.lineWidth = 1.2; cx.beginPath();
-        for (let k = 0; k <= halfK && k < st.forceVals.length; k++) {
-          const x = gutterL + (k / halfK) * (0.5 * plotW);
+        for (let k = 0; k < drivePts; k++) {
+          const x = gutterL + (k / (drivePts - 1)) * (0.5 * plotW);
           const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
           if (k === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+        }
+        cx.stroke();
+
+        cx.beginPath();
+        for (let k = drivePts; k < st.forceVals.length; k++) {
+          const x = splitX + ((k - drivePts) / (st.forceVals.length - drivePts || 1)) * (0.5 * plotW);
+          const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
+          if (k === drivePts) cx.moveTo(x, y); else cx.lineTo(x, y);
         }
         cx.stroke();
       }
@@ -2498,20 +2657,19 @@
     }
 
     // ==========================================================================
-    // 13. MASTER REQUESTANIMATIONFRAME LOOP
+    // 13. MASTER REQUESTANIMATIONFRAME LOOP (VISIBILITY GATED)
     // ==========================================================================
     const cnP1 = document.getElementById('strokeCanvasP1');
     const cnP2 = document.getElementById('strokeCanvasP2');
 
     function masterRenderLoop() {
-      renderDualPlates3DCanvas();
-      renderLiveFlowChart();
-
-      // Render Layer 4 Individual Overlays
-      renderIndividualStrokeCanvas(cnP1, currentStrokeP1, ghostLastStrokeP1, runningAverageStrokeP1, runningAverageStrokeP2, true);
-      renderIndividualStrokeCanvas(cnP2, currentStrokeP2, ghostLastStrokeP2, runningAverageStrokeP2, runningAverageStrokeP1, false);
-
-      if (document.getElementById('advancedSuiteView').classList.contains('active')) {
+      // Gate rendering behind visibility to eliminate background layout thrashing
+      if (document.getElementById('liveHomepageView').classList.contains('active')) {
+        renderDualPlates3DCanvas();
+        renderLiveFlowChart();
+        renderIndividualStrokeCanvas(cnP1, currentStrokeP1, ghostLastStrokeP1, runningAverageStrokeP1, runningAverageStrokeP2, true);
+        renderIndividualStrokeCanvas(cnP2, currentStrokeP2, ghostLastStrokeP2, runningAverageStrokeP2, runningAverageStrokeP1, false);
+      } else if (document.getElementById('advancedSuiteView').classList.contains('active')) {
         renderPlateCanvas();
         if (isAutoFollow && !isReplayMode) redrawInteractiveChart();
       }
