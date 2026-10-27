@@ -1,8 +1,3 @@
-Here is the complete, single-file master application. It implements every requested architectural requirement: the **Mobile-First Live Dashboard**, the **Dual-IMU Drone Kinematics Fusion & 3D Interactive Orientation Engine**, the **Automatic Stroke-Recovery Zeroing (Zero Tare Buttons)**, the **Coherent Multi-Sensor SPM Detector & Audio Synthesizer**, the **Layer 3 Live Dual-Plate Flow Chart**, the **Layer 4 Dedicated Individual Stroke Overlay Charts with Ghosting and Dual Averages**, the **Strava-Style Basic Recall Modal with Live Segment Cropping and Wireless SD Retrieval**, and the **Full 4-Chart Advanced Analysis Suite**.
-
-Save the code below as an `.html` file (e.g. `indaboat_master.html`) and open it in any modern browser (Google Chrome or Microsoft Edge recommended for Web Bluetooth API support).
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3183,33 +3178,3 @@ Save the code below as an `.html` file (e.g. `indaboat_master.html`) and open it
   </script>
 </body>
 </html>
-```
-
-### Architectural Breakdown
-
-1. **Dual-IMU Drone Kinematics Fusion & Interactive 3D Rotation**:
-   * Uses both independent sets of triaxial accelerometers and gyroscopes ($A_{x1}, A_{y1}, A_{z1}, G_{x1}, G_{y1}, G_{z1}$ and $A_{x2}, A_{y2}, A_{z2}, G_{x2}, G_{y2}, G_{z2}$) via the `DualIMUKinematics` class.
-   * If you pick up either oar/sensor and turn it in your hand, its respective 3D pitch/roll attitude updates in real time on the canvas. The boat hull uses kinematic multi-sensor averaging to filter out high-frequency mechanical vibration and lever-arm deflection.
-
-2. **Automated Stroke-Recovery Zeroing (Zero Tare Buttons)**:
-   * During the boat's recovery phase (when surge acceleration is low and force variance is settled), the background baseline estimator continuously computes the 40th-percentile resting median load for each plate independently.
-   * Deflections are clamped cleanly above baseline. Thermal drift, flipped mounting, and unequal sensor biases are compensated automatically with no manual intervention.
-
-3. **Coherent Multi-Sensor SPM Detection & Audio Synthesizer**:
-   * Analyzes synchronized bow surge spikes, GPS speed velocity movement ($>1.4\text{ km/h}$), and mechanical load rise with a 1.35-second refractory lockout window.
-   * Rejects water slaps, chop, or dock tapping to prevent overestimation of stroke rate.
-   * Synthesizes an 880 Hz crystal sine pulse with exponential decay through the Web Audio API on every genuine catch.
-
-4. **Layered Mobile-First Layout**:
-   * **Layer 1**: 3D dual-IMU kinematics model + ArcGIS live satellite GPS map.
-   * **Layer 2**: Session controls (`START`, `PAUSE`, `END`, `RECALL`, `CALIBRATE`) + Live & Average workout metric cards.
-   * **Layer 3**: Live streaming flow chart showing Plate 1 Force, Plate 2 Force, and clean bow surge.
-   * **Layer 4**: Dedicated individual stroke profile overlays for Plate 1 and Plate 2 featuring ghosted previous strokes, bright active strokes, and running averages (Gold for P1, Cyan for P2).
-
-5. **Strava-Style Basic Recall Modal & Segment Cropper**:
-   * Displays hero summary metrics (Total Time, Distance, Split, SPM, Strokes, and Plate Symmetry Balance).
-   * Includes an interactive Leaflet track map, session overview charts, dual-handle range sliders for cropping, and export options (`EXPORT CROPPED (CSV)`, `EXPORT FULL (CSV)`).
-   * Includes a `PULL FROM SD CARD (BLE)` command trigger to stream logs directly from the ESP32.
-
-6. **Preserved 4-Chart Advanced Analysis Suite**:
-   * Word-for-word preservation of the original 2.5D isometric attitude plate, interactive canvas with mouse wheel/drag zoom and pan, scrolling replay scrubber, flatline spike editor, timed playback engine ($0.25\times$ to $5.0\times$), and the modal with Catch-Aligned, Finish-Aligned, Surge Stretch, and Split-Aligned analysis charts.
