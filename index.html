@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>indaboat Dual-Telemetry Telemetry Suite</title>
+  <title>indaboat Dual-Telemetry Master Suite</title>
 
   <!-- Leaflet Satellite Mapping Engine -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -20,12 +21,12 @@
     }
 
     :root {
-      --bg-darkest: #040507;
-      --bg-panel: #0b0e14;
-      --bg-panel-alt: #10141e;
-      --bg-input: #151b28;
-      --border-dark: #19202f;
-      --border-light: #28354d;
+      --bg-darkest: #030406;
+      --bg-panel: #090c13;
+      --bg-panel-alt: #0e131d;
+      --bg-input: #141a27;
+      --border-dark: #161e2e;
+      --border-light: #243147;
       --accent-cyan: #00ffcc;
       --accent-blue: #0088ff;
       --accent-green: #00ff88;
@@ -89,15 +90,15 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 10px;
-      background: #090c12;
+      background: #080a0f;
       border-bottom: 1px solid var(--border-dark);
       z-index: 1000;
     }
 
     .view-tabs { display: flex; gap: 6px; }
     .tab-btn {
-      background: #111622;
-      border: 1px solid #202b3d;
+      background: #10141e;
+      border: 1px solid #1c2637;
       color: var(--text-muted);
       padding: 5px 12px;
       font-size: 11px;
@@ -117,7 +118,7 @@
       padding: 3px 7px;
       border-radius: 3px;
       border: 1px solid var(--border-dark);
-      background: #0d121c;
+      background: #0b0f16;
       display: inline-flex;
       align-items: center;
       gap: 5px;
@@ -158,7 +159,7 @@
       color: #b0c2de;
       z-index: 10;
       font-weight: 800;
-      background: rgba(10, 14, 22, 0.90);
+      background: rgba(9, 12, 19, 0.92);
       padding: 2px 7px;
       border-radius: 3px;
       pointer-events: none;
@@ -174,8 +175,8 @@
     .layer-top-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      height: 230px;
-      min-height: 200px;
+      height: 245px;
+      min-height: 210px;
       gap: 6px;
     }
 
@@ -183,8 +184,8 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      background: #0d111a;
-      border: 1px solid #1a2336;
+      background: #0a0d15;
+      border: 1px solid #172030;
       border-radius: 6px;
       padding: 8px 10px;
     }
@@ -217,8 +218,8 @@
       margin-top: 4px;
     }
     .stat-badge {
-      background: #07090e;
-      border: 1px solid #161e2e;
+      background: #06080d;
+      border: 1px solid #141b28;
       border-radius: 4px;
       display: flex;
       flex-direction: column;
@@ -242,8 +243,8 @@
     }
 
     .layer-flow-chart {
-      height: 185px;
-      min-height: 165px;
+      height: 195px;
+      min-height: 170px;
       position: relative;
     }
 
@@ -256,7 +257,7 @@
     }
 
     /* ==========================================================================
-       3. VIEW 2: FULL ADVANCED TELEMETRY SUITE (WORD-FOR-WORD PRESERVED)
+       3. VIEW 2: FULL ADVANCED TELEMETRY SUITE
        ========================================================================== */
     #advancedSuiteView { padding: 6px; gap: 6px; }
     #topbarAdv {
@@ -264,16 +265,16 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: #10141d;
-      border: 1px solid #1e2536;
+      background: #0d1119;
+      border: 1px solid #1a2232;
       border-radius: 5px;
       padding: 0 8px;
     }
     #replayBar {
       height: 38px;
       min-height: 38px;
-      background: #121622;
-      border-bottom: 1px solid #222b3d;
+      background: #0f131d;
+      border-bottom: 1px solid #1f2738;
       display: none;
       align-items: center;
       justify-content: space-between;
@@ -305,10 +306,10 @@
       display: flex;
       gap: 4px;
       pointer-events: auto;
-      background: rgba(12, 16, 24, 0.94);
+      background: rgba(10, 14, 21, 0.94);
       padding: 3px 6px;
       border-radius: 4px;
-      border: 1px solid #212a3c;
+      border: 1px solid #1c2434;
       flex-wrap: wrap;
       max-width: 65%;
     }
@@ -321,15 +322,15 @@
       display: flex;
       align-items: center;
       gap: 3px;
-      background: #141924;
-      border: 1px solid #242f44;
+      background: #121620;
+      border: 1px solid #202a3a;
     }
     .legend-pill.off { opacity: 0.3; filter: grayscale(1); }
 
     .chart-tooltip-box {
       position: absolute;
       display: none;
-      background: rgba(6, 8, 12, 0.96);
+      background: rgba(5, 7, 10, 0.96);
       border: 1px solid var(--accent-cyan);
       border-radius: 4px;
       padding: 6px 9px;
@@ -351,8 +352,8 @@
       gap: 6px;
     }
     .badge {
-      background: #0c0f16;
-      border: 1px solid #1a2233;
+      background: #090c13;
+      border: 1px solid #161e2e;
       border-radius: 5px;
       display: flex;
       flex-direction: column;
@@ -366,8 +367,8 @@
     #debugBar {
       height: 22px;
       min-height: 22px;
-      background: #040508;
-      border: 1px solid #131722;
+      background: #030406;
+      border: 1px solid #10141d;
       border-radius: 3px;
       padding: 0 8px;
       font-size: 10px;
@@ -386,7 +387,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(4, 6, 10, 0.98);
+      background: rgba(3, 5, 8, 0.98);
       z-index: 1500;
       flex-direction: column;
       padding: 12px;
@@ -397,8 +398,8 @@
       display: grid;
       grid-template-columns: repeat(6, 1fr);
       gap: 8px;
-      background: #0d111a;
-      border: 1px solid #1c2538;
+      background: #0a0d15;
+      border: 1px solid #182233;
       border-radius: 6px;
       padding: 12px;
     }
@@ -411,29 +412,29 @@
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      background: #111622;
-      border: 1px solid #202b3d;
+      background: #0e131d;
+      border: 1px solid #1c2637;
       border-radius: 6px;
       padding: 10px 14px;
       font-size: 11px;
     }
 
     /* ==========================================================================
-       5. VIEW 4: 4-CHART STROKE ANALYZER MODAL (EXACT SPECIFICATION)
+       5. VIEW 4: 4-CHART STROKE ANALYZER MODAL
        ========================================================================== */
     #analyzerModal {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(3, 4, 7, 0.99);
+      background: rgba(2, 3, 5, 0.99);
       z-index: 2000;
       flex-direction: column;
       overflow: hidden;
     }
     #analyzerHeader {
       height: 44px;
-      background: #0e121a;
-      border-bottom: 1px solid #20283c;
+      background: #0b0f16;
+      border-bottom: 1px solid #1d2535;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -448,8 +449,8 @@
       padding: 8px;
     }
     .analyzer-sidebar {
-      background: #0c0f16;
-      border: 1px solid #1a2233;
+      background: #090c12;
+      border: 1px solid #161e2c;
       border-radius: 5px;
       display: flex;
       flex-direction: column;
@@ -467,8 +468,8 @@
     .analyzer-panel {
       flex: 1;
       min-height: 190px;
-      background: #0c0f16;
-      border: 1px solid #1a2233;
+      background: #090c12;
+      border: 1px solid #161e2c;
       border-radius: 5px;
       position: relative;
       overflow: hidden;
@@ -478,18 +479,18 @@
       align-items: center;
       justify-content: space-between;
       padding: 5px 7px;
-      background: #121722;
-      border: 1px solid #222d42;
+      background: #0f141e;
+      border: 1px solid #1d2638;
       border-radius: 4px;
       cursor: pointer;
       font-size: 10px;
     }
-    .stroke-list-item.selected { border-color: var(--accent-gold); background: #261f0a; }
+    .stroke-list-item.selected { border-color: var(--accent-gold); background: #221b08; }
 
     input[type=range] { accent-color: #00ffcc; cursor: pointer; }
 
     @media (max-width: 900px) {
-      .layer-top-grid { grid-template-columns: 1fr; height: 380px; }
+      .layer-top-grid { grid-template-columns: 1fr; height: 420px; }
       .layer-individual-overlays { grid-template-columns: 1fr; height: 380px; }
       .grid-top { grid-template-columns: 1fr; height: 380px; }
       #analyzerContent { grid-template-columns: 1fr; }
@@ -525,19 +526,17 @@
   <!-- VIEW 1: MOBILE-FIRST LIVE HOMEPAGE -->
   <main class="view-container active" id="liveHomepageView">
 
-    <!-- LAYER 1: 3D DUAL-IMU KINEMATICS & REAL LIVE SATELLITE GPS -->
+    <!-- LAYER 1: DUAL 3D MECHANICAL FORCE PLATES & REAL LIVE SATELLITE GPS -->
     <section class="layer-top-grid">
-      <!-- 3D IMU PERSPECTIVE ENGINE -->
+      <!-- DUAL 3D FORCE PLATES CANVAS -->
       <div class="card">
-        <div class="card-title">Dual IMU Interactive 3D Kinematics</div>
+        <div class="card-title">Dual Mechanical Force Plates & Force Vectors</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
-          <select id="imuRenderMode" style="background:#131824; color:#00ffcc; border:1px solid #233048; border-radius:3px; font-size:9px; padding:2px 4px;">
-            <option value="both">HULL & DUAL OARS</option>
-            <option value="oar1">OAR 1 (PORT)</option>
-            <option value="oar2">OAR 2 (STARBOARD)</option>
-          </select>
+          <span style="font-size:9px; background:#121824; border:1px solid #1f2b40; color:#00ffcc; padding:2px 6px; border-radius:3px; font-weight:bold;">
+            6-DOF GRAVITY STABILIZED
+          </span>
         </div>
-        <canvas id="dualImuCanvas"></canvas>
+        <canvas id="dualPlatesCanvas"></canvas>
       </div>
 
       <!-- REAL LIVE SATELLITE GPS MAP -->
@@ -570,13 +569,13 @@
       </div>
     </section>
 
-    <!-- LAYER 3: LIVE TELEMETRY FLOW STRIP CHART -->
+    <!-- LAYER 3: LIVE TELEMETRY FLOW STRIP CHART (DUAL Y-AXIS: FORCE & SURGE) -->
     <section class="card layer-flow-chart">
-      <div class="card-title">Live Telemetry Flow (Plates & Surge)</div>
+      <div class="card-title">Live Telemetry Flow (Plates Left Axis & Clean Surge Right Axis)</div>
       <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-        <span style="font-size:9px; background:#0f1d24; border:1px solid #1c3b4a; color:#00ffcc; padding:2px 6px; border-radius:3px;">● Plate 1</span>
-        <span style="font-size:9px; background:#241022; border:1px solid #4a1c44; color:#ff55aa; padding:2px 6px; border-radius:3px;">● Plate 2</span>
-        <span style="font-size:9px; background:#082218; border:1px solid #124d35; color:#00ff88; padding:2px 6px; border-radius:3px; font-weight:bold;">● Clean Surge</span>
+        <span style="font-size:9px; background:#0a191f; border:1px solid #133340; color:#00ffcc; padding:2px 6px; border-radius:3px;">● Plate 1 (kg)</span>
+        <span style="font-size:9px; background:#210b1a; border:1px solid #421634; color:#ff55aa; padding:2px 6px; border-radius:3px;">● Plate 2 (kg)</span>
+        <span style="font-size:9px; background:#071c12; border:1px solid #0f3d26; color:#00ff88; padding:2px 6px; border-radius:3px; font-weight:bold;">● Clean Surge (m/s²)</span>
       </div>
       <canvas id="liveFlowCanvas"></canvas>
     </section>
@@ -587,9 +586,9 @@
       <div class="card">
         <div class="card-title">Plate 1 Stroke Profile (Equalized Baseline)</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
-          <span style="font-size:8px; background:#221808; border:1px solid #553c12; color:#ffd700; padding:2px 5px; border-radius:3px; font-weight:bold;">★ P1 AVG (GOLD)</span>
-          <span style="font-size:8px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 5px; border-radius:3px;">P2 AVG (CYAN)</span>
-          <span style="font-size:8px; background:#161a22; border:1px solid #283040; color:#888; padding:2px 5px; border-radius:3px;">GHOST (GREY)</span>
+          <span style="font-size:8px; background:#1f1606; border:1px solid #4a340e; color:#ffd700; padding:2px 5px; border-radius:3px; font-weight:bold;">★ P1 AVG (GOLD)</span>
+          <span style="font-size:8px; background:#0b1921; border:1px solid #163647; color:#00e5ff; padding:2px 5px; border-radius:3px;">P2 AVG (CYAN)</span>
+          <span style="font-size:8px; background:#12161f; border:1px solid #202738; color:#888; padding:2px 5px; border-radius:3px;">GHOST (GREY)</span>
         </div>
         <canvas id="strokeCanvasP1"></canvas>
       </div>
@@ -598,9 +597,9 @@
       <div class="card">
         <div class="card-title">Plate 2 Stroke Profile (Equalized Baseline)</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
-          <span style="font-size:8px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 5px; border-radius:3px; font-weight:bold;">★ P2 AVG (CYAN)</span>
-          <span style="font-size:8px; background:#221808; border:1px solid #553c12; color:#ffd700; padding:2px 5px; border-radius:3px;">P1 AVG (GOLD)</span>
-          <span style="font-size:8px; background:#161a22; border:1px solid #283040; color:#888; padding:2px 5px; border-radius:3px;">GHOST (GREY)</span>
+          <span style="font-size:8px; background:#0b1921; border:1px solid #163647; color:#00e5ff; padding:2px 5px; border-radius:3px; font-weight:bold;">★ P2 AVG (CYAN)</span>
+          <span style="font-size:8px; background:#1f1606; border:1px solid #4a340e; color:#ffd700; padding:2px 5px; border-radius:3px;">P1 AVG (GOLD)</span>
+          <span style="font-size:8px; background:#12161f; border:1px solid #202738; color:#888; padding:2px 5px; border-radius:3px;">GHOST (GREY)</span>
         </div>
         <canvas id="strokeCanvasP2"></canvas>
       </div>
@@ -632,7 +631,7 @@
         <button class="btn-ctrl" onclick="stepReplay(-1)">⏮</button>
         <button class="btn-ctrl" onclick="stepReplay(1)">⏭</button>
         <span style="font-size:10px; color:#8899aa;">SPEED:</span>
-        <select id="replaySpeed" onchange="changeReplaySpeed(this.value)" style="background:#1b202c; color:#ddd; border:1px solid #2e3547; font-size:10px;">
+        <select id="replaySpeed" onchange="changeReplaySpeed(this.value)" style="background:#171c26; color:#ddd; border:1px solid #283042; font-size:10px;">
           <option value="0.25">0.25x</option>
           <option value="0.5">0.5x</option>
           <option value="1" selected>1.0x (Real-Time)</option>
@@ -648,12 +647,12 @@
     </div>
 
     <div class="grid-top">
-      <!-- 2.5D ISOMETRIC ATTITUDE CANVAS -->
+      <!-- 2.5D ISOMETRIC ATTITUDE CANVAS (ORIGINAL) -->
       <div class="card">
         <div class="card-title">Accelerometer Plate Orientation (Original)</div>
         <canvas id="plateCanvas"></canvas>
       </div>
-      <!-- SATELLITE GPS MAP -->
+      <!-- SATELLITE GPS MAP (ORIGINAL) -->
       <div class="card">
         <div class="card-title" id="mapTitle">GPS Satellite Track (Original)</div>
         <div style="position:absolute; top:6px; right:8px; z-index:400;">
@@ -704,7 +703,7 @@
 
   <!-- VIEW 3: STRAVA-STYLE BASIC RECALL MODAL -->
   <div id="modalBasicRecall">
-    <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #202a3d; padding-bottom:8px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #1c2637; padding-bottom:8px;">
       <span style="font-size:16px; font-weight:900; color:#ffaa00;">★ WORKOUT ACTIVITY SUMMARY</span>
       <div style="display:flex; gap:6px;">
         <button class="btn-ctrl" onclick="triggerWirelessSdDump()" style="background:#0070e0; color:#fff;">PULL FROM SD CARD (BLE)</button>
@@ -748,7 +747,7 @@
     <div id="analyzerHeader">
       <div style="display:flex; align-items:center; gap:10px;">
         <span style="font-size:13px; font-weight:900; color:#ffaa00;">⚡ STROKE ANALYSIS SUITE</span>
-        <span id="analyzerStrokeBadge" style="font-size:11px; background:#241d11; color:#ffcc55; padding:2px 8px; border-radius:3px;">0 STROKES FOUND</span>
+        <span id="analyzerStrokeBadge" style="font-size:11px; background:#201808; color:#ffcc55; padding:2px 8px; border-radius:3px;">0 STROKES FOUND</span>
       </div>
       <div style="display:flex; gap:6px;">
         <button class="btn-ctrl" onclick="exportStrokeAnalyticsCSV()" style="background:#009955; color:#fff;">EXPORT STROKE CSV</button>
@@ -776,8 +775,8 @@
           <input type="range" id="minPeriodSlider" min="0.8" max="3.5" value="1.2" step="0.1" oninput="onMinPeriodChange(this.value)" />
         </div>
 
-        <div id="strokeScorecard" style="background:#11151e; border:1px solid #1f283a; border-radius:4px; padding:8px; margin-top:6px; font-size:10px;">
-          <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #1d2535; padding-bottom:3px;">STROKE SCORECARD</div>
+        <div id="strokeScorecard" style="background:#0e131d; border:1px solid #1a2233; border-radius:4px; padding:8px; margin-top:6px; font-size:10px;">
+          <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #19202f; padding-bottom:3px;">STROKE SCORECARD</div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px;">
             <div>Rate: <b id="scRate" style="color:#fff;">--</b> SPM</div>
             <div>Drive: <b id="scDriveT" style="color:#ffaa00;">--</b> s</div>
@@ -798,22 +797,18 @@
       </aside>
 
       <section class="analyzer-main">
-        <!-- CHART 1: CATCH-ALIGNED FORCE OVERLAY -->
         <div class="analyzer-panel">
           <div class="card-title">Chart 1: Catch-Aligned Force Overlay (All Humps + Bold Mean + Envelope)</div>
           <canvas id="overlayForceCanvas"></canvas>
         </div>
-        <!-- CHART 2: FINISH / PRE-CATCH ALIGNED OVERLAY -->
         <div class="analyzer-panel">
           <div class="card-title" id="c2Title">Chart 2: Finish / Pre-Catch Right-Aligned Overlay</div>
           <canvas id="overlayRightAlignedCanvas"></canvas>
         </div>
-        <!-- CHART 3: BOW SURGE ACCEL OVERLAID ON FORCE -->
         <div class="analyzer-panel">
           <div class="card-title">Chart 3: Selection Stretch — Bow Surge Accel (Green, Flipped) Overlaid on Force</div>
           <canvas id="overlaySelectionCanvas"></canvas>
         </div>
-        <!-- CHART 4: MID-DRIVE SPLIT-ALIGNED BREAKDOWN -->
         <div class="analyzer-panel">
           <div class="card-title">Chart 4: Split-Aligned Breakdown (Catch Aligned Left, Finish Aligned Right)</div>
           <canvas id="overlaySplitCanvas"></canvas>
@@ -834,7 +829,7 @@
     let flatlines = [];
     let isFlatlineSelecting = false;
     let flatlineDragStart = null;
-    let invertLoad = true;
+    let invertLoad = false;
 
     // Session Workout Recording State
     let sessionActive = false;
@@ -944,29 +939,25 @@
     }
 
     // ==========================================================================
-    // 2. DUAL-IMU 3D PERSPECTIVE KINEMATICS ENGINE
+    // 2. DRIFT-FREE DUAL-IMU ATTITUDE SOLVER (NO UNCONTROLLABLE SPINNING)
     // ==========================================================================
     class IMUOrientationSolver {
       constructor() {
         this.pitch = 0;
         this.roll = 0;
-        this.yaw = 0;
-        this.gravity_k = [0, -1, 0];
+        this.yaw = 0; // Bound oar swing (leaky-integrated around 0)
       }
       update(ax, ay, az, gx, gy, gz, dt) {
-        const normA = Math.hypot(ax, ay, az);
-        if (normA > 0.001) {
-          const alpha = 0.05;
-          this.gravity_k[0] = (1 - alpha) * this.gravity_k[0] + alpha * (ax / normA);
-          this.gravity_k[1] = (1 - alpha) * this.gravity_k[1] + alpha * (ay / normA);
-          this.gravity_k[2] = (1 - alpha) * this.gravity_k[2] + alpha * (az / normA);
-        }
+        // Accelerometer absolute attitude references (gravity tethered)
         const accPitch = Math.atan2(ax, Math.sqrt(az * az + ay * ay));
         const accRoll  = Math.atan2(az, Math.max(0.05, -ay));
 
-        this.pitch = 0.94 * (this.pitch + gz * dt) + 0.06 * accPitch;
-        this.roll  = 0.94 * (this.roll  + gx * dt) + 0.06 * accRoll;
-        this.yaw  += gy * dt;
+        // Complementary filter on Pitch and Roll: CANNOT drift or spin to infinity
+        this.pitch = 0.92 * (this.pitch + gz * dt) + 0.08 * accPitch;
+        this.roll  = 0.92 * (this.roll  + gx * dt) + 0.08 * accRoll;
+
+        // Leaky integrator for Yaw (Swing): tracks dynamic movement without runaway DC spin
+        this.yaw = 0.985 * (this.yaw + gy * dt);
       }
     }
 
@@ -981,14 +972,19 @@
     }
 
     // ==========================================================================
-    // 3. AUTOMATIC ZERO-TARE RECOVERY EQUALIZATION & COHERENT LIVE SPM
+    // 3. AUTONOMOUS RECOVERY ZEROING & ADAPTIVE POLARITY CORRECTION
     // ==========================================================================
     let oar1Baseline = 0, oar2Baseline = 0;
     let recoverySamples1 = [], recoverySamples2 = [];
     let isCurrentlyInDrive = false;
 
+    // Automatic polarity detection: flips signs if sensor was wired/mounted backwards
+    let polarityP1 = 1;
+    let polarityP2 = 1;
+
     let strokeDetectionHistory = [];
     let lastValidStrokeTimestamp = 0;
+    let lastPacketTimestampMs = null;
 
     // Separate stroke buffers for Layer 4 overlays
     let currentStrokeP1 = [];
@@ -1042,7 +1038,8 @@
       if (isNaN(w1) || isNaN(ax1)) return null;
 
       const t_sec = ms / 1000.0;
-      const dt = 0.1;
+      const dt = lastPacketTimestampMs === null ? 0.05 : Math.max(0.01, Math.min(0.25, (ms - lastPacketTimestampMs) / 1000.0));
+      lastPacketTimestampMs = ms;
 
       // 1. Solve 6-DOF IMU orientations
       oar1IMU.update(ax1, ay1, az1, gx1, gy1, gz1, dt);
@@ -1052,32 +1049,47 @@
       fusedBoatPitch = (oar1IMU.pitch + oar2IMU.pitch) / 2.0;
       fusedBoatRoll  = (oar1IMU.roll  + oar2IMU.roll)  / 2.0;
 
-      // Clean bow surge acceleration
+      // Clean forward surge acceleration (m/s²)
       const u_up = Math.sin(fusedBoatPitch);
       const cleanSurge = -(((ax1 + ax2) / 2.0) - (9.80665 * u_up));
 
-      // 2. AUTOMATIC ZERO-TARE RECOVERY EQUALIZATION (Strictly Zero Tare Buttons)
-      // When boat is recovering (negative surge acceleration), dynamically calculate 40th percentile resting baseline
+      // 2. AUTOMATIC RECOVERY EQUALIZATION & AUTO-POLARITY (Zero Tare Buttons)
       if (!isCurrentlyInDrive) {
         recoverySamples1.push(w1);
         recoverySamples2.push(w2);
         if (recoverySamples1.length > 35) recoverySamples1.shift();
         if (recoverySamples2.length > 35) recoverySamples2.shift();
 
+        // 40th percentile low-median resting baseline
         const s1 = [...recoverySamples1].sort((a,b)=>a-b);
         const s2 = [...recoverySamples2].sort((a,b)=>a-b);
         oar1Baseline = s1[Math.floor(s1.length * 0.4)] || 0;
         oar2Baseline = s2[Math.floor(s2.length * 0.4)] || 0;
       }
 
-      // Equalized Dynamic Force
-      const netF1 = Math.max(0, (invertLoad ? -1 : 1) * (w1 - oar1Baseline));
-      const netF2 = Math.max(0, (invertLoad ? -1 : 1) * (w2 - oar2Baseline));
+      // Check deflection relative to recovery baseline
+      const rawDelta1 = w1 - oar1Baseline;
+      const rawDelta2 = w2 - oar2Baseline;
+
+      // Auto-Polarity: when boat experiences surge acceleration (>1.2 m/s²), force must be positive.
+      // If rawDelta is negative, auto-flip that plate's polarity!
+      if (cleanSurge > 1.2) {
+        if (rawDelta1 < -1.5) polarityP1 = -1;
+        else if (rawDelta1 > 1.5) polarityP1 = 1;
+
+        if (rawDelta2 < -1.5) polarityP2 = -1;
+        else if (rawDelta2 > 1.5) polarityP2 = 1;
+      }
+
+      // Compute Net Dynamic Force (Zeroed cleanly on recovery, never locked at zero)
+      const invMultiplier = invertLoad ? -1 : 1;
+      const netF1 = Math.max(0, invMultiplier * polarityP1 * rawDelta1);
+      const netF2 = Math.max(0, invMultiplier * polarityP2 * rawDelta2);
 
       // 3. COHERENT LIVE SPM ENGINE (Surge Jerk + GPS Velocity + 1.25s Refractory Lockout)
-      const surgeJerk = cleanSurge > 1.30;
-      const gpsMovement = spd > 1.2; // Boat moving over 1.2 km/h rejects dock handling & chop
-      const refractoryLockout = 1.25; // Absolute ceiling: 48 SPM
+      const surgeJerk = cleanSurge > 1.15;
+      const gpsMovement = spd > 1.0; // Moving > 1 km/h rejects dock handling
+      const refractoryLockout = 1.25; // 48 SPM physiological ceiling
 
       if (surgeJerk && gpsMovement && (t_sec - lastValidStrokeTimestamp > refractoryLockout) && !isCurrentlyInDrive) {
         isCurrentlyInDrive = true;
@@ -1102,14 +1114,13 @@
         strokeDetectionHistory.push(t_sec);
       }
 
-      if (isCurrentlyInDrive && cleanSurge < 0.25) {
+      if (isCurrentlyInDrive && cleanSurge < 0.20) {
         isCurrentlyInDrive = false;
       }
 
       currentStrokeP1.push(netF1);
       currentStrokeP2.push(netF2);
 
-      // Accumulate Active Session Stats
       if (sessionActive && !sessionPaused) {
         activeElapsedSec += dt;
         totalDistanceMeters += (spd / 3.6) * dt;
@@ -1118,7 +1129,7 @@
 
       const point = {
         ms, timeStr: timeS,
-        raw_w: (invertLoad ? -1 : 1) * w1,
+        raw_w: w1,
         net_force: netF1,
         w1: netF1, w2: netF2,
         surge: cleanSurge,
@@ -1211,7 +1222,7 @@
     }
 
     // ==========================================================================
-    // 4. BLE STREAMING & BIDIRECTIONAL SD CARD RECORDING
+    // 4. BLE STREAMING & WIRELESS SD RECOVERY
     // ==========================================================================
     const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
     const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
@@ -1327,14 +1338,14 @@
     }
 
     // ==========================================================================
-    // 5. 3D DUAL-IMU PERSPECTIVE RENDERER
+    // 5. DUAL 3D MECHANICAL FORCE PLATES WITH DYNAMIC FORCE VECTORS
     // ==========================================================================
-    const dualImuCanvas = document.getElementById('dualImuCanvas');
-    const dualImuCtx = dualImuCanvas.getContext('2d');
+    const dualPlatesCanvas = document.getElementById('dualPlatesCanvas');
+    const dualPlatesCtx = dualPlatesCanvas.getContext('2d');
 
-    function renderDualImu3DCanvas() {
-      const cn = dualImuCanvas;
-      const cx = dualImuCtx;
+    function renderDualPlates3DCanvas() {
+      const cn = dualPlatesCanvas;
+      const cx = dualPlatesCtx;
       const dpr = window.devicePixelRatio || 1;
       const w = cn.clientWidth, h = cn.clientHeight;
 
@@ -1345,13 +1356,11 @@
       cx.scale(dpr, dpr);
       cx.clearRect(0, 0, w, h);
 
-      const mode = document.getElementById('imuRenderMode').value;
-      const cx_pt = w / 2;
-      const cy_pt = h / 2 + 10;
-      const fov = 200;
+      const fov = 190;
+      const dist = 210;
 
-      // Project 3D coordinate onto 2D viewport
-      function project3D(x, y, z, roll, pitch, yaw) {
+      // Project 3D point centered around local origin (cx_pt, cy_pt)
+      function project3D(x, y, z, roll, pitch, yaw, cx_pt, cy_pt) {
         // Yaw
         const cy = Math.cos(yaw), sy = Math.sin(yaw);
         let x1 = x * cy - y * sy;
@@ -1368,90 +1377,99 @@
         let y3 = y2;
         let z3 = -x2 * sr + z2 * cr;
 
-        const distance = 240;
-        const scale = fov / (distance + z3);
+        const scale = fov / (dist + z3);
         return [cx_pt + x3 * scale, cy_pt - y3 * scale];
       }
 
-      // Draw horizon reference
-      cx.strokeStyle = '#141c28';
+      // Draw Horizon Lines for both plates
+      cx.strokeStyle = '#121822';
       cx.lineWidth = 1;
-      cx.beginPath(); cx.moveTo(15, cy_pt); cx.lineTo(w - 15, cy_pt); cx.stroke();
+      cx.beginPath();
+      cx.moveTo(10, h / 2 + 5); cx.lineTo(w / 2 - 15, h / 2 + 5);
+      cx.moveTo(w / 2 + 15, h / 2 + 5); cx.lineTo(w - 10, h / 2 + 5);
+      cx.stroke();
 
-      if (mode === 'both') {
-        // Draw Boat Hull
-        const hullP = fusedBoatPitch - zeroBoatPitch;
-        const hullR = fusedBoatRoll - zeroBoatRoll;
+      // Divider
+      cx.strokeStyle = '#182232';
+      cx.beginPath(); cx.moveTo(w / 2, 20); cx.lineTo(w / 2, h - 20); cx.stroke();
 
-        const hullCorners = [
-          [-12, -75, -5], [12, -75, -5], [14, 75, -5], [-14, 75, -5],
-          [-12, -75, 5],  [12, -75, 5],  [14, 75, 5],  [-14, 75, 5],
-          [0, 115, 0] // Bow tip
-        ];
-        const projH = hullCorners.map(c => project3D(c[0], c[1], c[2], hullR, hullP, 0));
+      // Plate geometry: width=50, height=70, thickness=12
+      const pw = 28, pl = 38, pth = 6;
+      const boxCorners = [
+        [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth], // Top face
+        [-pw, -pl, pth],  [pw, -pl, pth],  [pw, pl, pth],  [-pw, pl, pth]   // Bottom face
+      ];
 
-        // Draw Shell Faces
-        cx.fillStyle = '#101724';
-        cx.strokeStyle = '#00ffcc';
-        cx.lineWidth = 2.0;
-        cx.beginPath();
-        cx.moveTo(projH[0][0], projH[0][1]);
-        cx.lineTo(projH[1][0], projH[1][1]);
-        cx.lineTo(projH[8][0], projH[8][1]);
-        cx.closePath();
-        cx.fill(); cx.stroke();
+      function renderSinglePlate(imu, forceVal, cx_pt, cy_pt, isP1) {
+        const pR = imu.roll;
+        const pP = imu.pitch;
+        const pY = imu.yaw;
 
-        // Oar 1 (Port - Gold): Rotates with IMU 1
-        const p1R = oar1IMU.roll, p1P = oar1IMU.pitch;
-        const oar1Tip = project3D(-95, -15, 0, p1R, p1P, 0);
-        const rigger1 = project3D(-25, 10, 0, hullR, hullP, 0);
-        cx.strokeStyle = '#ffd700'; cx.lineWidth = 3.5;
-        cx.beginPath(); cx.moveTo(rigger1[0], rigger1[1]); cx.lineTo(oar1Tip[0], oar1Tip[1]); cx.stroke();
-        cx.fillStyle = '#ffd700'; cx.fillRect(oar1Tip[0] - 6, oar1Tip[1] - 3, 12, 6);
+        const proj = boxCorners.map(c => project3D(c[0], c[1], c[2], pR, pP, pY, cx_pt, cy_pt));
 
-        // Oar 2 (Starboard - Cyan): Rotates with IMU 2
-        const p2R = oar2IMU.roll, p2P = oar2IMU.pitch;
-        const oar2Tip = project3D(95, -15, 0, p2R, p2P, 0);
-        const rigger2 = project3D(25, 10, 0, hullR, hullP, 0);
-        cx.strokeStyle = '#00e5ff'; cx.lineWidth = 3.5;
-        cx.beginPath(); cx.moveTo(rigger2[0], rigger2[1]); cx.lineTo(oar2Tip[0], oar2Tip[1]); cx.stroke();
-        cx.fillStyle = '#00e5ff'; cx.fillRect(oar2Tip[0] - 6, oar2Tip[1] - 3, 12, 6);
-
-      } else {
-        // Individual Sensor 3D Perspective Box
-        const isO1 = mode === 'oar1';
-        const curIMU = isO1 ? oar1IMU : oar2IMU;
-        const boxCorners = [
-          [-35, -50, -10], [35, -50, -10], [35, 50, -10], [-35, 50, -10],
-          [-35, -50, 10],  [35, -50, 10],  [35, 50, 10],  [-35, 50, 10]
-        ];
-        const projB = boxCorners.map(c => project3D(c[0], c[1], c[2], curIMU.roll, curIMU.pitch, curIMU.yaw));
-
-        function drawBoxPoly(indices, fill, stroke) {
+        function drawFace(indices, fill, stroke) {
           cx.beginPath();
-          cx.moveTo(projB[indices[0]][0], projB[indices[0]][1]);
-          for (let i = 1; i < indices.length; i++) cx.lineTo(projB[indices[i]][0], projB[indices[i]][1]);
+          cx.moveTo(proj[indices[0]][0], proj[indices[0]][1]);
+          for (let i = 1; i < indices.length; i++) cx.lineTo(proj[indices[i]][0], proj[indices[i]][1]);
           cx.closePath();
           cx.fillStyle = fill; cx.fill();
-          cx.strokeStyle = stroke; cx.lineWidth = 1.5; cx.stroke();
+          cx.strokeStyle = stroke; cx.lineWidth = 1.2; cx.stroke();
         }
 
-        drawBoxPoly([0, 1, 2, 3], isO1 ? '#554200' : '#004a55', isO1 ? '#ffd700' : '#00e5ff');
-        drawBoxPoly([4, 5, 6, 7], '#141822', '#2a364e');
-        drawBoxPoly([0, 1, 5, 4], '#1d2332', '#3a4966');
+        // Shaded 3D Body
+        drawFace([4, 5, 6, 7], '#141822', '#263042'); // Bottom
+        drawFace([0, 1, 5, 4], '#1a2230', '#2d3b52'); // Front
+        drawFace([1, 2, 6, 5], '#10151f', '#243044'); // Side
+        drawFace([0, 1, 2, 3], isP1 ? '#42330a' : '#08333d', isP1 ? '#ffd700' : '#00e5ff'); // Top plate
+
+        // 3D DYNAMIC FORCE VECTOR ARROW (Projects out perpendicular to plate face when loaded)
+        const plateCenter = [
+          (proj[0][0] + proj[2][0]) / 2,
+          (proj[0][1] + proj[2][1]) / 2
+        ];
+
+        if (forceVal > 1.0) {
+          const arrowLen = Math.min(80, 12 + forceVal * 1.2);
+          const arrowTip = project3D(0, 0, -pth - arrowLen, pR, pP, pY, cx_pt, cy_pt);
+
+          cx.strokeStyle = isP1 ? '#ffd700' : '#00e5ff';
+          cx.lineWidth = 3.5;
+          cx.beginPath();
+          cx.moveTo(plateCenter[0], plateCenter[1]);
+          cx.lineTo(arrowTip[0], arrowTip[1]);
+          cx.stroke();
+
+          // 3D Arrowhead
+          cx.fillStyle = isP1 ? '#ffd700' : '#00e5ff';
+          cx.beginPath();
+          cx.arc(arrowTip[0], arrowTip[1], 4.5, 0, Math.PI * 2);
+          cx.fill();
+        }
+
+        // Corner Titles & Readouts
+        cx.font = '10px monospace';
+        cx.fillStyle = isP1 ? '#ffd700' : '#00e5ff';
+        cx.fillText(isP1 ? "PLATE 1 (PORT)" : "PLATE 2 (STARBOARD)", cx_pt - 45, cy_pt - 65);
+        cx.fillStyle = '#889bb4';
+        cx.fillText(`P:${((pP * 180)/Math.PI).toFixed(0)}° R:${((pR * 180)/Math.PI).toFixed(0)}°`, cx_pt - 30, cy_pt + 70);
+        cx.fillStyle = isP1 ? '#ffd700' : '#00e5ff';
+        cx.fillText(`${forceVal.toFixed(1)} kg`, cx_pt - 18, cy_pt + 84);
       }
 
-      // Readouts
-      cx.font = '10px monospace';
-      cx.fillStyle = '#00ffcc';
-      cx.fillText(`PITCH: ${((fusedBoatPitch * 180)/Math.PI).toFixed(1)}°`, 10, h - 8);
-      cx.fillStyle = '#ff55aa';
-      cx.fillText(`ROLL:  ${((fusedBoatRoll * 180)/Math.PI).toFixed(1)}°`, w - 120, h - 8);
+      const p1Force = chartData[chartData.length - 1]?.w1 || 0;
+      const p2Force = chartData[chartData.length - 1]?.w2 || 0;
+
+      // Render Plate 1 (Left side)
+      renderSinglePlate(oar1IMU, p1Force, w * 0.25, h / 2, true);
+
+      // Render Plate 2 (Right side)
+      renderSinglePlate(oar2IMU, p2Force, w * 0.75, h / 2, false);
+
       cx.restore();
     }
 
     // ==========================================================================
-    // 6. REAL LIVE SATELLITE GPS MAP (LEAFLET + ARCGIS WORLD IMAGERY)
+    // 6. REAL LIVE SATELLITE GPS MAP (LEAFLET + ARCGIS)
     // ==========================================================================
     const mapLive = L.map('liveMap', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true }).addTo(mapLive);
@@ -1474,7 +1492,7 @@
     }
 
     // ==========================================================================
-    // 7. LIVE FLOW STRIP CHART (LAYER 3)
+    // 7. LIVE FLOW STRIP CHART (DUAL Y-AXIS: FORCE LEFT, SURGE RIGHT)
     // ==========================================================================
     const liveFlowCanvas = document.getElementById('liveFlowCanvas');
     const liveFlowCtx = liveFlowCanvas.getContext('2d');
@@ -1492,23 +1510,50 @@
 
       if (chartData.length < 2) { cx.restore(); return; }
 
-      const gutterL = 45, gutterR = 45, padTop = 26, padBottom = 18;
+      const gutterL = 48, gutterR = 50, padTop = 26, padBottom = 20;
       const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
-      const slice = chartData.slice(-140);
+      const slice = chartData.slice(-150);
 
-      let maxF = 100;
+      // 1. Force Scale (Left Axis)
+      let maxF = 40;
       for (const pt of slice) {
         if (pt.w1 > maxF) maxF = pt.w1;
         if (pt.w2 > maxF) maxF = pt.w2;
       }
-      maxF *= 1.15;
+      maxF *= 1.18;
 
-      cx.strokeStyle = '#141822'; cx.lineWidth = 1;
+      // 2. Surge Scale (Right Axis: m/s²)
+      let minS = -3.0, maxS = 4.0;
+      for (const pt of slice) {
+        if (pt.surge < minS) minS = pt.surge;
+        if (pt.surge > maxS) maxS = pt.surge;
+      }
+      minS = Math.min(-2.5, minS - 0.5);
+      maxS = Math.max(3.0, maxS + 0.5);
+
+      // Grid Lines & Dual Labels
+      cx.strokeStyle = '#121722'; cx.lineWidth = 1;
       for (let i = 0; i <= 3; i++) {
         const y = padTop + plotH - (i / 3) * plotH;
         cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+
+        // Left Ticks (Force kg)
         cx.fillStyle = '#667788'; cx.font = '9px monospace'; cx.textAlign = 'right';
         cx.fillText(((i / 3) * maxF).toFixed(0), gutterL - 5, y + 3);
+
+        // Right Ticks (Surge m/s²)
+        cx.fillStyle = '#00ff88'; cx.textAlign = 'left';
+        const sVal = minS + (i / 3) * (maxS - minS);
+        cx.fillText((sVal >= 0 ? '+' : '') + sVal.toFixed(1), gutterL + plotW + 6, y + 3);
+      }
+
+      // Zero-Line for Bow Surge
+      const zeroNormS = (0.0 - minS) / (maxS - minS);
+      const zeroY = padTop + plotH - zeroNormS * plotH;
+      if (zeroY >= padTop && zeroY <= padTop + plotH) {
+        cx.strokeStyle = '#1d2a22'; cx.lineWidth = 1; cx.setLineDash([3, 3]);
+        cx.beginPath(); cx.moveTo(gutterL, zeroY); cx.lineTo(gutterL + plotW, zeroY); cx.stroke();
+        cx.setLineDash([]);
       }
 
       // Plate 1 Force (Cyan)
@@ -1529,11 +1574,11 @@
       }
       cx.stroke();
 
-      // Clean Bow Surge (Green)
-      cx.strokeStyle = '#00ff88'; cx.lineWidth = 2.2; cx.beginPath();
+      // Clean Bow Surge (Continuous Physical Wave - NEVER Clips)
+      cx.strokeStyle = '#00ff88'; cx.lineWidth = 2.4; cx.beginPath();
       for (let i = 0; i < slice.length; i++) {
         const x = gutterL + (i / (slice.length - 1)) * plotW;
-        const normSurge = (slice[i].surge - (-3)) / (8 - (-3));
+        const normSurge = (slice[i].surge - minS) / (maxS - minS);
         const y = padTop + plotH - Math.max(0, Math.min(1, normSurge)) * plotH;
         if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
       }
@@ -1558,7 +1603,7 @@
       const gutterL = 40, gutterR = 25, padTop = 26, padBottom = 20;
       const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
 
-      let maxF = 80;
+      let maxF = 40;
       const checkM = (arr) => arr.forEach(v => { if (v > maxF) maxF = v; });
       checkM(currentStroke);
       checkM(ghostStroke);
@@ -1566,7 +1611,7 @@
       checkM(secondaryAvg);
       maxF *= 1.15;
 
-      cx.strokeStyle = '#151b26'; cx.lineWidth = 1;
+      cx.strokeStyle = '#121722'; cx.lineWidth = 1;
       for (let i = 0; i <= 3; i++) {
         const y = padTop + plotH - (i / 3) * plotH;
         cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
@@ -2172,7 +2217,7 @@
     }
 
     // ==========================================================================
-    // 12. 4-CHART STROKE ANALYZER SUITE (PRESERVED)
+    // 12. 4-CHART STROKE ANALYZER SUITE
     // ==========================================================================
     let detectedStrokes = [], selectedStrokeId = null;
     let analyzerRegionMode = 'zoom', driveDeltaThreshold = 180, minStrokePeriodSec = 1.2;
@@ -2459,7 +2504,7 @@
     const cnP2 = document.getElementById('strokeCanvasP2');
 
     function masterRenderLoop() {
-      renderDualImu3DCanvas();
+      renderDualPlates3DCanvas();
       renderLiveFlowChart();
 
       // Render Layer 4 Individual Overlays
