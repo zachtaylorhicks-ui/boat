@@ -3,28 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>indaboat Dual-Telemetry Live HUD</title>
+  <title>indaboat Dual-Telemetry Live HUD & Analyzer</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #08090b; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow: hidden; height: 100vh; }
-    #topbar { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #111317; border-bottom: 1px solid #232731; }
-    button { background: #0070e0; border: none; color: #fff; font-weight: bold; padding: 6px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+    body { background: #08090b; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    
+    #topbar { height: 42px; min-height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #111317; border-bottom: 1px solid #232731; z-index: 100; }
+    button { background: #0070e0; border: none; color: #fff; font-weight: bold; padding: 5px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
     button:active { filter: brightness(1.2); }
     .btn-export { background: #009955; }
-    .btn-clear { background: #444; }
+    .btn-import { background: #7b2cbf; }
+    .btn-clear { background: #3a3f4b; }
+    .btn-ctrl { background: #232731; border: 1px solid #363c4a; padding: 3px 8px; font-size: 10px; }
+    .btn-ctrl:hover { background: #2f3543; }
+    .btn-ctrl.active { background: #0070e0; border-color: #0088ff; }
 
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: 240px 1fr 75px 22px;
-      gap: 6px;
-      padding: 6px;
-      height: calc(100vh - 42px);
+    #replayBar {
+      height: 38px;
+      min-height: 38px;
+      background: #12151d;
+      border-bottom: 1px solid #262c3b;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      gap: 12px;
+      font-size: 11px;
     }
 
-    .card { background: #0f1116; border: 1px solid #1f232c; border-radius: 5px; position: relative; overflow: hidden; }
+    .main-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 42px);
+      min-height: 0;
+      padding: 6px;
+      gap: 6px;
+    }
+
+    .grid-top {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: 230px;
+      min-height: 180px;
+      gap: 6px;
+    }
+
+    .card { background: #0f1116; border: 1px solid #1f232c; border-radius: 5px; position: relative; overflow: hidden; display: flex; flex-direction: column; }
     .card-title {
       position: absolute;
       top: 6px;
@@ -38,13 +65,81 @@
       background: rgba(15,17,22,0.85);
       padding: 2px 6px;
       border-radius: 3px;
+      pointer-events: none;
     }
 
     #map { width: 100%; height: 100%; }
     canvas { width: 100%; height: 100%; display: block; }
 
+    /* Interactive Chart Card */
+    #chartCard {
+      flex: 1;
+      min-height: 180px;
+      position: relative;
+    }
+    .chart-header {
+      position: absolute;
+      top: 5px;
+      left: 8px;
+      right: 8px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+    .chart-controls {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      pointer-events: auto;
+    }
+    .legend-group {
+      display: flex;
+      gap: 6px;
+      pointer-events: auto;
+      background: rgba(15,17,22,0.9);
+      padding: 3px 6px;
+      border-radius: 4px;
+      border: 1px solid #232731;
+    }
+    .legend-pill {
+      font-size: 10px;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #181c24;
+      border: 1px solid #2a3140;
+    }
+    .legend-pill.off {
+      opacity: 0.35;
+      filter: grayscale(1);
+    }
+
+    #chartTooltip {
+      position: absolute;
+      display: none;
+      background: rgba(11, 13, 18, 0.94);
+      border: 1px solid #00ffcc;
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 10px;
+      font-family: monospace;
+      color: #eee;
+      pointer-events: none;
+      z-index: 50;
+      white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+    }
+
     #hud {
-      grid-column: span 2;
+      height: 68px;
+      min-height: 68px;
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       gap: 6px;
@@ -59,22 +154,23 @@
       justify-content: center;
       padding: 2px 4px;
     }
-    .badge-val { font-size: 18px; font-weight: 800; color: #00ffcc; line-height: 1.1; }
+    .badge-val { font-size: 17px; font-weight: 800; color: #00ffcc; line-height: 1.1; }
     .badge-lbl { font-size: 9px; color: #777; text-transform: uppercase; margin-top: 2px; font-weight: 600; }
 
     #debugBar {
-      grid-column: span 2;
+      height: 22px;
+      min-height: 22px;
       background: #050608;
       border: 1px solid #16181f;
       border-radius: 3px;
-      padding: 2px 8px;
+      padding: 0 8px;
       font-size: 10px;
       color: #00ff88;
       font-family: monospace;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      line-height: 18px;
+      line-height: 20px;
     }
   </style>
 </head>
@@ -84,37 +180,71 @@
   <div style="display:flex; align-items:center; gap:8px;">
     <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
     <span id="nodeBadge" style="font-size:10px; font-weight:bold; background:#1b202c; border:1px solid #2e3547; color:#88a0cc; padding:2px 6px; border-radius:3px;">NODES: 1 (STANDALONE)</span>
+    <span id="modeBadge" style="font-size:10px; font-weight:bold; background:#221528; border:1px solid #492857; color:#d988ff; padding:2px 6px; border-radius:3px; display:none;">REPLAY MODE</span>
   </div>
-  <span id="bleStatus" style="font-size: 12px; color: #ff4444; font-weight: bold; letter-spacing: 1px;">DISCONNECTED</span>
+  <span id="bleStatus" style="font-size: 11px; color: #ff4444; font-weight: bold; letter-spacing: 1px;">DISCONNECTED</span>
   <div style="display: flex; gap: 6px;">
+    <input type="file" id="fileInput" accept=".csv,.txt,.log,.tsv" style="display:none;" onchange="handleFileSelected(event)">
+    <button class="btn-import" onclick="document.getElementById('fileInput').click()">LOAD CSV / LOG</button>
     <button class="btn-export" onclick="exportDatabase()">EXPORT (<span id="dbCount">0</span>)</button>
     <button class="btn-clear" onclick="clearDatabase()">CLEAR</button>
   </div>
 </div>
 
-<div class="grid">
-  <!-- DYNAMIC 3D FORCE PLATE (CANVAS PROJECTION) -->
-  <div class="card">
-    <div class="card-title">3D Attitude Force Plate</div>
-    <canvas id="plateCanvas"></canvas>
+<!-- FILE REPLAY CONTROLS -->
+<div id="replayBar">
+  <div style="display:flex; align-items:center; gap:6px;">
+    <button id="btnPlay" class="btn-ctrl" onclick="toggleReplayPlay()" style="background:#009955; color:#fff; font-weight:bold; width:65px;">PLAY</button>
+    <button class="btn-ctrl" onclick="stepReplay(-1)">⏮ -1</button>
+    <button class="btn-ctrl" onclick="stepReplay(1)">+1 ⏭</button>
+    <select id="replaySpeed" onchange="replaySpeed = parseFloat(this.value)" style="background:#1b202c; color:#ddd; border:1px solid #2e3547; border-radius:3px; padding:2px 4px; font-size:10px;">
+      <option value="0.5">0.5x</option>
+      <option value="1" selected>1.0x</option>
+      <option value="2">2.0x</option>
+      <option value="5">5.0x</option>
+    </select>
+  </div>
+  <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:650px;">
+    <input type="range" id="replaySlider" min="0" max="100" value="0" style="flex:1; cursor:pointer;" oninput="onReplaySliderInput(this.value)">
+    <span id="replayTimeDisplay" style="font-family:monospace; font-size:10px; color:#00e5ff; white-space:nowrap; min-width:140px;">0 / 0</span>
+  </div>
+  <button class="btn-ctrl" onclick="exitReplayMode()" style="background:#442222; border-color:#663333;">EXIT REPLAY</button>
+</div>
+
+<div class="main-container">
+  <!-- TOP ROW: 3D ATTITUDE + MAP -->
+  <div class="grid-top">
+    <!-- 3D ATTITUDE (NO FORCE OFFSET/ARROW) -->
+    <div class="card">
+      <div class="card-title">3D Attitude Orientation</div>
+      <canvas id="plateCanvas"></canvas>
+    </div>
+
+    <!-- GPS MAP -->
+    <div class="card">
+      <div class="card-title" id="mapTitle">GPS Satellite Track</div>
+      <div id="map"></div>
+    </div>
   </div>
 
-  <!-- GPS SATELLITE MAP -->
-  <div class="card">
-    <div class="card-title" id="mapTitle">GPS Satellite Track</div>
-    <div id="map"></div>
-  </div>
-
-  <!-- LOAD CELL STRIP CHART -->
-  <div class="card">
-    <div class="card-title" id="chartForceTitle">Dynamic Drive Force (kg)</div>
-    <canvas id="chartForce"></canvas>
-  </div>
-
-  <!-- PLANAR SURGE ACCEL CHART -->
-  <div class="card">
-    <div class="card-title" id="chartAccelTitle">Planar Surge Accel (m/s²)</div>
-    <canvas id="chartAccel"></canvas>
+  <!-- BOTTOM ROW: UNIFIED INTERACTIVE MULTI-SERIES CHART -->
+  <div class="card" id="chartCard">
+    <div class="chart-header">
+      <div class="legend-group">
+        <span class="legend-pill" id="leg_load" onclick="toggleSeries('load')" style="color:#00ffcc;">● Load (kg)</span>
+        <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax (m/s²)</span>
+        <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#00ff66;">● Ay (m/s²)</span>
+        <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff;">● Az (m/s²)</span>
+      </div>
+      <div class="chart-controls">
+        <button class="btn-ctrl" onclick="zoomChart(0.7)">+ ZOOM IN</button>
+        <button class="btn-ctrl" onclick="zoomChart(1.4)">- ZOOM OUT</button>
+        <button class="btn-ctrl" onclick="resetChartZoom()">FIT ALL</button>
+        <button class="btn-ctrl active" id="btnFollow" onclick="toggleAutoFollow()">LIVE FOLLOW</button>
+      </div>
+    </div>
+    <div id="chartTooltip"></div>
+    <canvas id="interactiveCanvas"></canvas>
   </div>
 
   <!-- 7 METRIC BADGES -->
@@ -128,17 +258,18 @@
     <div class="badge"><div class="badge-val" id="valSats" style="color: #aaa;">--</div><div class="badge-lbl">GPS Sats</div></div>
   </div>
 
-  <!-- RAW BLE PACKET MONITOR -->
-  <div id="debugBar">Awaiting BLE Connection...</div>
+  <!-- STATUS/PACKET MONITOR -->
+  <div id="debugBar">Ready. Connect BLE or Load a CSV session...</div>
 </div>
 
 <script>
 // ==============================================================================
-// 1. INDEXEDDB PERSISTENT STORAGE
+// 1. DATA STORAGE & RELIABLE EXPORT SYSTEM
 // ==============================================================================
 let db;
 const DB_NAME = "IndaBoatTelemetryDB";
 const STORE_NAME = "records";
+let inMemoryLog = []; // Always records data so export NEVER fails
 
 const dbReq = indexedDB.open(DB_NAME, 1);
 dbReq.onupgradeneeded = (e) => {
@@ -152,50 +283,62 @@ dbReq.onsuccess = (e) => {
   updateRecordCountDisplay();
 };
 
-function saveRowToDB(rowStr) {
-  if (!db) return;
-  const tx = db.transaction([STORE_NAME], "readwrite");
-  tx.objectStore(STORE_NAME).add(rowStr);
+function saveRowToStorage(rowStr) {
+  inMemoryLog.push(rowStr);
+  if (db) {
+    try {
+      const tx = db.transaction([STORE_NAME], "readwrite");
+      tx.objectStore(STORE_NAME).add(rowStr);
+    } catch (err) {}
+  }
+  updateRecordCountDisplay();
 }
 
 function updateRecordCountDisplay() {
-  if (!db) return;
-  const tx = db.transaction([STORE_NAME], "readonly");
-  const countReq = tx.objectStore(STORE_NAME).count();
-  countReq.onsuccess = () => {
-    document.getElementById('dbCount').innerText = countReq.result;
-  };
+  const count = inMemoryLog.length;
+  document.getElementById('dbCount').innerText = count;
 }
 
 function exportDatabase() {
-  if (!db) return;
-  const tx = db.transaction([STORE_NAME], "readonly");
-  const req = tx.objectStore(STORE_NAME).getAll();
-  req.onsuccess = () => {
-    const rows = req.result;
-    if (rows.length === 0) {
-      alert("No data recorded yet.");
-      return;
-    }
-    const blob = new Blob([rows.join('\n') + '\n'], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `indaboat_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
-    a.click();
-  };
+  if (inMemoryLog.length === 0) {
+    alert("No data recorded to export. Connect to device or load a CSV first.");
+    return;
+  }
+  
+  // Format matching hardware output
+  let csvContent = "ms,timestamp,raw_w,ax,ay,az,gx,gy,gz,lat,lng,alt,spd,sats\n";
+  csvContent += inMemoryLog.join("\n") + "\n";
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.style.display = "none";
+  a.href = url;
+  a.download = `indaboat_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 200);
 }
 
 function clearDatabase() {
   if (!confirm("Clear all recorded session data?")) return;
-  const tx = db.transaction([STORE_NAME], "readwrite");
-  tx.objectStore(STORE_NAME).clear().onsuccess = () => {
-    updateRecordCountDisplay();
-  };
+  inMemoryLog = [];
+  chartData = [];
+  if (db) {
+    const tx = db.transaction([STORE_NAME], "readwrite");
+    tx.objectStore(STORE_NAME).clear();
+  }
+  updateRecordCountDisplay();
+  track.setLatLngs([]);
+  marker.setLatLng([0, 0]);
+  redrawInteractiveChart();
 }
 
 // ==============================================================================
-// 2. BLE PACKET STREAM REASSEMBLER
+// 2. BLE LIVE STREAMING ENGINE
 // ==============================================================================
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
@@ -225,38 +368,19 @@ async function toggleConnect() {
     document.getElementById('bleStatus').innerText = "CONNECTED";
     document.getElementById('bleStatus').style.color = "#00ff88";
     document.getElementById('btnConnect').innerText = "DISCONNECT";
+    exitReplayMode();
 
-    if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').catch(() => {});
-    }
+    if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
   } catch (err) {
     console.error(err);
-    alert("Connection failed: " + err.message);
+    alert("BLE Connection notice: " + err.message);
   }
 }
 
 function onDisconnected() {
-  document.getElementById('bleStatus').innerText = "RECONNECTING...";
-  document.getElementById('bleStatus').style.color = "#ff9900";
+  document.getElementById('bleStatus').innerText = "DISCONNECTED";
+  document.getElementById('bleStatus').style.color = "#ff4444";
   document.getElementById('btnConnect').innerText = "CONNECT";
-  setTimeout(attemptAutoReconnect, 2000);
-}
-
-async function attemptAutoReconnect() {
-  if (!device || device.gatt.connected) return;
-  try {
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(SERVICE_UUID);
-    txChar = await service.getCharacteristic(TX_CHAR_UUID);
-    await txChar.startNotifications();
-    txChar.addEventListener('characteristicvaluechanged', handleChunk);
-
-    document.getElementById('bleStatus').innerText = "CONNECTED";
-    document.getElementById('bleStatus').style.color = "#00ff88";
-    document.getElementById('btnConnect').innerText = "DISCONNECT";
-  } catch (e) {
-    setTimeout(attemptAutoReconnect, 2500);
-  }
 }
 
 function handleChunk(event) {
@@ -270,14 +394,13 @@ function handleChunk(event) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     document.getElementById('debugBar').innerText = `RX [${trimmed.length}b]: ${trimmed}`;
-    saveRowToDB(trimmed);
-    parseTelemetry(trimmed);
+    saveRowToStorage(trimmed);
+    ingestTelemetry(trimmed, true);
   }
-  updateRecordCountDisplay();
 }
 
 // ==============================================================================
-// 3. TELEMETRY MATH & DUAL-IMU OPPOSITE-SWING FUSION
+// 3. TELEMETRY MATH & NODES LOGIC
 // ==============================================================================
 class NodeState {
   constructor(id) {
@@ -286,9 +409,9 @@ class NodeState {
     this.raw_w = 0;
     this.baseline_w = null;
     this.net_force = 0;
-    this.a_raw = [0, 0, 0]; // ax, ay, az
-    this.g_raw = [0, 0, 0]; // gx, gy, gz (rad/s)
-    this.gravity_k = [0, -1, 0]; // Dynamic vertical orientation vector
+    this.a_raw = [0, 0, 0];
+    this.g_raw = [0, 0, 0];
+    this.gravity_k = [0, -1, 0];
     this.pitch_est = 0;
     this.roll_est = 0;
     this.swing_rate = 0;
@@ -300,18 +423,14 @@ class NodeState {
     this.a_raw = [ax, ay, az];
     this.g_raw = [gx, gy, gz];
 
-    // Asymmetric baseline for load cell
-    if (this.baseline_w === null) {
-      this.baseline_w = raw_w;
-    }
+    if (this.baseline_w === null) this.baseline_w = raw_w;
     const rate = raw_w > this.baseline_w ? 0.003 : 0.04;
     this.baseline_w = (1.0 - rate) * this.baseline_w + rate * raw_w;
     this.net_force = raw_w - this.baseline_w;
 
-    // Self-aligning Gravity Vector: extracts the true 'Up' axis regardless of chip orientation
     const normA = Math.hypot(ax, ay, az);
     if (normA > 0.001) {
-      const alphaG = 0.02; // Slow low-pass to find gravity
+      const alphaG = 0.02;
       this.gravity_k[0] = (1.0 - alphaG) * this.gravity_k[0] + alphaG * (ax / normA);
       this.gravity_k[1] = (1.0 - alphaG) * this.gravity_k[1] + alphaG * (ay / normA);
       this.gravity_k[2] = (1.0 - alphaG) * this.gravity_k[2] + alphaG * (az / normA);
@@ -319,7 +438,6 @@ class NodeState {
       this.gravity_k = [this.gravity_k[0] / magK, this.gravity_k[1] / magK, this.gravity_k[2] / magK];
     }
 
-    // Python axis mapping: FORWARD = X, LATERAL = Z, GRAVITY_UP = -Y
     const a_fwd = ax;
     const a_lat = az;
     const a_up  = -ay;
@@ -332,8 +450,6 @@ class NodeState {
 
     this.pitch_est = 0.93 * (this.pitch_est + wx * dt) + 0.07 * acc_pitch;
     this.roll_est  = 0.93 * (this.roll_est  + wy * dt) + 0.07 * acc_roll;
-
-    // Planar swing rate (angular velocity projected along normal vector)
     this.swing_rate = gx * this.gravity_k[0] + gy * this.gravity_k[1] + gz * this.gravity_k[2];
   }
 }
@@ -343,123 +459,77 @@ const node2 = new NodeState(2);
 
 let lastTimeSec = null;
 let current_d = { pitch_deg: 0, roll_deg: 0, force_net: 0, a_surge: 0 };
+let chartData = []; // Full series: { ms, timeStr, raw_w, ax, ay, az, net_force, surge }
 
-const HIST_SIZE = 120;
-let forceHistory = new Array(HIST_SIZE).fill(0);
-let surgeHistory = new Array(HIST_SIZE).fill(0);
-
-function parseTelemetry(row) {
+function parseCsvTokens(row) {
   const parts = [];
   let inQuotes = false;
-  let currentToken = '';
-
+  let token = '';
   for (let i = 0; i < row.length; i++) {
     const c = row[i];
-    if (c === '"') {
-      inQuotes = !inQuotes;
-    } else if (c === ',' && !inQuotes) {
-      parts.push(currentToken.trim());
-      currentToken = '';
-    } else {
-      currentToken += c;
-    }
+    if (c === '"') inQuotes = !inQuotes;
+    else if (c === ',' && !inQuotes) { parts.push(token.trim()); token = ''; }
+    else token += c;
   }
-  parts.push(currentToken.trim());
+  parts.push(token.trim());
+  return parts;
+}
 
-  if (parts.length < 14) return;
+function ingestTelemetry(row, updateLiveChart = true) {
+  const parts = parseCsvTokens(row);
+  if (parts.length < 10) return null;
 
   const ms    = parseInt(parts[0], 10);
+  const timeS = parts[1] ? parts[1].replace(/"/g, '') : '';
   const raw_w = parseFloat(parts[2]);
   const ax    = parseFloat(parts[3]);
   const ay    = parseFloat(parts[4]);
   const az    = parseFloat(parts[5]);
-  const gx    = parseFloat(parts[6]); // rad/s from Nano
-  const gy    = parseFloat(parts[7]); // rad/s from Nano
-  const gz    = parseFloat(parts[8]); // rad/s from Nano
+  const gx    = parseFloat(parts[6]);
+  const gy    = parseFloat(parts[7]);
+  const gz    = parseFloat(parts[8]);
   const lat   = parseFloat(parts[9]);
   const lng   = parseFloat(parts[10]);
-  const spd   = parseFloat(parts[12]);
-  const sats  = parseInt(parts[13], 10);
+  const spd   = parts[12] !== undefined ? parseFloat(parts[12]) : 0;
+  const sats  = parts[13] !== undefined ? parseInt(parts[13], 10) : 0;
 
-  // Optional 15th column for Multi-Node ID ("1" or "2")
   let nodeId = 1;
-  if (parts.length >= 15) {
-    const parsedId = parseInt(parts[14], 10);
-    if (parsedId === 2) nodeId = 2;
-  }
+  if (parts.length >= 15 && parseInt(parts[14], 10) === 2) nodeId = 2;
 
-  if (isNaN(raw_w) || isNaN(ax)) return;
+  if (isNaN(raw_w) || isNaN(ax)) return null;
 
   const t_sec = ms / 1000.0;
   const dt = lastTimeSec === null ? 0.033 : Math.min(0.2, Math.max(0.001, t_sec - lastTimeSec));
   lastTimeSec = t_sec;
 
-  // Ingest into target node
-  if (nodeId === 1) {
-    node1.update(raw_w, ax, ay, az, gx, gy, gz, dt);
-  } else {
-    node2.update(raw_w, ax, ay, az, gx, gy, gz, dt);
-  }
+  if (nodeId === 1) node1.update(raw_w, ax, ay, az, gx, gy, gz, dt);
+  else node2.update(raw_w, ax, ay, az, gx, gy, gz, dt);
 
-  // Determine if Node 2 is actively streaming (received data within the last 1500ms)
   const isDual = (Date.now() - node2.lastSeen) < 1500;
   document.getElementById('nodeBadge').innerText = isDual ? "NODES: 2 (KINEMATIC FUSED)" : "NODES: 1 (STANDALONE)";
   document.getElementById('nodeBadge').style.color = isDual ? "#00ffcc" : "#88a0cc";
 
-  let fusedPitch = 0.0;
-  let fusedRoll  = 0.0;
-  let fusedSurge = 0.0;
-  let totalNetForce = 0.0;
+  let fusedPitch = 0.0, fusedRoll = 0.0, fusedSurge = 0.0, totalNetForce = 0.0;
 
   if (isDual) {
-    // =========================================================================
-    // DUAL-NODE FUSION: SHARED HEAVE/ROLL + OPPOSITE SWING CANCELLATION
-    // =========================================================================
-    // 1. Common-mode locked axis (Pitch and Roll are mechanically tied to hull)
     fusedPitch = (node1.pitch_est + node2.pitch_est) / 2.0;
     fusedRoll  = (node1.roll_est  + node2.roll_est)  / 2.0;
-
-    // 2. Relative scissor swing between the two articulated members
-    const diffSwingRate = (node1.swing_rate - node2.swing_rate) / 2.0;
-
-    // 3. Isolate Boat Surge:
-    // Centripetal and tangential whip cancel in the common-mode acceleration sum
     const u_up_x = Math.sin(fusedPitch);
-    const a1_fwd = node1.a_raw[0];
-    const a2_fwd = node2.a_raw[0];
-    const commonFwd = (a1_fwd + a2_fwd) / 2.0;
-
-    // Clean hull surge without arm whip artifacts
-    fusedSurge = commonFwd - (9.80665 * u_up_x);
-
-    // 4. Dual Load Cell Sum & Balance
+    fusedSurge = ((node1.a_raw[0] + node2.a_raw[0]) / 2.0) - (9.80665 * u_up_x);
     totalNetForce = node1.net_force + node2.net_force;
-
     document.getElementById('lblRaw').innerText = "L1 / L2 Raw";
     document.getElementById('valRaw').innerText = `${node1.raw_w.toFixed(0)} / ${node2.raw_w.toFixed(0)}`;
-    document.getElementById('lblNet').innerText = "Total Drive (kg)";
-    document.getElementById('valNet').innerText = (totalNetForce >= 0 ? "+" : "") + totalNetForce.toFixed(1);
-    document.getElementById('chartForceTitle').innerText = `Dual Drive Force (${node1.net_force.toFixed(1)}kg : ${node2.net_force.toFixed(1)}kg)`;
   } else {
-    // =========================================================================
-    // SINGLE-NODE FALLBACK: 100% IDENTICAL TO ORIGINAL STANDALONE LOGIC
-    // =========================================================================
     fusedPitch = node1.pitch_est;
     fusedRoll  = node1.roll_est;
-
     const u_up_x = Math.sin(fusedPitch);
     const u_up_y = Math.sin(fusedRoll);
     const u_up_z = Math.cos(fusedPitch) * Math.cos(fusedRoll);
     const norm_u = Math.hypot(u_up_x, u_up_y, u_up_z) || 1.0;
-
     fusedSurge = node1.a_raw[0] - (9.80665 * (u_up_x / norm_u));
     totalNetForce = node1.net_force;
-
     document.getElementById('lblRaw').innerText = "Raw Load (kg)";
     document.getElementById('valRaw').innerText = node1.raw_w.toFixed(1);
-    document.getElementById('lblNet').innerText = "Drive Force (kg)";
-    document.getElementById('valNet').innerText = (totalNetForce >= 0 ? "+" : "") + totalNetForce.toFixed(1);
-    document.getElementById('chartForceTitle').innerText = "Dynamic Drive Force (kg)";
   }
 
   current_d = {
@@ -469,35 +539,46 @@ function parseTelemetry(row) {
     a_surge:   fusedSurge
   };
 
-  forceHistory.push(totalNetForce);
-  forceHistory.shift();
-  surgeHistory.push(fusedSurge);
-  surgeHistory.shift();
+  const point = {
+    ms, timeStr: timeS, raw_w, ax, ay, az,
+    net_force: totalNetForce, surge: fusedSurge,
+    lat, lng, spd, sats,
+    pitch_deg: current_d.pitch_deg,
+    roll_deg: current_d.roll_deg
+  };
 
-  // Update Remaining HUD
-  document.getElementById('valSurge').innerText = (fusedSurge >= 0 ? "+" : "") + fusedSurge.toFixed(2);
-  document.getElementById('valSpd').innerText   = spd.toFixed(1);
-  document.getElementById('valPitch').innerText = current_d.pitch_deg.toFixed(1) + "°";
-  document.getElementById('valRoll').innerText  = current_d.roll_deg.toFixed(1) + "°";
-  document.getElementById('valSats').innerText  = isNaN(sats) ? 0 : sats;
+  if (updateLiveChart) {
+    chartData.push(point);
+    if (chartData.length > 5000) chartData.shift(); // Live sliding window buffer
+    updateHUD(point);
+  }
 
-  // GPS Map updates
-  if (lat !== 0.0 && lng !== 0.0) {
-    const coord = [lat, lng];
+  return point;
+}
+
+function updateHUD(d) {
+  document.getElementById('valNet').innerText = (d.net_force >= 0 ? "+" : "") + d.net_force.toFixed(1);
+  document.getElementById('valSurge').innerText = (d.surge >= 0 ? "+" : "") + d.surge.toFixed(2);
+  document.getElementById('valSpd').innerText   = d.spd.toFixed(1);
+  document.getElementById('valPitch').innerText = d.pitch_deg.toFixed(1) + "°";
+  document.getElementById('valRoll').innerText  = d.roll_deg.toFixed(1) + "°";
+  document.getElementById('valSats').innerText  = isNaN(d.sats) ? 0 : d.sats;
+
+  if (d.lat !== 0.0 && d.lng !== 0.0 && !isNaN(d.lat) && !isNaN(d.lng)) {
+    const coord = [d.lat, d.lng];
     marker.setLatLng(coord);
     track.addLatLng(coord);
-    map.panTo(coord, { animate: true, duration: 0.1 });
-    document.getElementById('mapTitle').innerText = `GPS Track (${spd.toFixed(1)} km/h | ${sats} Sats)`;
+    if (isAutoFollow) map.panTo(coord, { animate: true, duration: 0.1 });
+    document.getElementById('mapTitle').innerText = `GPS Track (${d.spd.toFixed(1)} km/h | ${d.sats} Sats)`;
   }
 }
 
 // ==============================================================================
-// 4. DYNAMIC 3D MOVING FORCE PLATE (LINE-FOR-LINE PYTHON SECTION 5 PORT)
+// 4. 3D ATTITUDE ORIENTATION (FORCE REMOVED FROM VISUALIZER)
 // ==============================================================================
 function renderPlateCanvas() {
   const cn = document.getElementById('plateCanvas');
   const cx = cn.getContext('2d');
-
   const dpr = window.devicePixelRatio || 1;
   const w = cn.clientWidth;
   const h = cn.clientHeight;
@@ -509,14 +590,14 @@ function renderPlateCanvas() {
 
   cx.save();
   cx.scale(dpr, dpr);
-  cx.fillStyle = '#101010';
+  cx.fillStyle = '#0f1116';
   cx.fillRect(0, 0, w, h);
 
   const pitch = current_d.pitch_deg * (Math.PI / 180.0);
   const roll  = current_d.roll_deg  * (Math.PI / 180.0);
 
   const pw = w * 0.22;
-  const pl = h * 0.20;
+  const pl = h * 0.22;
   const pth = 10;
 
   const corners = [
@@ -524,16 +605,13 @@ function renderPlateCanvas() {
     [-pw, -pl, pth],  [pw, -pl, pth],  [pw, pl, pth],  [-pw, pl, pth]
   ];
 
-  // Rotation Matrix: Ry @ Rx
   const cosR = Math.cos(roll),  sinR = Math.sin(roll);
   const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
 
   const rot = corners.map(c => {
-    // 1. Rx
     const x1 = c[0];
     const y1 = c[1] * cosR - c[2] * sinR;
     const z1 = c[1] * sinR + c[2] * cosR;
-    // 2. Ry
     const x2 = x1 * cosP + z1 * sinP;
     const y2 = y1;
     const z2 = -x1 * sinP + z1 * cosP;
@@ -542,11 +620,10 @@ function renderPlateCanvas() {
 
   const centerX = w / 2;
   const centerY = h / 2 + 10;
-  const vert_shift = Math.max(-45, Math.min(45, (current_d.force_net * -0.65) + (current_d.a_surge * 2.0)));
 
   const pts = rot.map(p => [
     centerX + p[0] * 0.85 - p[1] * 0.40,
-    centerY + p[1] * 0.45 + p[2] + vert_shift
+    centerY + p[1] * 0.45 + p[2]
   ]);
 
   function drawPoly(indices, fillColor, strokeColor) {
@@ -563,66 +640,166 @@ function renderPlateCanvas() {
     cx.stroke();
   }
 
-  // Draw Faces
-  drawPoly([3, 2, 6, 7], '#414141', '#828282'); // Front face
-  drawPoly([1, 2, 6, 5], '#5a5a5a', '#828282'); // Side face
-  drawPoly([0, 1, 2, 3], '#b4961e', '#ffffff'); // Top face (gold)
+  // Draw 3D Box Faces (Pure Attitude)
+  drawPoly([3, 2, 6, 7], '#2b313e', '#525d75'); // Front
+  drawPoly([1, 2, 6, 5], '#384152', '#6b7999'); // Side
+  drawPoly([0, 1, 2, 3], '#0088cc', '#ffffff'); // Top face
 
-  const plate_cx = (pts[0][0] + pts[2][0]) / 2;
-  const plate_cy = (pts[0][1] + pts[2][1]) / 2;
-
-  // Force vector arrow
-  const arrow_len = Math.max(10, Math.min(75, Math.abs(current_d.force_net) * 1.5));
-  cx.beginPath();
-  cx.moveTo(plate_cx, plate_cy);
-  cx.lineTo(plate_cx, plate_cy + arrow_len);
-  cx.strokeStyle = '#00ff00';
-  cx.lineWidth = 3;
-  cx.stroke();
-
-  // Arrowhead
-  cx.beginPath();
-  cx.moveTo(plate_cx - 5, plate_cy + arrow_len - 8);
-  cx.lineTo(plate_cx, plate_cy + arrow_len);
-  cx.lineTo(plate_cx + 5, plate_cy + arrow_len - 8);
-  cx.fillStyle = '#00ff00';
-  cx.fill();
-
-  // Corner readouts matching Python
+  // Readouts
   cx.font = '10px monospace';
   cx.fillStyle = '#00e6ff';
   cx.fillText(`PITCH: ${(current_d.pitch_deg >= 0 ? '+' : '') + current_d.pitch_deg.toFixed(1)}°`, 10, h - 10);
-  cx.fillStyle = '#ff64ff';
+  cx.fillStyle = '#cc66ff';
   cx.fillText(`ROLL:  ${(current_d.roll_deg >= 0 ? '+' : '') + current_d.roll_deg.toFixed(1)}°`, 120, h - 10);
 
   cx.restore();
 }
 
 // ==============================================================================
-// 5. LEAFLET SATELLITE MAP
+// 5. UNIFIED INTERACTIVE MULTI-SERIES CHART (DUAL Y-AXIS, ZOOM, PAN, TOOLTIP)
 // ==============================================================================
-const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19
-}).addTo(map);
+const chartCanvas = document.getElementById('interactiveCanvas');
+const chartCtx = chartCanvas.getContext('2d');
+const chartTooltip = document.getElementById('chartTooltip');
 
-const track = L.polyline([], { color: '#00e5ff', weight: 3 }).addTo(map);
-const marker = L.circleMarker([0, 0], { radius: 6, color: '#ff1100', fillColor: '#ffff00', fillOpacity: 1 }).addTo(map);
+let seriesVisible = { load: true, ax: true, ay: true, az: true };
+let viewStart = 0;   // 0.0 to 1.0
+let viewEnd = 1.0;   // 0.0 to 1.0
+let isAutoFollow = true;
+let chartHoverIndex = null;
+let replayMarkerIndex = null;
 
-// ==============================================================================
-// 6. AUTO-SCALING STRIP CHARTS
-// ==============================================================================
-function renderLoop() {
-  renderPlateCanvas();
-  drawAutoScaledChart('chartForce', forceHistory, '#00ffcc', 'kg', 5.0);
-  drawAutoScaledChart('chartAccel', surgeHistory, '#ffaa00', 'm/s²', 1.0);
-  requestAnimationFrame(renderLoop);
+function toggleSeries(key) {
+  seriesVisible[key] = !seriesVisible[key];
+  document.getElementById(`leg_${key}`).classList.toggle('off', !seriesVisible[key]);
+  redrawInteractiveChart();
 }
 
-function drawAutoScaledChart(id, arr, col, unit, minSpan) {
-  const cn = document.getElementById(id);
-  const cx = cn.getContext('2d');
+function toggleAutoFollow() {
+  isAutoFollow = !isAutoFollow;
+  document.getElementById('btnFollow').classList.toggle('active', isAutoFollow);
+  if (isAutoFollow) {
+    viewEnd = 1.0;
+    viewStart = Math.max(0, 1.0 - 0.25);
+  }
+  redrawInteractiveChart();
+}
 
+function zoomChart(scaleFactor) {
+  isAutoFollow = false;
+  document.getElementById('btnFollow').classList.remove('active');
+  const mid = (viewStart + viewEnd) / 2;
+  const halfSpan = ((viewEnd - viewStart) * scaleFactor) / 2;
+  viewStart = Math.max(0, mid - halfSpan);
+  viewEnd = Math.min(1.0, mid + halfSpan);
+  if (viewEnd <= viewStart) viewEnd = Math.min(1.0, viewStart + 0.05);
+  redrawInteractiveChart();
+}
+
+function resetChartZoom() {
+  viewStart = 0.0;
+  viewEnd = 1.0;
+  redrawInteractiveChart();
+}
+
+// Mouse wheel zoom
+chartCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  isAutoFollow = false;
+  document.getElementById('btnFollow').classList.remove('active');
+  const factor = e.deltaY < 0 ? 0.85 : 1.15;
+  zoomChart(factor);
+}, { passive: false });
+
+// Drag to Pan
+let isDragging = false;
+let dragStartX = 0;
+let dragStartRange = [0, 1];
+
+chartCanvas.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartRange = [viewStart, viewEnd];
+  isAutoFollow = false;
+  document.getElementById('btnFollow').classList.remove('active');
+});
+
+window.addEventListener('mouseup', () => { isDragging = false; });
+
+chartCanvas.addEventListener('mousemove', (e) => {
+  const rect = chartCanvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  if (isDragging) {
+    const dx = e.clientX - dragStartX;
+    const span = dragStartRange[1] - dragStartRange[0];
+    const shift = -(dx / rect.width) * span;
+    viewStart = Math.max(0, dragStartRange[0] + shift);
+    viewEnd = Math.min(1.0, dragStartRange[1] + shift);
+    if (viewStart === 0) viewEnd = span;
+    if (viewEnd === 1.0) viewStart = 1.0 - span;
+    redrawInteractiveChart();
+    return;
+  }
+
+  // Hover Tooltip & Exact Timestamp Lookup
+  handleChartHover(mouseX, mouseY, rect.width, rect.height);
+});
+
+chartCanvas.addEventListener('mouseleave', () => {
+  chartHoverIndex = null;
+  chartTooltip.style.display = 'none';
+  redrawInteractiveChart();
+});
+
+// Click graph in replay mode to jump to timestamp
+chartCanvas.addEventListener('click', (e) => {
+  if (chartHoverIndex !== null && isReplayMode) {
+    jumpToReplayIndex(chartHoverIndex);
+  }
+});
+
+function handleChartHover(mouseX, mouseY, w, h) {
+  if (chartData.length === 0) return;
+  const gutterL = 60, gutterR = 55;
+  const plotW = w - gutterL - gutterR;
+
+  if (mouseX < gutterL || mouseX > w - gutterR) {
+    chartHoverIndex = null;
+    chartTooltip.style.display = 'none';
+    redrawInteractiveChart();
+    return;
+  }
+
+  const sIdx = Math.floor(viewStart * (chartData.length - 1));
+  const eIdx = Math.ceil(viewEnd * (chartData.length - 1));
+  const count = eIdx - sIdx;
+  if (count <= 0) return;
+
+  const ratio = (mouseX - gutterL) / plotW;
+  const idx = Math.min(chartData.length - 1, Math.max(0, Math.round(sIdx + ratio * count)));
+  chartHoverIndex = idx;
+
+  const d = chartData[idx];
+  chartTooltip.style.display = 'block';
+  chartTooltip.style.left = `${Math.min(w - 220, Math.max(10, mouseX + 15))}px`;
+  chartTooltip.style.top = `${Math.min(h - 110, Math.max(30, mouseY - 40))}px`;
+
+  chartTooltip.innerHTML = `
+    <div style="color:#88aacc; font-weight:bold; margin-bottom:3px;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
+    <div style="color:#00ffcc;">LOAD: ${d.raw_w.toFixed(2)} kg</div>
+    <div style="color:#ff4444;">Ax:   ${d.ax.toFixed(2)} m/s²</div>
+    <div style="color:#00ff66;">Ay:   ${d.ay.toFixed(2)} m/s²</div>
+    <div style="color:#3399ff;">Az:   ${d.az.toFixed(2)} m/s²</div>
+  `;
+
+  redrawInteractiveChart();
+}
+
+function redrawInteractiveChart() {
+  const cn = chartCanvas;
+  const cx = chartCtx;
   const dpr = window.devicePixelRatio || 1;
   const w = cn.clientWidth;
   const h = cn.clientHeight;
@@ -636,71 +813,398 @@ function drawAutoScaledChart(id, arr, col, unit, minSpan) {
   cx.scale(dpr, dpr);
   cx.clearRect(0, 0, w, h);
 
-  const gutter = 48;
-  const chartW = w - gutter - 10;
-  const chartH = h - 24;
-  const topPad = 16;
+  const gutterL = 60;
+  const gutterR = 55;
+  const padTop = 32;
+  const padBottom = 22;
+  const plotW = w - gutterL - gutterR;
+  const plotH = h - padTop - padBottom;
 
-  let vMin = Infinity, vMax = -Infinity;
-  for (let i = 0; i < arr.length; i++) {
-    if (arr[i] < vMin) vMin = arr[i];
-    if (arr[i] > vMax) vMax = arr[i];
-  }
-  if (!isFinite(vMin) || !isFinite(vMax)) { vMin = -1; vMax = 1; }
-
-  let span = vMax - vMin;
-  if (span < minSpan) {
-    const mid = (vMax + vMin) / 2.0;
-    vMin = mid - (minSpan / 2.0);
-    vMax = mid + (minSpan / 2.0);
-  } else {
-    vMin -= span * 0.15;
-    vMax += span * 0.15;
+  if (chartData.length < 2) {
+    cx.fillStyle = "#444";
+    cx.font = "12px monospace";
+    cx.textAlign = "center";
+    cx.fillText("Awaiting sensor data or loaded file...", w / 2, h / 2);
+    cx.restore();
+    return;
   }
 
+  if (isAutoFollow && !isReplayMode) {
+    const windowSpan = 150;
+    const total = chartData.length;
+    if (total > windowSpan) {
+      viewStart = (total - windowSpan) / total;
+      viewEnd = 1.0;
+    } else {
+      viewStart = 0; viewEnd = 1.0;
+    }
+  }
+
+  const sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
+  const eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
+  const slice = chartData.slice(sIdx, eIdx + 1);
+
+  // Auto-scale Left Axis (Force in kg)
+  let fMin = Infinity, fMax = -Infinity;
+  // Auto-scale Right Axis (Accel in m/s²)
+  let aMin = Infinity, aMax = -Infinity;
+
+  for (let i = 0; i < slice.length; i++) {
+    const p = slice[i];
+    if (seriesVisible.load) {
+      if (p.raw_w < fMin) fMin = p.raw_w;
+      if (p.raw_w > fMax) fMax = p.raw_w;
+    }
+    if (seriesVisible.ax) {
+      if (p.ax < aMin) aMin = p.ax;
+      if (p.ax > aMax) aMax = p.ax;
+    }
+    if (seriesVisible.ay) {
+      if (p.ay < aMin) aMin = p.ay;
+      if (p.ay > aMax) aMax = p.ay;
+    }
+    if (seriesVisible.az) {
+      if (p.az < aMin) aMin = p.az;
+      if (p.az > aMax) aMax = p.az;
+    }
+  }
+
+  if (!isFinite(fMin) || !isFinite(fMax)) { fMin = -100; fMax = 100; }
+  if (!isFinite(aMin) || !isFinite(aMax)) { aMin = -15; aMax = 15; }
+
+  const fPad = Math.max(2.0, (fMax - fMin) * 0.1);
+  fMin -= fPad; fMax += fPad;
+
+  const aPad = Math.max(1.0, (aMax - aMin) * 0.15);
+  aMin -= aPad; aMax += aPad;
+
+  // Grid & Left Axis (kg)
   const ticks = 4;
-  cx.font = '10px monospace';
-  cx.textAlign = 'right';
-  cx.textBaseline = 'middle';
+  cx.font = "10px monospace";
+  cx.lineWidth = 1;
 
   for (let i = 0; i <= ticks; i++) {
-    const val = vMin + (i / ticks) * (vMax - vMin);
-    const y = topPad + chartH - (i / ticks) * chartH;
-
-    cx.strokeStyle = (Math.abs(val) < (vMax - vMin) / 20.0) ? '#384050' : '#1a1f28';
-    cx.lineWidth = (Math.abs(val) < (vMax - vMin) / 20.0) ? 1.5 : 1;
+    const y = padTop + plotH - (i / ticks) * plotH;
+    
+    // Grid line
+    cx.strokeStyle = "#161b24";
     cx.beginPath();
-    cx.moveTo(gutter, y);
-    cx.lineTo(gutter + chartW, y);
+    cx.moveTo(gutterL, y);
+    cx.lineTo(gutterL + plotW, y);
     cx.stroke();
 
-    cx.fillStyle = '#778899';
-    cx.fillText((val >= 0 ? '+' : '') + val.toFixed(1), gutter - 6, y);
+    // Left Ticks (Force kg)
+    const valF = fMin + (i / ticks) * (fMax - fMin);
+    cx.fillStyle = "#00ffcc";
+    cx.textAlign = "right";
+    cx.textBaseline = "middle";
+    cx.fillText(`${valF.toFixed(1)}`, gutterL - 6, y);
+
+    // Right Ticks (Accel m/s²)
+    const valA = aMin + (i / ticks) * (aMax - aMin);
+    cx.fillStyle = "#8899aa";
+    cx.textAlign = "left";
+    cx.fillText(`${valA.toFixed(1)}`, gutterL + plotW + 6, y);
   }
 
-  cx.strokeStyle = col;
-  cx.lineWidth = 2;
-  cx.beginPath();
-  const step = chartW / (arr.length - 1);
+  // Axis Unit Headers
+  cx.fillStyle = "#00ffcc";
+  cx.textAlign = "left";
+  cx.fillText("FORCE (kg)", 6, padTop - 12);
 
-  for (let i = 0; i < arr.length; i++) {
-    const norm = (arr[i] - vMin) / (vMax - vMin);
-    const x = gutter + i * step;
-    const y = topPad + chartH - Math.max(0, Math.min(1, norm)) * chartH;
+  cx.fillStyle = "#8899aa";
+  cx.textAlign = "right";
+  cx.fillText("ACCEL (m/s²)", w - 6, padTop - 12);
 
-    if (i === 0) cx.moveTo(x, y);
-    else cx.lineTo(x, y);
+  // Helper to draw series
+  function drawLine(key, color, minV, maxV) {
+    if (!seriesVisible[key]) return;
+    cx.strokeStyle = color;
+    cx.lineWidth = 1.8;
+    cx.beginPath();
+    for (let i = 0; i < slice.length; i++) {
+      const p = slice[i];
+      const normX = i / (slice.length - 1);
+      const normY = (p[key === 'load' ? 'raw_w' : key] - minV) / (maxV - minV);
+      const x = gutterL + normX * plotW;
+      const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
+      if (i === 0) cx.moveTo(x, y);
+      else cx.lineTo(x, y);
+    }
+    cx.stroke();
   }
-  cx.stroke();
 
-  cx.fillStyle = '#556677';
-  cx.textAlign = 'left';
-  cx.fillText(unit, gutter + 4, topPad + 10);
+  // Draw 4 Lines
+  drawLine('load', '#00ffcc', fMin, fMax);
+  drawLine('ax',   '#ff4444', aMin, aMax);
+  drawLine('ay',   '#00ff66', aMin, aMax);
+  drawLine('az',   '#3399ff', aMin, aMax);
+
+  // Replay Position Marker
+  if (isReplayMode && replayMarkerIndex !== null && replayMarkerIndex >= sIdx && replayMarkerIndex <= eIdx) {
+    const replayNormX = (replayMarkerIndex - sIdx) / (eIdx - sIdx || 1);
+    const rx = gutterL + replayNormX * plotW;
+    cx.strokeStyle = '#ffff00';
+    cx.lineWidth = 2;
+    cx.setLineDash([4, 3]);
+    cx.beginPath();
+    cx.moveTo(rx, padTop);
+    cx.lineTo(rx, padTop + plotH);
+    cx.stroke();
+    cx.setLineDash([]);
+  }
+
+  // Hover Inspection Crosshair & Dot Snapping
+  if (chartHoverIndex !== null && chartHoverIndex >= sIdx && chartHoverIndex <= eIdx) {
+    const hoverNormX = (chartHoverIndex - sIdx) / (eIdx - sIdx || 1);
+    const hx = gutterL + hoverNormX * plotW;
+    const targetPoint = chartData[chartHoverIndex];
+
+    cx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    cx.lineWidth = 1;
+    cx.setLineDash([3, 3]);
+    cx.beginPath();
+    cx.moveTo(hx, padTop);
+    cx.lineTo(hx, padTop + plotH);
+    cx.stroke();
+    cx.setLineDash([]);
+
+    // Draw Snap Dots
+    function drawDot(val, minV, maxV, col) {
+      const ny = (val - minV) / (maxV - minV);
+      const y = padTop + plotH - Math.max(0, Math.min(1, ny)) * plotH;
+      cx.beginPath();
+      cx.arc(hx, y, 4, 0, Math.PI * 2);
+      cx.fillStyle = col;
+      cx.fill();
+      cx.strokeStyle = '#fff';
+      cx.lineWidth = 1;
+      cx.stroke();
+    }
+    if (seriesVisible.load) drawDot(targetPoint.raw_w, fMin, fMax, '#00ffcc');
+    if (seriesVisible.ax)   drawDot(targetPoint.ax,    aMin, aMax, '#ff4444');
+    if (seriesVisible.ay)   drawDot(targetPoint.ay,    aMin, aMax, '#00ff66');
+    if (seriesVisible.az)   drawDot(targetPoint.az,    aMin, aMax, '#3399ff');
+  }
+
+  // Bottom Time Axis Labels
+  cx.fillStyle = "#667788";
+  cx.textAlign = "left";
+  cx.fillText(slice[0].timeStr || `${slice[0].ms}ms`, gutterL, h - 6);
+  cx.textAlign = "right";
+  cx.fillText(slice[slice.length - 1].timeStr || `${slice[slice.length - 1].ms}ms`, gutterL + plotW, h - 6);
 
   cx.restore();
 }
 
+// ==============================================================================
+// 6. CSV & BLE LOG FILE REPLAY SYSTEM
+// ==============================================================================
+let isReplayMode = false;
+let replayData = [];
+let replayIndex = 0;
+let replayTimer = null;
+let replaySpeed = 1.0;
+
+function handleFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    parseAndLoadFile(evt.target.result);
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function parseAndLoadFile(content) {
+  const lines = content.split(/\r?\n/);
+  const rows = [];
+
+  // 1. Detect if it's the nRF BLE characteristic logger format (Hex encoded)
+  const isHexLog = content.includes("Updated Value of Characteristic");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    if (isHexLog) {
+      const match = line.match(/Updated Value of Characteristic.*?to\s+([0-9a-fA-F\s]+)/);
+      if (match) {
+        const hex = match[1].replace(/[^0-9a-fA-F]/g, '');
+        let ascii = '';
+        for (let j = 0; j < hex.length - 1; j += 2) {
+          ascii += String.fromCharCode(parseInt(hex.substr(j, 2), 16));
+        }
+        const clean = ascii.trim();
+        if (clean.length > 5) rows.push(clean);
+      }
+    } else {
+      // Standard CSV or tab-separated file
+      if (line.includes('\tApplication\t') || line.includes('\t')) {
+        const parts = line.split('\t').map(p => p.trim());
+        const appIdx = parts.indexOf("Application");
+        const useful = appIdx !== -1 ? parts.slice(appIdx + 1) : parts;
+        if (useful.length >= 10 && !isNaN(parseFloat(useful[0]))) {
+          rows.push(`${useful[0]},"${useful[1]}",${useful.slice(2).join(',')}`);
+        }
+      } else if (line.includes(',')) {
+        const tokens = line.split(',');
+        if (tokens.length >= 10 && !isNaN(parseFloat(tokens[0]))) {
+          rows.push(line);
+        }
+      }
+    }
+  }
+
+  if (rows.length === 0) {
+    alert("Could not parse valid telemetry records from this file.");
+    return;
+  }
+
+  // Deduplicate consecutive identical timestamps if dual-logged
+  const cleanRows = [];
+  let lastMs = null;
+  for (const r of rows) {
+    const p = parseCsvTokens(r);
+    const m = parseInt(p[0], 10);
+    if (m !== lastMs) {
+      cleanRows.push(r);
+      lastMs = m;
+    }
+  }
+
+  // Populate data
+  replayData = [];
+  chartData = [];
+  track.setLatLngs([]);
+
+  for (const r of cleanRows) {
+    saveRowToStorage(r);
+    const pt = ingestTelemetry(r, false);
+    if (pt) {
+      replayData.push(pt);
+      chartData.push(pt);
+    }
+  }
+
+  enterReplayMode();
+}
+
+function enterReplayMode() {
+  isReplayMode = true;
+  document.getElementById('modeBadge').style.display = "inline-block";
+  document.getElementById('replayBar').style.display = "flex";
+  document.getElementById('replaySlider').max = replayData.length - 1;
+  document.getElementById('btnFollow').classList.remove('active');
+  isAutoFollow = false;
+
+  resetChartZoom();
+  jumpToReplayIndex(0);
+}
+
+function exitReplayMode() {
+  pauseReplay();
+  isReplayMode = false;
+  document.getElementById('modeBadge').style.display = "none";
+  document.getElementById('replayBar').style.display = "none";
+  isAutoFollow = true;
+  document.getElementById('btnFollow').classList.add('active');
+  replayMarkerIndex = null;
+  redrawInteractiveChart();
+}
+
+function toggleReplayPlay() {
+  if (replayTimer) pauseReplay();
+  else startReplay();
+}
+
+function startReplay() {
+  if (replayIndex >= replayData.length - 1) replayIndex = 0;
+  document.getElementById('btnPlay').innerText = "PAUSE";
+  document.getElementById('btnPlay').style.background = "#e67300";
+
+  let lastTick = performance.now();
+  replayTimer = setInterval(() => {
+    const now = performance.now();
+    const elapsedMs = (now - lastTick) * replaySpeed;
+    lastTick = now;
+
+    // Advance according to packet delta
+    const currentPt = replayData[replayIndex];
+    let nextIdx = replayIndex + 1;
+    if (nextIdx >= replayData.length) {
+      pauseReplay();
+      return;
+    }
+    jumpToReplayIndex(nextIdx);
+  }, 33);
+}
+
+function pauseReplay() {
+  if (replayTimer) {
+    clearInterval(replayTimer);
+    replayTimer = null;
+  }
+  document.getElementById('btnPlay').innerText = "PLAY";
+  document.getElementById('btnPlay').style.background = "#009955";
+}
+
+function stepReplay(step) {
+  pauseReplay();
+  jumpToReplayIndex(Math.max(0, Math.min(replayData.length - 1, replayIndex + step)));
+}
+
+function onReplaySliderInput(val) {
+  pauseReplay();
+  jumpToReplayIndex(parseInt(val, 10));
+}
+
+function jumpToReplayIndex(idx) {
+  if (idx < 0 || idx >= replayData.length) return;
+  replayIndex = idx;
+  replayMarkerIndex = idx;
+  document.getElementById('replaySlider').value = idx;
+
+  const pt = replayData[idx];
+  document.getElementById('replayTimeDisplay').innerText = `${idx + 1}/${replayData.length} (${pt.timeStr || pt.ms + 'ms'})`;
+
+  current_d = {
+    pitch_deg: pt.pitch_deg,
+    roll_deg:  pt.roll_deg,
+    force_net: pt.net_force,
+    a_surge:   pt.surge
+  };
+
+  updateHUD(pt);
+  redrawInteractiveChart();
+}
+
+// ==============================================================================
+// 7. LEAFLET SATELLITE MAP
+// ==============================================================================
+const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19
+}).addTo(map);
+
+const track = L.polyline([], { color: '#00e5ff', weight: 3 }).addTo(map);
+const marker = L.circleMarker([0, 0], { radius: 6, color: '#ff1100', fillColor: '#ffff00', fillOpacity: 1 }).addTo(map);
+
+// ==============================================================================
+// 8. MASTER ANIMATION LOOP
+// ==============================================================================
+function renderLoop() {
+  renderPlateCanvas();
+  if (isAutoFollow && !isReplayMode) redrawInteractiveChart();
+  requestAnimationFrame(renderLoop);
+}
+
 requestAnimationFrame(renderLoop);
+window.addEventListener('resize', () => {
+  redrawInteractiveChart();
+});
 </script>
 </body>
 </html>
