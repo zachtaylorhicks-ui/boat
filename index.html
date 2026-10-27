@@ -52,8 +52,8 @@
     .grid-top {
       display: grid;
       grid-template-columns: 1.15fr 0.85fr;
-      height: 250px;
-      min-height: 200px;
+      height: 260px;
+      min-height: 210px;
       gap: 6px;
     }
 
@@ -101,17 +101,6 @@
     }
     .align-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .align-row label { color: #88a0cc; }
-    .num-input {
-      background: #0b0e14;
-      border: 1px solid #333d52;
-      color: #00ffcc;
-      font-family: monospace;
-      font-size: 10px;
-      width: 50px;
-      padding: 2px 4px;
-      border-radius: 3px;
-      text-align: center;
-    }
 
     #map { width: 100%; height: 100%; }
     canvas { width: 100%; height: 100%; display: block; }
@@ -148,7 +137,6 @@
       border-radius: 4px;
       border: 1px solid #232731;
       flex-wrap: wrap;
-      max-width: 65%;
     }
     .legend-pill {
       font-size: 9px;
@@ -222,7 +210,7 @@
     }
 
     /* ============================================================ */
-    /* STROKE ANALYZER MODAL                                        */
+    /* STROKE ANALYZER MODAL & 3 CHARTS WORKSPACE                   */
     /* ============================================================ */
     #analyzerModal {
       display: none;
@@ -269,7 +257,7 @@
     }
     .analyzer-panel {
       flex: 1;
-      min-height: 210px;
+      min-height: 195px;
       background: #0e1117;
       border: 1px solid #1e2433;
       border-radius: 5px;
@@ -280,7 +268,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 5px 8px;
+      padding: 4px 6px;
       background: #151a24;
       border: 1px solid #263044;
       border-radius: 4px;
@@ -351,12 +339,13 @@
 <div class="main-container">
   <!-- TOP ROW: 3D ORIENTATION + SATELLITE MAP -->
   <div class="grid-top">
-    <!-- 3D ATTITUDE (ZERO LOAD SHIFT APPLIED TO PLATE POSITION/MOTION) -->
+    <!-- 3D ATTITUDE + 6-DOF ARROWS & TWIST SYMBOLS ON ACCELEROMETER -->
     <div class="card">
       <div class="card-title">3D Attitude Orientation</div>
       <div id="canvas3dControls">
         <button class="btn-ctrl" id="btnToggleForceArrow" onclick="toggleForceArrow()">FORCE ARROW: OFF</button>
-        <button class="btn-ctrl" onclick="toggleAlignDrawer()">⚙ ALIGN & OFFSETS</button>
+        <button class="btn-ctrl active" id="btnToggle6Dof" onclick="toggle6DofSymbols()">6-DOF: ON</button>
+        <button class="btn-ctrl" onclick="toggleAlignDrawer()">⚙ ALIGN</button>
         <button class="btn-ctrl" onclick="reset3DCamera()">RESET VIEW</button>
       </div>
 
@@ -364,16 +353,23 @@
       <div id="alignDrawer">
         <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #252e42; padding-bottom:3px;">Relative Sensor Mounting</div>
         <div class="align-row">
-          <label>Mount Yaw Offset:</label>
-          <input type="number" class="num-input" id="inpMountYaw" value="0" step="5" onchange="mountYawDeg = parseFloat(this.value); renderPlateCanvas();">
+          <label>Mount Yaw:</label>
+          <select id="mountYawSel" onchange="mountYawDeg = parseFloat(this.value); renderPlateCanvas();" style="background:#181d26; color:#fff; border:1px solid #333; font-size:10px;">
+            <option value="0" selected>0° (Default)</option>
+            <option value="90">90° CW</option>
+            <option value="180">180°</option>
+            <option value="270">270° CCW</option>
+          </select>
         </div>
         <div class="align-row">
-          <label>Mount Pitch Offset:</label>
-          <input type="number" class="num-input" id="inpMountPitch" value="0" step="1" onchange="mountPitchTrim = parseFloat(this.value); renderPlateCanvas();">
+          <label>Pitch Trim:</label>
+          <input type="range" min="-45" max="45" value="0" step="1" oninput="mountPitchTrim = parseFloat(this.value); document.getElementById('lblPTrim').innerText=this.value+'°'; renderPlateCanvas();">
+          <span id="lblPTrim" style="font-family:monospace; min-width:26px;">0°</span>
         </div>
         <div class="align-row">
-          <label>Mount Roll Offset:</label>
-          <input type="number" class="num-input" id="inpMountRoll" value="0" step="1" onchange="mountRollTrim = parseFloat(this.value); renderPlateCanvas();">
+          <label>Roll Trim:</label>
+          <input type="range" min="-45" max="45" value="0" step="1" oninput="mountRollTrim = parseFloat(this.value); document.getElementById('lblRTrim').innerText=this.value+'°'; renderPlateCanvas();">
+          <span id="lblRTrim" style="font-family:monospace; min-width:26px;">0°</span>
         </div>
         <div class="align-row" style="margin-top:4px;">
           <button class="btn-ctrl" onclick="zeroAttitudeNow()" style="flex:1; justify-content:center; background:#005599;">ZERO LEVEL NOW</button>
@@ -399,12 +395,12 @@
       <div class="legend-group">
         <span class="legend-pill" id="leg_load" onclick="toggleSeries('load')" style="color:#00ffcc;">● Force Plate</span>
         <span class="legend-pill" id="leg_surge" onclick="toggleSeries('surge')" style="color:#00ff88; font-weight:bold;">● Bow Surge (m/s²)</span>
-        <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax (m/s²)</span>
-        <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#22cc88;">● Ay (m/s²)</span>
-        <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff;">● Az (m/s²)</span>
-        <span class="legend-pill" id="leg_gx" onclick="toggleSeries('gx')" style="color:#ffaa00;">● Gx (rad/s)</span>
-        <span class="legend-pill" id="leg_gy" onclick="toggleSeries('gy')" style="color:#d044ff;">● Gy (rad/s)</span>
-        <span class="legend-pill" id="leg_gz" onclick="toggleSeries('gz')" style="color:#ffea00;">● Gz (rad/s)</span>
+        <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax</span>
+        <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#22cc88;">● Ay</span>
+        <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff;">● Az</span>
+        <span class="legend-pill" id="leg_gx" onclick="toggleSeries('gx')" style="color:#ffaa00;">● Gx</span>
+        <span class="legend-pill" id="leg_gy" onclick="toggleSeries('gy')" style="color:#d044ff;">● Gy</span>
+        <span class="legend-pill" id="leg_gz" onclick="toggleSeries('gz')" style="color:#ffea00;">● Gz</span>
         <span class="legend-pill" id="leg_gpsSpd" onclick="toggleSeries('gpsSpd')" style="color:#ffff00;">● GPS Speed</span>
       </div>
       <div class="chart-controls">
@@ -435,7 +431,7 @@
 </div>
 
 <!-- ============================================================ -->
-<!-- STROKE ANALYZER WORKSPACE                                    -->
+<!-- STROKE ANALYZER MODAL: 3 DEDICATED CHARTS                    -->
 <!-- ============================================================ -->
 <div id="analyzerModal">
   <div id="analyzerHeader">
@@ -486,7 +482,7 @@
         </div>
       </div>
 
-      <!-- Stroke List Selector with Discard Checkboxes -->
+      <!-- Stroke List Selector with Checkboxes -->
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
         <span style="font-weight:bold; color:#88a0cc; font-size:10px;">DETECTED STROKES</span>
         <button class="btn-ctrl" onclick="selectAllStrokes(true)">SELECT ALL</button>
@@ -496,7 +492,7 @@
 
     <!-- RIGHT MAIN: THE 3 SPECIFIC CHARTS -->
     <div class="analyzer-main">
-      <!-- CHART 1: CATCH-ALIGNED FORCE CURVES OVERLAY + 6-AXIS IMU LINES FOR EACH STROKE -->
+      <!-- CHART 1: CATCH-ALIGNED FORCE OVERLAY + 6-AXIS IMU LINES FOR EACH STROKE -->
       <div class="analyzer-panel">
         <div class="card-title">Chart 1: Catch-Aligned Force Overlay (All Humps + Bold Average + 6-Axis Lines)</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
@@ -510,7 +506,7 @@
         <canvas id="overlayForceCanvas"></canvas>
       </div>
 
-      <!-- CHART 2: BOW SURGE ACCELERATION (GREEN) OVERLAID ON FORCE PLATE FOR THE WHOLE SELECTION -->
+      <!-- CHART 2: BOW SURGE ACCEL (GREEN) OVERLAID ON FORCE PLATE MEASUREMENTS OVER THE WHOLE SELECTION -->
       <div class="analyzer-panel">
         <div class="card-title">Chart 2: Selection Stretch — Bow Surge Accel (Green) Overlaid on Force Plate</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
@@ -520,9 +516,9 @@
         <canvas id="overlaySelectionCanvas"></canvas>
       </div>
 
-      <!-- CHART 3: SPLIT-ALIGNED KINEMATICS (CATCH ON LEFT, FINISH ON RIGHT) -->
+      <!-- CHART 3: SPLIT-ALIGNED BREAKDOWN (CATCH ALIGNED LEFT, FINISH ALIGNED RIGHT) -->
       <div class="analyzer-panel">
-        <div class="card-title">Chart 3: Split-Aligned Breakdown (Catch on Left, Finish on Right)</div>
+        <div class="card-title">Chart 3: Split-Aligned Breakdown (Catch Aligned Left, Finish Aligned Right)</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
           <span style="font-size:9px; background:#082218; border:1px solid #124d35; color:#00ff88; padding:2px 6px; border-radius:3px;">● BOW SURGE (m/s²)</span>
           <span style="font-size:9px; background:#221808; border:1px solid #553c12; color:#ffd700; padding:2px 6px; border-radius:3px;">● FORCE</span>
@@ -536,7 +532,7 @@
 
 <script>
 // ==============================================================================
-// 1. DATA STORAGE & RELIABLE EXPORT
+// 1. DATA STORAGE & EXPORT
 // ==============================================================================
 let inMemoryLog = [];
 let invertLoad = true;
@@ -852,9 +848,10 @@ function updateHUD(d) {
 }
 
 // ==============================================================================
-// 4. 3D ACCELEROMETER ORIENTATION (ZERO LOAD DISPLACEMENT ON PLATE)
+// 4. 3D ACCELEROMETER ORIENTATION (RESTORED MATRIX & 6-DOF VECTORS)
 // ==============================================================================
 let showForceArrow = false;
+let show6DofSymbols = true;
 let mountYawDeg = 0;
 let mountPitchTrim = 0;
 let mountRollTrim = 0;
@@ -894,6 +891,13 @@ function toggleForceArrow() {
   renderPlateCanvas();
 }
 
+function toggle6DofSymbols() {
+  show6DofSymbols = !show6DofSymbols;
+  document.getElementById('btnToggle6Dof').classList.toggle('active', show6DofSymbols);
+  document.getElementById('btnToggle6Dof').innerText = show6DofSymbols ? "6-DOF: ON" : "6-DOF: OFF";
+  renderPlateCanvas();
+}
+
 function toggleAlignDrawer() {
   const d = document.getElementById('alignDrawer');
   d.style.display = d.style.display === 'flex' ? 'none' : 'flex';
@@ -922,35 +926,42 @@ function renderPlateCanvas() {
   cx.fillStyle = '#0f1116';
   cx.fillRect(0, 0, w, h);
 
-  // Purely Driven by Kinematic IMU Attitude (ZERO load displacement)
+  // Attitude Driven 100% by IMU (Zero Load Cell Movement Applied to Plate)
   const pitchRad = ((current_d.pitch_deg - zeroPitchOffset + mountPitchTrim) * Math.PI) / 180.0;
   const rollRad  = ((current_d.roll_deg - zeroRollOffset + mountRollTrim) * Math.PI) / 180.0;
   const mountYaw = (mountYawDeg * Math.PI) / 180.0;
 
+  // Exact, Non-distorting 3D Euler Transformation
   function rotate3D(pt) {
+    // 1. Mount Yaw
     let x = pt[0] * Math.cos(mountYaw) - pt[1] * Math.sin(mountYaw);
     let y = pt[0] * Math.sin(mountYaw) + pt[1] * Math.cos(mountYaw);
     let z = pt[2];
 
+    // 2. Rx (Roll)
     const cosR = Math.cos(rollRad), sinR = Math.sin(rollRad);
     let y1 = y * cosR - z * sinR;
     let z1 = y * sinR + z * cosR;
+    let x1 = x;
 
+    // 3. Ry (Pitch)
     const cosP = Math.cos(pitchRad), sinP = Math.sin(pitchRad);
-    let x2 = x * cosP + z1 * sinP;
+    let x2 = x1 * cosP + z1 * sinP;
     let y2 = y1;
     let z2 = -x1 * sinP + z1 * cosP;
 
+    // 4. Camera View Orbit (camYaw around Y, camPitch around X)
     const cosCY = Math.cos(camYaw), sinCY = Math.sin(camYaw);
     let x3 = x2 * cosCY + z2 * sinCY;
     let y3 = y2;
     let z3 = -x2 * sinCY + z2 * cosCY;
 
     const cosCP = Math.cos(camPitch), sinCP = Math.sin(camPitch);
-    let y4 = y1 * cosCP - z3 * sinCP;
-    let z4 = y1 * sinCP + z3 * cosCP;
+    let x4 = x3;
+    let y4 = y3 * cosCP - z3 * sinCP;
+    let z4 = y3 * sinCP + z3 * cosCP;
 
-    return [x3, y4, z4];
+    return [x4, y4, z4];
   }
 
   const centerX = w / 2;
@@ -959,9 +970,10 @@ function renderPlateCanvas() {
 
   function project(pt3) {
     const r = rotate3D(pt3);
-    return [centerX + r[0] * scale, centerY + r[1] * scale];
+    return [centerX + r[0] * scale, centerY + r[1] * scale, r[2]];
   }
 
+  // Plate Geometry
   const pw = 55, pl = 85, pth = 8;
   const corners = [
     [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth],
@@ -985,6 +997,33 @@ function renderPlateCanvas() {
   drawPoly([1, 2, 6, 5], '#252c38', '#424c61');
   drawPoly([0, 1, 2, 3], '#114466', '#00ffcc');
 
+  // Accelerometer IMU Chip (Mounted on top of plate)
+  const chipW = 16, chipL = 20, chipH = 4;
+  const chipZ = -pth - 3;
+  const chipCorners = [
+    [-chipW, -chipL, chipZ - chipH], [chipW, -chipL, chipZ - chipH],
+    [chipW, chipL, chipZ - chipH],   [-chipW, chipL, chipZ - chipH]
+  ];
+  const chipPts = chipCorners.map(project);
+
+  cx.beginPath();
+  cx.moveTo(chipPts[0][0], chipPts[0][1]);
+  for (let i = 1; i < 4; i++) cx.lineTo(chipPts[i][0], chipPts[i][1]);
+  cx.closePath();
+  cx.fillStyle = '#222';
+  cx.fill();
+  cx.strokeStyle = '#ffbb00';
+  cx.lineWidth = 1.5;
+  cx.stroke();
+
+  const chipCenter3D = [0, 0, chipZ - chipH];
+  const chipCenter2D = project(chipCenter3D);
+
+  cx.fillStyle = '#ffbb00';
+  cx.font = '8px monospace';
+  cx.fillText("IMU", chipCenter2D[0] - 8, chipCenter2D[1] - 4);
+
+  // Optional Force Vector Arrow (Pure Visual on Plate Surface)
   const effLoad = (invertLoad ? -1 : 1) * current_d.raw_w;
   if (showForceArrow) {
     const fMag = Math.max(-70, Math.min(70, effLoad * 0.12));
@@ -997,11 +1036,69 @@ function renderPlateCanvas() {
     cx.strokeStyle = '#00ffcc';
     cx.lineWidth = 3.5;
     cx.stroke();
+  }
 
-    cx.fillStyle = '#00ffcc';
-    cx.beginPath();
-    cx.arc(tip2D[0], tip2D[1], 4, 0, Math.PI * 2);
-    cx.fill();
+  // Restored 6-DOF Linear Arrows & Rotational Twist Arcs
+  if (show6DofSymbols) {
+    const aScale = 2.8;
+    function drawVectorArrow(vec, col, label, val) {
+      const p1 = chipCenter2D;
+      const p2 = project([
+        chipCenter3D[0] + vec[0] * aScale,
+        chipCenter3D[1] + vec[1] * aScale,
+        chipCenter3D[2] + vec[2] * aScale
+      ]);
+
+      cx.beginPath();
+      cx.moveTo(p1[0], p1[1]);
+      cx.lineTo(p2[0], p2[1]);
+      cx.strokeStyle = col;
+      cx.lineWidth = 2.2;
+      cx.stroke();
+
+      cx.font = '9px monospace';
+      cx.fillStyle = col;
+      cx.fillText(`${label}: ${(val >= 0 ? '+' : '') + val.toFixed(2)}`, p2[0] + 5, p2[1] + 3);
+    }
+
+    drawVectorArrow([current_d.ax, 0, 0], '#ff4444', 'Ax', current_d.ax);
+    drawVectorArrow([0, current_d.ay, 0], '#00ff66', 'Ay', current_d.ay);
+    drawVectorArrow([0, 0, current_d.az], '#3399ff', 'Az', current_d.az);
+
+    function drawTwistArc(axis, rate, col, label) {
+      const radius = 24;
+      const arcLen = Math.min(Math.PI * 1.5, Math.max(0.6, Math.abs(rate) * 1.8));
+      const steps = 12;
+      const sign = rate >= 0 ? 1 : -1;
+
+      cx.beginPath();
+      let lastPt = null;
+      for (let s = 0; s <= steps; s++) {
+        const theta = (s / steps) * arcLen * sign;
+        let pt = [0, 0, 0];
+        if (axis === 'x') pt = [0, radius * Math.cos(theta), radius * Math.sin(theta)];
+        else if (axis === 'y') pt = [radius * Math.cos(theta), 0, radius * Math.sin(theta)];
+        else pt = [radius * Math.cos(theta), radius * Math.sin(theta), 0];
+
+        const p2d = project([chipCenter3D[0] + pt[0], chipCenter3D[1] + pt[1], chipCenter3D[2] + pt[2]]);
+        if (s === 0) cx.moveTo(p2d[0], p2d[1]);
+        else cx.lineTo(p2d[0], p2d[1]);
+        lastPt = p2d;
+      }
+      cx.strokeStyle = col;
+      cx.lineWidth = 2.0;
+      cx.stroke();
+
+      if (lastPt) {
+        cx.font = '9px monospace';
+        cx.fillStyle = col;
+        cx.fillText(`${label}: ${(rate >= 0 ? '+' : '') + rate.toFixed(2)}`, lastPt[0] + 6, lastPt[1] - 4);
+      }
+    }
+
+    drawTwistArc('x', current_d.gx, '#ff9900', 'Gx');
+    drawTwistArc('y', current_d.gy, '#d044ff', 'Gy');
+    drawTwistArc('z', current_d.gz, '#ffea00', 'Gz');
   }
 
   cx.font = '10px monospace';
@@ -1009,6 +1106,8 @@ function renderPlateCanvas() {
   cx.fillText(`PITCH: ${(current_d.pitch_deg >= 0 ? '+' : '') + current_d.pitch_deg.toFixed(1)}°`, 10, h - 10);
   cx.fillStyle = '#cc66ff';
   cx.fillText(`ROLL:  ${(current_d.roll_deg >= 0 ? '+' : '') + current_d.roll_deg.toFixed(1)}°`, 110, h - 10);
+  cx.fillStyle = '#8899aa';
+  cx.fillText(`LOAD:  ${effLoad.toFixed(1)}`, 200, h - 10);
 
   cx.restore();
 }
@@ -1365,7 +1464,7 @@ function redrawInteractiveChart() {
   }
 
   drawLine('load', '#00ffcc', fMin, fMax, true, 2.0);
-  drawLine('surge', '#00ff88', mMin, mMax, false, 2.2); // GREEN BOW SURGE LINE
+  drawLine('surge', '#00ff88', mMin, mMax, false, 2.2); // Green Bow Surge Line
   drawLine('ax', '#ff4444', mMin, mMax);
   drawLine('ay', '#22cc88', mMin, mMax);
   drawLine('az', '#3399ff', mMin, mMax);
@@ -1374,7 +1473,7 @@ function redrawInteractiveChart() {
   drawLine('gz', '#ffea00', mMin, mMax);
   drawLine('gpsSpd', '#ffff00', mMin, mMax, false, 1.8);
 
-  // REPLAY TIME-SCROLL SCRUBBER LINE
+  // Prominent Replay Time-Scroller Vertical Line
   if (isReplayMode && replayMarkerIndex !== null && replayMarkerIndex >= sIdx && replayMarkerIndex <= eIdx) {
     const rx = gutterL + ((replayMarkerIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
     cx.strokeStyle = '#ffffff';
