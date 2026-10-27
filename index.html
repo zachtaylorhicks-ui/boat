@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>indaboat Dual-Telemetry Live HUD & 6-DOF Kinematic Analyzer</title>
+  <title>indaboat Dual-Telemetry Live HUD & Kinematic Stroke Analyzer</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #08090b; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    body { background: #08090b; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow-x: hidden; height: 100vh; display: flex; flex-direction: column; }
     
     #topbar { height: 42px; min-height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; background: #111317; border-bottom: 1px solid #232731; z-index: 100; }
     button { background: #0070e0; border: none; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; user-select: none; }
@@ -16,13 +16,13 @@
     .btn-export { background: #009955; }
     .btn-import { background: #7b2cbf; }
     .btn-clear { background: #3a3f4b; }
-    .btn-analyzer { background: #ffaa00; color: #111; font-weight: 800; border: 1px solid #ffbb22; }
-    .btn-analyzer:hover { background: #ffbb22; }
     .btn-toggle { background: #262c3a; border: 1px solid #3c465d; font-size: 10px; padding: 4px 8px; }
     .btn-toggle.active { background: #0088cc; border-color: #33bbff; color: #fff; }
-    .btn-ctrl { background: #1e232e; border: 1px solid #323b4e; padding: 3px 8px; font-size: 10px; border-radius: 3px; }
+    .btn-ctrl { background: #1e232e; border: 1px solid #323b4e; padding: 3px 8px; font-size: 10px; border-radius: 3px; color: #ddd; }
     .btn-ctrl:hover { background: #2a3243; }
-    .btn-ctrl.active { background: #0070e0; border-color: #0099ff; }
+    .btn-ctrl.active { background: #0070e0; border-color: #0099ff; color: #fff; }
+    .btn-flatline { background: #993300; border: 1px solid #cc4400; font-size: 10px; }
+    .btn-flatline.active { background: #ff4400; color: #fff; }
 
     #replayBar {
       height: 38px;
@@ -45,12 +45,13 @@
       min-height: 0;
       padding: 6px;
       gap: 6px;
+      overflow-y: auto;
     }
 
     .grid-top {
       display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      height: 270px;
+      grid-template-columns: 1fr 1fr;
+      height: 250px;
       min-height: 220px;
       gap: 6px;
     }
@@ -103,10 +104,10 @@
     #map { width: 100%; height: 100%; }
     canvas { width: 100%; height: 100%; display: block; }
 
-    /* Interactive Chart Card */
-    #chartCard {
+    /* Chart Workspaces */
+    .chart-container {
       flex: 1;
-      min-height: 180px;
+      min-height: 250px;
       position: relative;
     }
     .chart-header {
@@ -135,6 +136,7 @@
       border-radius: 4px;
       border: 1px solid #232731;
       flex-wrap: wrap;
+      max-width: 70%;
     }
     .legend-pill {
       font-size: 9px;
@@ -172,8 +174,8 @@
     }
 
     #hud {
-      height: 62px;
-      min-height: 62px;
+      height: 58px;
+      min-height: 58px;
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       gap: 6px;
@@ -188,7 +190,7 @@
       justify-content: center;
       padding: 2px 4px;
     }
-    .badge-val { font-size: 16px; font-weight: 800; color: #00ffcc; line-height: 1.1; }
+    .badge-val { font-size: 15px; font-weight: 800; color: #00ffcc; line-height: 1.1; }
     .badge-lbl { font-size: 9px; color: #777; text-transform: uppercase; margin-top: 2px; font-weight: 600; }
 
     #debugBar {
@@ -207,87 +209,82 @@
       line-height: 18px;
     }
 
-    /* ============================================================ */
-    /* STROKE ANALYZER MODAL & WORKSPACE STYLES                     */
-    /* ============================================================ */
-    #analyzerModal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(4, 5, 8, 0.97);
-      z-index: 500;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    #analyzerHeader {
-      height: 48px;
-      background: #11141c;
-      border-bottom: 1px solid #232a3b;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-    }
-    #analyzerContent {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 320px 1fr;
-      min-height: 0;
-      gap: 8px;
-      padding: 8px;
-    }
-    .analyzer-sidebar {
-      background: #0e1117;
-      border: 1px solid #1e2433;
-      border-radius: 5px;
-      display: flex;
-      flex-direction: column;
-      padding: 10px;
-      gap: 10px;
-      overflow-y: auto;
-    }
-    .analyzer-main {
+    /* IN-CONTEXT STROKE ANALYZER WORKSPACE */
+    #strokeAnalyzerWorkspace {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      min-height: 0;
-    }
-    .analyzer-panel {
-      flex: 1;
-      background: #0e1117;
-      border: 1px solid #1e2433;
+      background: #0a0c10;
+      border: 1px solid #232b3d;
       border-radius: 5px;
-      position: relative;
-      overflow: hidden;
-      min-height: 140px;
+      padding: 8px;
     }
-    .stroke-list-item {
+    .stroke-ctrl-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 4px 6px;
-      background: #151a24;
-      border: 1px solid #263044;
+      gap: 8px;
+      background: #121620;
+      border: 1px solid #202738;
       border-radius: 4px;
-      cursor: pointer;
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+    .stroke-input-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .num-input {
+      background: #0b0e14;
+      border: 1px solid #333d52;
+      color: #00ffcc;
+      font-family: monospace;
+      font-size: 11px;
+      width: 55px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      text-align: center;
+    }
+
+    .scorecard-bar {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+      background: #11141c;
+      border: 1px solid #1e2433;
+      border-radius: 4px;
+      padding: 6px 8px;
       font-size: 10px;
+    }
+    .scorecard-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .scorecard-val { font-size: 13px; font-weight: bold; color: #00e5ff; font-family: monospace; }
+    .scorecard-lbl { font-size: 8px; color: #8899aa; text-transform: uppercase; margin-top: 1px; }
+
+    .stroke-pills-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+      padding: 4px 0;
+      white-space: nowrap;
+    }
+    .stroke-chip {
+      background: #161b26;
+      border: 1px solid #263147;
+      color: #ccc;
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
       user-select: none;
     }
-    .stroke-list-item:hover { background: #1c2331; }
-    .stroke-list-item.selected { border-color: #ffaa00; background: #262215; }
-    .stroke-list-item.dimmed { opacity: 0.35; }
-
-    .control-box {
-      background: #141822;
-      border: 1px solid #242c3d;
-      border-radius: 4px;
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 10px;
-    }
-    .control-box label { color: #88a0cc; font-weight: bold; display: flex; justify-content: space-between; }
+    .stroke-chip.active { background: #ffaa00; border-color: #ffbb22; color: #111; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -298,7 +295,10 @@
     <span id="nodeBadge" style="font-size:10px; font-weight:bold; background:#1b202c; border:1px solid #2e3547; color:#88a0cc; padding:2px 6px; border-radius:3px;">NODES: 1</span>
     <span id="modeBadge" style="font-size:10px; font-weight:bold; background:#291433; border:1px solid #55246e; color:#dc88ff; padding:2px 6px; border-radius:3px; display:none;">REPLAY</span>
     <button class="btn-toggle active" id="btnInvertLoad" onclick="toggleLoadInversion()">FLIP LOAD (+/-)</button>
-    <button class="btn-analyzer" onclick="openStrokeAnalyzer()">⚡ STROKE ANALYZER</button>
+    
+    <!-- Flatlining & Gap Tools -->
+    <button class="btn-flatline" id="btnFlatlineTool" onclick="toggleFlatlineMode()">✏️ FLATLINE SPIKE</button>
+    <button class="btn-ctrl" onclick="resetFlatlines()">⟲ RESET FLATLINES</button>
   </div>
   <span id="bleStatus" style="font-size: 11px; color: #ff4444; font-weight: bold; letter-spacing: 0.5px;">DISCONNECTED</span>
   <div style="display: flex; gap: 6px;">
@@ -334,41 +334,34 @@
 <div class="main-container">
   <!-- TOP ROW: 3D ORIENTATION + SATELLITE MAP -->
   <div class="grid-top">
-    <!-- 3D ATTITUDE + 6-DOF ARROWS & TWIST SYMBOLS ON ACCELEROMETER -->
+    <!-- 3D ATTITUDE (ZERO LOAD SHIFT APPLIED TO PLATE) -->
     <div class="card">
-      <div class="card-title">3D Attitude & 6-DOF Motion Kinematics</div>
+      <div class="card-title">3D Attitude (Accelerometer/IMU Kinematics)</div>
       <div id="canvas3dControls">
         <button class="btn-ctrl" id="btnToggleForceArrow" onclick="toggleForceArrow()">FORCE ARROW: OFF</button>
-        <button class="btn-ctrl active" id="btnToggle6Dof" onclick="toggle6DofSymbols()">6-DOF: ON</button>
-        <button class="btn-ctrl" onclick="toggleAlignDrawer()">⚙ ALIGN</button>
+        <button class="btn-ctrl" onclick="toggleAlignDrawer()">⚙ ALIGN & OFFSETS</button>
         <button class="btn-ctrl" onclick="reset3DCamera()">RESET VIEW</button>
       </div>
 
-      <!-- Alignment & Mounting Offset Drawer -->
+      <!-- Alignment & Relative Mounting Offset Drawer -->
       <div id="alignDrawer">
-        <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #252e42; padding-bottom:3px;">Relative Plate Mounting</div>
+        <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #252e42; padding-bottom:3px;">Relative Sensor Mounting</div>
         <div class="align-row">
-          <label>Mount Yaw:</label>
-          <select id="mountYawSel" onchange="mountYawDeg = parseFloat(this.value)" style="background:#181d26; color:#fff; border:1px solid #333; font-size:10px;">
-            <option value="0" selected>0° (Default)</option>
-            <option value="90">90° CW</option>
-            <option value="180">180°</option>
-            <option value="270">270° CCW</option>
-          </select>
+          <label>Mount Yaw Offset:</label>
+          <input type="number" class="num-input" id="inpMountYaw" value="0" step="5" onchange="mountYawDeg = parseFloat(this.value); renderPlateCanvas();">
         </div>
         <div class="align-row">
-          <label>Pitch Trim:</label>
-          <input type="range" min="-45" max="45" value="0" step="1" oninput="mountPitchTrim = parseFloat(this.value); document.getElementById('lblPTrim').innerText=this.value+'°'">
-          <span id="lblPTrim" style="font-family:monospace; min-width:26px;">0°</span>
+          <label>Mount Pitch Offset:</label>
+          <input type="number" class="num-input" id="inpMountPitch" value="0" step="1" onchange="mountPitchTrim = parseFloat(this.value); renderPlateCanvas();">
         </div>
         <div class="align-row">
-          <label>Roll Trim:</label>
-          <input type="range" min="-45" max="45" value="0" step="1" oninput="mountRollTrim = parseFloat(this.value); document.getElementById('lblRTrim').innerText=this.value+'°'">
-          <span id="lblRTrim" style="font-family:monospace; min-width:26px;">0°</span>
+          <label>Mount Roll Offset:</label>
+          <input type="number" class="num-input" id="inpMountRoll" value="0" step="1" onchange="mountRollTrim = parseFloat(this.value); renderPlateCanvas();">
         </div>
         <div class="align-row" style="margin-top:4px;">
           <button class="btn-ctrl" onclick="zeroAttitudeNow()" style="flex:1; justify-content:center; background:#005599;">ZERO LEVEL NOW</button>
         </div>
+        <div style="font-size:9px; color:#778899; margin-top:2px;">*Click & drag canvas with mouse to orbit camera</div>
       </div>
 
       <canvas id="plateCanvas"></canvas>
@@ -384,28 +377,86 @@
     </div>
   </div>
 
-  <!-- BOTTOM ROW: UNIFIED INTERACTIVE MULTI-SERIES CHART (LOAD + ALL 6 AXES) -->
-  <div class="card" id="chartCard">
+  <!-- CHART 1: FULL STRETCH MULTI-SENSOR TELEMETRY (SELECTED TIMELINE SECTION) -->
+  <div class="card chart-container" id="chartCard">
     <div class="chart-header">
       <div class="legend-group">
-        <span class="legend-pill" id="leg_load" onclick="toggleSeries('load')" style="color:#00ffcc;">● Load (raw)</span>
-        <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax (m/s²)</span>
-        <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#00ff66;">● Ay (m/s²)</span>
-        <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff;">● Az (m/s²)</span>
-        <span class="legend-pill" id="leg_gx" onclick="toggleSeries('gx')" style="color:#ff9900;">● Gx (rad/s)</span>
+        <span class="legend-pill" id="leg_load" onclick="toggleSeries('load')" style="color:#00ffcc;">● Force Plate</span>
+        <span class="legend-pill" id="leg_surge" onclick="toggleSeries('surge')" style="color:#00ff88; font-weight:800;">● Calc Bow Surge (m/s²)</span>
+        <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax</span>
+        <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#22cc88;">● Ay</span>
+        <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff;">● Az</span>
+        <span class="legend-pill" id="leg_gx" onclick="toggleSeries('gx')" style="color:#ffaa00;">● Gx (rad/s)</span>
         <span class="legend-pill" id="leg_gy" onclick="toggleSeries('gy')" style="color:#d044ff;">● Gy (rad/s)</span>
         <span class="legend-pill" id="leg_gz" onclick="toggleSeries('gz')" style="color:#ffea00;">● Gz (rad/s)</span>
+        <span class="legend-pill" id="leg_gpsSpd" onclick="toggleSeries('gpsSpd')" style="color:#ffff00;">● GPS Rep Speed (km/h)</span>
+        <span class="legend-pill" id="leg_posSpd" onclick="toggleSeries('posSpd')" style="color:#ff88dd;">● GPS Pos Speed (km/h)</span>
+        <span class="legend-pill" id="leg_posAccel" onclick="toggleSeries('posAccel')" style="color:#88eeff;">● GPS Pos Accel (m/s²)</span>
       </div>
       <div class="chart-controls">
-        <button class="btn-analyzer" onclick="openStrokeAnalyzer()" style="padding:2px 8px; font-size:10px;">⚡ ANALYZE STROKES</button>
-        <button class="btn-ctrl" onclick="zoomChart(0.7)">+ ZOOM IN</button>
-        <button class="btn-ctrl" onclick="zoomChart(1.4)">- ZOOM OUT</button>
+        <button class="btn-ctrl" onclick="zoomChart(0.7)">+ ZOOM</button>
+        <button class="btn-ctrl" onclick="zoomChart(1.4)">- ZOOM</button>
         <button class="btn-ctrl" onclick="resetChartZoom()">FIT ALL</button>
         <button class="btn-ctrl active" id="btnFollow" onclick="toggleAutoFollow()">LIVE FOLLOW</button>
       </div>
     </div>
     <div id="chartTooltip"></div>
     <canvas id="interactiveCanvas"></canvas>
+  </div>
+
+  <!-- IN-CONTEXT STROKE ANALYZER WORKSPACE -->
+  <div id="strokeAnalyzerWorkspace">
+    <!-- Controls Bar -->
+    <div class="stroke-ctrl-bar">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-weight:800; color:#ffaa00; font-size:12px;">⚡ CATCH-SYNCED STROKE ENSEMBLE</span>
+        <span id="strokeCountBadge" style="font-size:10px; background:#1b202c; border:1px solid #2e3547; color:#88a0cc; padding:2px 6px; border-radius:3px;">0 STROKES FOUND</span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="stroke-input-group">
+          <label style="color:#8899aa; font-size:10px;">CATCH SWIVEL (deg/s):</label>
+          <input type="number" id="inpSwivelThresh" class="num-input" value="35" step="5" onchange="runStrokeAnalysis()">
+        </div>
+        <div class="stroke-input-group">
+          <label style="color:#8899aa; font-size:10px;">DRIVE DELTA (ΔF):</label>
+          <input type="number" id="inpDriveDelta" class="num-input" value="180" step="10" onchange="runStrokeAnalysis()">
+        </div>
+        <div class="stroke-input-group">
+          <label style="color:#8899aa; font-size:10px;">MIN PERIOD (s):</label>
+          <input type="number" id="inpMinPeriod" class="num-input" value="1.2" step="0.1" onchange="runStrokeAnalysis()">
+        </div>
+        <button class="btn-ctrl" onclick="runStrokeAnalysis()" style="background:#0070e0; color:#fff;">RE-ANALYZE</button>
+        <button class="btn-ctrl" onclick="exportStrokeAnalyticsCSV()" style="background:#009955; color:#fff;">EXPORT STROKES CSV</button>
+      </div>
+    </div>
+
+    <!-- Biomechanics Scorecard (Drive:Recovery Ratio, NOT %) -->
+    <div class="scorecard-bar">
+      <div class="scorecard-item"><div class="scorecard-val" id="scRate">--</div><div class="scorecard-lbl">Stroke Rate (SPM)</div></div>
+      <div class="scorecard-item"><div class="scorecard-val" id="scDriveT" style="color:#ffaa00;">--</div><div class="scorecard-lbl">Drive Time (s)</div></div>
+      <div class="scorecard-item"><div class="scorecard-val" id="scRecovT" style="color:#00ffcc;">--</div><div class="scorecard-lbl">Recovery Time (s)</div></div>
+      <div class="scorecard-item"><div class="scorecard-val" id="scRhythm" style="color:#ffea00;">--</div><div class="scorecard-lbl">Rhythm (Drive : Rec)</div></div>
+      <div class="scorecard-item"><div class="scorecard-val" id="scPeakF" style="color:#ff4444;">--</div><div class="scorecard-lbl">Peak Force</div></div>
+      <div class="scorecard-item"><div class="scorecard-val" id="scMeanF" style="color:#00e5ff;">--</div><div class="scorecard-lbl">Mean Drive Force</div></div>
+      <div class="scorecard-item"><div class="scorecard-val" id="scSpd" style="color:#ffff00;">--</div><div class="scorecard-lbl">Boat Speed (km/h)</div></div>
+      <div class="scorecard-item"><div class="scorecard-val" id="scSurge" style="color:#00ff88;">--</div><div class="scorecard-lbl">Peak Bow Surge (m/s²)</div></div>
+    </div>
+
+    <!-- Stroke Selection Chips -->
+    <div class="stroke-pills-row" id="strokePillsContainer">
+      <!-- Generated dynamically -->
+    </div>
+
+    <!-- CHART 2: CATCH-ALIGNED FORCE CURVES OVERLAY (INDIVIDUAL HUMPS + BOLD AVERAGE LINE) -->
+    <div class="card" style="height: 240px; min-height: 200px; position: relative;">
+      <div class="card-title">Catch-Aligned Force Curves (All Humps Overlaid + Bold Yellow Average Line)</div>
+      <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
+        <span style="font-size:9px; background:#221808; border:1px solid #553c12; color:#ffd700; padding:2px 6px; border-radius:3px; font-weight:bold;">★ BOLD YELLOW = AVERAGE STROKE HUMP</span>
+        <span style="font-size:9px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 6px; border-radius:3px;">OVERLAID CYAN = INDIVIDUAL STROKE HUMPS</span>
+      </div>
+      <canvas id="overlayForceCanvas"></canvas>
+    </div>
   </div>
 
   <!-- 7 METRIC BADGES -->
@@ -423,124 +474,83 @@
   <div id="debugBar">Ready. Connect BLE or Load a CSV session...</div>
 </div>
 
-<!-- ============================================================ -->
-<!-- STROKE BIOMECHANICS & KINEMATIC DECOMPOSITION MODAL          -->
-<!-- ============================================================ -->
-<div id="analyzerModal">
-  <div id="analyzerHeader">
-    <div style="display:flex; align-items:center; gap:10px;">
-      <span style="font-size:14px; font-weight:800; color:#ffaa00; letter-spacing:0.5px;">⚡ STROKE BIOMECHANICS & ENSEMBLE OVERLAY ANALYZER</span>
-      <span id="analyzerStrokeBadge" style="font-size:11px; background:#241d11; border:1px solid #4a3818; color:#ffcc55; padding:2px 8px; border-radius:3px;">0 STROKES FOUND</span>
-    </div>
-    <div style="display:flex; gap:6px;">
-      <button class="btn-ctrl" onclick="exportStrokeAnalyticsCSV()" style="background:#009955; color:#fff;">EXPORT STROKE CSV</button>
-      <button class="btn-ctrl" onclick="closeStrokeAnalyzer()" style="background:#552222; border-color:#883333;">CLOSE ANALYZER ✕</button>
-    </div>
-  </div>
-
-  <div id="analyzerContent">
-    <!-- LEFT SIDEBAR: THRESHOLD & STROKE CAROUSEL -->
-    <div class="analyzer-sidebar">
-      <div class="control-box">
-        <label><span>Analysis Region:</span><span id="lblRegionMode" style="color:#00ffcc;">ZOOM VIEW</span></label>
-        <div style="display:flex; gap:4px;">
-          <button class="btn-ctrl active" id="btnRegZoom" onclick="setAnalyzerRegion('zoom')" style="flex:1;">CURRENT ZOOM</button>
-          <button class="btn-ctrl" id="btnRegAll" onclick="setAnalyzerRegion('all')" style="flex:1;">ENTIRE SESSION</button>
-        </div>
-      </div>
-
-      <div class="control-box">
-        <label><span>Drive Delta Threshold (ΔF):</span><span id="lblDeltaThresh" style="color:#ffaa00;">180</span></label>
-        <input type="range" id="deltaThreshSlider" min="30" max="600" value="180" step="5" oninput="onThresholdChange(this.value)">
-        <div style="font-size:9px; color:#778899;">*Relative jump from recovery baseline to peak drive</div>
-      </div>
-
-      <div class="control-box">
-        <label><span>Min Stroke Period (s):</span><span id="lblMinPeriod" style="color:#00e5ff;">1.2s</span></label>
-        <input type="range" id="minPeriodSlider" min="0.8" max="3.5" value="1.2" step="0.1" oninput="onMinPeriodChange(this.value)">
-      </div>
-
-      <!-- Stroke Scorecard -->
-      <div class="control-box" id="strokeScorecard" style="background:#11151e; border-color:#2a364e;">
-        <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #202b3f; padding-bottom:3px;">STROKE SCORECARD</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:2px;">
-          <div><span style="color:#8899aa;">Stroke Rate:</span> <b id="scRate" style="color:#fff;">--</b> SPM</div>
-          <div><span style="color:#8899aa;">Drive Time:</span> <b id="scDriveT" style="color:#ffaa00;">--</b> s</div>
-          <div><span style="color:#8899aa;">Recovery:</span> <b id="scRecovT" style="color:#00ffcc;">--</b> s</div>
-          <div><span style="color:#8899aa;">Ratio:</span> <b id="scRatio" style="color:#ffcc00;">--</b> %</div>
-          <div><span style="color:#8899aa;">Peak Force:</span> <b id="scPeakF" style="color:#ff4444;">--</b></div>
-          <div><span style="color:#8899aa;">Dist / Stroke:</span> <b id="scDPS" style="color:#3399ff;">--</b> m</div>
-          <div><span style="color:#8899aa;">Avg Speed:</span> <b id="scSpd" style="color:#ffff00;">--</b> km/h</div>
-          <div><span style="color:#8899aa;">Peak Surge:</span> <b id="scSurge" style="color:#00ff66;">--</b> m/s²</div>
-        </div>
-      </div>
-
-      <!-- Stroke List Selector -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-        <span style="font-weight:bold; color:#88a0cc; font-size:10px;">DETECTED STROKES</span>
-        <button class="btn-ctrl" onclick="selectAllStrokes(true)">SELECT ALL</button>
-      </div>
-      <div id="strokeListContainer" style="display:flex; flex-direction:column; gap:4px; max-height:260px; overflow-y:auto;">
-        <!-- Populated dynamically -->
-      </div>
-    </div>
-
-    <!-- RIGHT MAIN: 3 SYNCED OVERLAY CHARTS -->
-    <div class="analyzer-main">
-      <!-- 1. CATCH-ALIGNED FORCE CURVES OVERLAY (WITH AVERAGE CURVE & SD BAND) -->
-      <div class="analyzer-panel">
-        <div class="card-title">1. Catch-Synchronized Force Curves Overlay (All Strokes + Bold Average)</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-          <span style="font-size:9px; background:#221808; border:1px solid #553c12; color:#ffd700; padding:2px 6px; border-radius:3px; font-weight:bold;">★ BOLD GOLD = AVERAGE FORCE</span>
-          <span style="font-size:9px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 6px; border-radius:3px;">FAINT = INDIVIDUAL STROKES</span>
-        </div>
-        <canvas id="overlayForceCanvas"></canvas>
-      </div>
-
-      <!-- 2. KINEMATIC DECOMPOSITION: BLADE ROTATION VS BOAT BOW SURGE -->
-      <div class="analyzer-panel">
-        <div class="card-title">2. Kinematic Decomposition: Blade Rotation (Oar Sweep) vs. Boat Bow Surge Force</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-          <span style="font-size:9px; background:#251608; border:1px solid #542f10; color:#ff9900; padding:2px 6px; border-radius:3px;">● BLADE ROTATION RATE (deg/s)</span>
-          <span style="font-size:9px; background:#082218; border:1px solid #124d35; color:#00ff88; padding:2px 6px; border-radius:3px;">● BOW SURGE ACCEL (m/s²)</span>
-          <span style="font-size:9px; background:#1e1424; border:1px solid #4a285c; color:#d044ff; padding:2px 6px; border-radius:3px;">● AX / AY / AZ</span>
-        </div>
-        <canvas id="overlayKinematicsCanvas"></canvas>
-      </div>
-
-      <!-- 3. SATELLITE GPS BOAT VELOCITY & DISPLACEMENT THROUGH STROKE -->
-      <div class="analyzer-panel">
-        <div class="card-title">3. Satellite GPS Dynamic Velocity & Distance Gained Profile</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-          <span style="font-size:9px; background:#242408; border:1px solid #545410; color:#ffff00; padding:2px 6px; border-radius:3px;">● GPS SPEED (km/h)</span>
-          <span style="font-size:9px; background:#081b24; border:1px solid #103c54; color:#33aaff; padding:2px 6px; border-radius:3px;">● STROKE DISPLACEMENT (m)</span>
-        </div>
-        <canvas id="overlayGpsCanvas"></canvas>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
 // ==============================================================================
 // 1. DATA STORAGE & EXPORT
 // ==============================================================================
 let inMemoryLog = [];
-let invertLoad = true; // Auto inverted polarity by default
+let invertLoad = true;
+let flatlines = []; // [{startIdx, endIdx, originalSlice}]
+let isFlatlineSelecting = false;
+let flatlineDragStart = null;
 
 function toggleLoadInversion() {
   invertLoad = !invertLoad;
   document.getElementById('btnInvertLoad').classList.toggle('active', invertLoad);
   document.getElementById('btnInvertLoad').innerText = invertLoad ? "FLIP LOAD (+/-): ON" : "FLIP LOAD (+/-): OFF";
   if (chartData.length > 0) {
-    if (isReplayMode && replayData[replayIndex]) {
-      updateHUD(replayData[replayIndex]);
-    } else if (chartData[chartData.length - 1]) {
-      updateHUD(chartData[chartData.length - 1]);
-    }
+    if (isReplayMode && replayData[replayIndex]) updateHUD(replayData[replayIndex]);
+    else if (chartData[chartData.length - 1]) updateHUD(chartData[chartData.length - 1]);
     redrawInteractiveChart();
-    if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
+    runStrokeAnalysis();
   }
+}
+
+function toggleFlatlineMode() {
+  isFlatlineSelecting = !isFlatlineSelecting;
+  document.getElementById('btnFlatlineTool').classList.toggle('active', isFlatlineSelecting);
+  document.getElementById('btnFlatlineTool').innerText = isFlatlineSelecting ? "CANCEL FLATLINE" : "✏️ FLATLINE SPIKE";
+}
+
+function applyFlatline(idx1, idx2) {
+  if (idx1 > idx2) { const t = idx1; idx1 = idx2; idx2 = t; }
+  idx1 = Math.max(0, idx1);
+  idx2 = Math.min(chartData.length - 1, idx2);
+  if (idx2 - idx1 < 1) return;
+
+  // Save backup for reset
+  const backup = [];
+  for (let i = idx1; i <= idx2; i++) {
+    backup.push({ ...chartData[i] });
+  }
+  flatlines.push({ idx1, idx2, backup });
+
+  // Interpolate flatline between endpoints
+  const pA = chartData[idx1];
+  const pB = chartData[idx2];
+  const count = idx2 - idx1;
+
+  for (let i = idx1; i <= idx2; i++) {
+    const alpha = (i - idx1) / count;
+    chartData[i].raw_w = pA.raw_w + alpha * (pB.raw_w - pA.raw_w);
+    chartData[i].ax = pA.ax + alpha * (pB.ax - pA.ax);
+    chartData[i].ay = pA.ay + alpha * (pB.ay - pA.ay);
+    chartData[i].az = pA.az + alpha * (pB.az - pA.az);
+    chartData[i].gx = pA.gx + alpha * (pB.gx - pA.gx);
+    chartData[i].gy = pA.gy + alpha * (pB.gy - pA.gy);
+    chartData[i].gz = pA.gz + alpha * (pB.gz - pA.gz);
+    chartData[i].surge = pA.surge + alpha * (pB.surge - pA.surge);
+  }
+
+  isFlatlineSelecting = false;
+  document.getElementById('btnFlatlineTool').classList.remove('active');
+  document.getElementById('btnFlatlineTool').innerText = "✏️ FLATLINE SPIKE";
+
+  redrawInteractiveChart();
+  runStrokeAnalysis();
+}
+
+function resetFlatlines() {
+  if (flatlines.length === 0) return;
+  for (let f = flatlines.length - 1; f >= 0; f--) {
+    const { idx1, backup } = flatlines[f];
+    for (let k = 0; k < backup.length; k++) {
+      chartData[idx1 + k] = backup[k];
+    }
+  }
+  flatlines = [];
+  redrawInteractiveChart();
+  runStrokeAnalysis();
 }
 
 function saveRowToStorage(rowStr) {
@@ -573,12 +583,14 @@ function clearDatabase() {
   inMemoryLog = [];
   chartData = [];
   replayData = [];
+  flatlines = [];
   detectedStrokes = [];
   updateRecordCountDisplay();
   track.setLatLngs([]);
   marker.setLatLng([0, 0]);
   exitReplayMode();
   redrawInteractiveChart();
+  renderAllOverlayCharts();
 }
 
 // ==============================================================================
@@ -642,28 +654,20 @@ function handleChunk(event) {
 }
 
 // ==============================================================================
-// 3. TELEMETRY PARSING & ATTITUDE MATH
+// 3. TELEMETRY PARSING, ATTITUDE & TIME JUMPS
 // ==============================================================================
 class NodeState {
   constructor(id) {
     this.id = id;
-    this.lastSeen = 0;
     this.raw_w = 0;
     this.baseline_w = null;
     this.net_force = 0;
-    this.a_raw = [0, 0, 0];
-    this.g_raw = [0, 0, 0];
     this.pitch_est = 0;
     this.roll_est = 0;
   }
 
   update(raw_w, ax, ay, az, gx, gy, gz, dt) {
-    this.lastSeen = Date.now();
     this.raw_w = raw_w;
-    this.a_raw = [ax, ay, az];
-    this.g_raw = [gx, gy, gz];
-
-    // Robust median-anchored recovery baseline
     if (this.baseline_w === null) this.baseline_w = raw_w;
     const rate = 0.01;
     this.baseline_w = (1.0 - rate) * this.baseline_w + rate * raw_w;
@@ -678,8 +682,6 @@ class NodeState {
 }
 
 const node1 = new NodeState(1);
-const node2 = new NodeState(2);
-
 let lastTimeSec = null;
 let current_d = {
   pitch_deg: 0, roll_deg: 0, force_net: 0, a_surge: 0,
@@ -722,6 +724,17 @@ function ingestTelemetry(row, updateLiveChart = true) {
   if (isNaN(raw_w) || isNaN(ax)) return null;
 
   const t_sec = ms / 1000.0;
+  let isTimeJump = false;
+  let jumpDuration = 0;
+
+  if (lastTimeSec !== null) {
+    const deltaT = t_sec - lastTimeSec;
+    if (deltaT > 0.6) { // Detected cut / time jump > 600ms
+      isTimeJump = true;
+      jumpDuration = deltaT;
+    }
+  }
+
   const dt = lastTimeSec === null ? 0.033 : Math.min(0.2, Math.max(0.001, t_sec - lastTimeSec));
   lastTimeSec = t_sec;
 
@@ -730,7 +743,9 @@ function ingestTelemetry(row, updateLiveChart = true) {
   const fusedPitch = node1.pitch_est;
   const fusedRoll  = node1.roll_est;
   const u_up_x = Math.sin(fusedPitch);
-  const fusedSurge = node1.a_raw[0] - (9.80665 * u_up_x);
+  
+  // Clean forward surge acceleration (m/s²)
+  const fusedSurge = ax - (9.80665 * u_up_x);
 
   current_d = {
     pitch_deg: fusedPitch * (180.0 / Math.PI),
@@ -740,10 +755,28 @@ function ingestTelemetry(row, updateLiveChart = true) {
     raw_w, ax, ay, az, gx, gy, gz
   };
 
+  // Positional GPS speed & Positional Acceleration
+  let posSpd = 0;
+  let posAccel = 0;
+
+  if (chartData.length > 0) {
+    const prev = chartData[chartData.length - 1];
+    if (lat !== 0 && lng !== 0 && prev.lat !== 0 && prev.lng !== 0 && dt > 0) {
+      const dLat = (lat - prev.lat) * (Math.PI / 180.0) * 6371000.0;
+      const dLng = (lng - prev.lng) * (Math.PI / 180.0) * 6371000.0 * Math.cos(lat * (Math.PI / 180.0));
+      const dist = Math.hypot(dLat, dLng);
+      const vMps = dist / dt;
+      posSpd = vMps * 3.6; // km/h
+      posAccel = (vMps - (prev.posSpd / 3.6 || 0)) / dt;
+    }
+  }
+
   const point = {
     ms, timeStr: timeS, raw_w, ax, ay, az, gx, gy, gz,
     net_force: node1.net_force, surge: fusedSurge,
     lat, lng, spd, sats,
+    posSpd, posAccel,
+    isTimeJump, jumpDuration,
     pitch_deg: current_d.pitch_deg,
     roll_deg: current_d.roll_deg
   };
@@ -779,10 +812,9 @@ function updateHUD(d) {
 }
 
 // ==============================================================================
-// 4. 3D ATTITUDE & 6-DOF KINEMATICS
+// 4. 3D ACCELEROMETER ORIENTATION (FORCE REMOVED FROM PLATE MOTION)
 // ==============================================================================
 let showForceArrow = false;
-let show6DofSymbols = true;
 let mountYawDeg = 0;
 let mountPitchTrim = 0;
 let mountRollTrim = 0;
@@ -822,13 +854,6 @@ function toggleForceArrow() {
   renderPlateCanvas();
 }
 
-function toggle6DofSymbols() {
-  show6DofSymbols = !show6DofSymbols;
-  document.getElementById('btnToggle6Dof').classList.toggle('active', show6DofSymbols);
-  document.getElementById('btnToggle6Dof').innerText = show6DofSymbols ? "6-DOF: ON" : "6-DOF: OFF";
-  renderPlateCanvas();
-}
-
 function toggleAlignDrawer() {
   const d = document.getElementById('alignDrawer');
   d.style.display = d.style.display === 'flex' ? 'none' : 'flex';
@@ -857,25 +882,32 @@ function renderPlateCanvas() {
   cx.fillStyle = '#0f1116';
   cx.fillRect(0, 0, w, h);
 
+  // Purely Driven by Kinematic IMU Attitude + User Mounting Offsets (ZERO Load cell displacement)
   const pitchRad = ((current_d.pitch_deg - zeroPitchOffset + mountPitchTrim) * Math.PI) / 180.0;
   const rollRad  = ((current_d.roll_deg - zeroRollOffset + mountRollTrim) * Math.PI) / 180.0;
   const mountYaw = (mountYawDeg * Math.PI) / 180.0;
 
   function rotate3D(pt) {
+    // Relative Mounting Rotation
     let x = pt[0] * Math.cos(mountYaw) - pt[1] * Math.sin(mountYaw);
     let y = pt[0] * Math.sin(mountYaw) + pt[1] * Math.cos(mountYaw);
     let z = pt[2];
 
+    // Roll (Rx)
     const cosR = Math.cos(rollRad), sinR = Math.sin(rollRad);
     let y1 = y * cosR - z * sinR;
     let z1 = y * sinR + z * cosR;
 
+    // Pitch (Ry)
     const cosP = Math.cos(pitchRad), sinP = Math.sin(pitchRad);
     let x2 = x * cosP + z1 * sinP;
+    let y2 = y1;
     let z2 = -x * sinP + z1 * cosP;
 
+    // Camera Orbit
     const cosCY = Math.cos(camYaw), sinCY = Math.sin(camYaw);
     let x3 = x2 * cosCY + z2 * sinCY;
+    let y3 = y2;
     let z3 = -x2 * sinCY + z2 * cosCY;
 
     const cosCP = Math.cos(camPitch), sinCP = Math.sin(camPitch);
@@ -891,7 +923,7 @@ function renderPlateCanvas() {
 
   function project(pt3) {
     const r = rotate3D(pt3);
-    return [centerX + r[0] * scale, centerY + r[1] * scale, r[2]];
+    return [centerX + r[0] * scale, centerY + r[1] * scale];
   }
 
   const pw = 55, pl = 85, pth = 8;
@@ -913,35 +945,12 @@ function renderPlateCanvas() {
     cx.stroke();
   }
 
+  // Draw Accelerometer Plate
   drawPoly([3, 2, 6, 7], '#1d222c', '#333b4d');
   drawPoly([1, 2, 6, 5], '#252c38', '#424c61');
   drawPoly([0, 1, 2, 3], '#114466', '#00ffcc');
 
-  const chipW = 16, chipL = 20, chipH = 4;
-  const chipZ = -pth - 3;
-  const chipCorners = [
-    [-chipW, -chipL, chipZ - chipH], [chipW, -chipL, chipZ - chipH],
-    [chipW, chipL, chipZ - chipH],   [-chipW, chipL, chipZ - chipH]
-  ];
-  const chipPts = chipCorners.map(project);
-
-  cx.beginPath();
-  cx.moveTo(chipPts[0][0], chipPts[0][1]);
-  for (let i = 1; i < 4; i++) cx.lineTo(chipPts[i][0], chipPts[i][1]);
-  cx.closePath();
-  cx.fillStyle = '#222';
-  cx.fill();
-  cx.strokeStyle = '#ffbb00';
-  cx.lineWidth = 1.5;
-  cx.stroke();
-
-  const chipCenter3D = [0, 0, chipZ - chipH];
-  const chipCenter2D = project(chipCenter3D);
-
-  cx.fillStyle = '#ffbb00';
-  cx.font = '8px monospace';
-  cx.fillText("IMU", chipCenter2D[0] - 8, chipCenter2D[1] - 4);
-
+  // ONLY Draw the Force Arrow if toggled (visualizing the load, without affecting plate motion)
   const effLoad = (invertLoad ? -1 : 1) * current_d.raw_w;
   if (showForceArrow) {
     const fMag = Math.max(-70, Math.min(70, effLoad * 0.12));
@@ -954,77 +963,19 @@ function renderPlateCanvas() {
     cx.strokeStyle = '#00ffcc';
     cx.lineWidth = 3.5;
     cx.stroke();
+
+    cx.fillStyle = '#00ffcc';
+    cx.beginPath();
+    cx.arc(tip2D[0], tip2D[1], 4, 0, Math.PI * 2);
+    cx.fill();
   }
 
-  if (show6DofSymbols) {
-    const aScale = 2.8;
-    function drawVectorArrow(vec, col, label, val) {
-      const p1 = chipCenter2D;
-      const p2 = project([
-        chipCenter3D[0] + vec[0] * aScale,
-        chipCenter3D[1] + vec[1] * aScale,
-        chipCenter3D[2] + vec[2] * aScale
-      ]);
-
-      cx.beginPath();
-      cx.moveTo(p1[0], p1[1]);
-      cx.lineTo(p2[0], p2[1]);
-      cx.strokeStyle = col;
-      cx.lineWidth = 2.2;
-      cx.stroke();
-
-      cx.font = '9px monospace';
-      cx.fillStyle = col;
-      cx.fillText(`${label}: ${(val >= 0 ? '+' : '') + val.toFixed(2)}`, p2[0] + 5, p2[1] + 3);
-    }
-
-    drawVectorArrow([current_d.ax, 0, 0], '#ff4444', 'Ax', current_d.ax);
-    drawVectorArrow([0, current_d.ay, 0], '#00ff66', 'Ay', current_d.ay);
-    drawVectorArrow([0, 0, current_d.az], '#3399ff', 'Az', current_d.az);
-
-    function drawTwistArc(axis, rate, col, label) {
-      const radius = 24;
-      const arcLen = Math.min(Math.PI * 1.5, Math.max(0.6, Math.abs(rate) * 1.8));
-      const steps = 12;
-      const sign = rate >= 0 ? 1 : -1;
-
-      cx.beginPath();
-      let lastPt = null;
-      for (let s = 0; s <= steps; s++) {
-        const theta = (s / steps) * arcLen * sign;
-        let pt = [0, 0, 0];
-        if (axis === 'x') pt = [0, radius * Math.cos(theta), radius * Math.sin(theta)];
-        else if (axis === 'y') pt = [radius * Math.cos(theta), 0, radius * Math.sin(theta)];
-        else pt = [radius * Math.cos(theta), radius * Math.sin(theta), 0];
-
-        const p2d = project([chipCenter3D[0] + pt[0], chipCenter3D[1] + pt[1], chipCenter3D[2] + pt[2]]);
-        if (s === 0) cx.moveTo(p2d[0], p2d[1]);
-        else cx.lineTo(p2d[0], p2d[1]);
-        lastPt = p2d;
-      }
-      cx.strokeStyle = col;
-      cx.lineWidth = 2.0;
-      cx.stroke();
-
-      if (lastPt) {
-        cx.font = '9px monospace';
-        cx.fillStyle = col;
-        cx.fillText(`${label}: ${(rate >= 0 ? '+' : '') + rate.toFixed(2)}`, lastPt[0] + 6, lastPt[1] - 4);
-      }
-    }
-
-    drawTwistArc('x', current_d.gx, '#ff9900', 'Gx');
-    drawTwistArc('y', current_d.gy, '#d044ff', 'Gy');
-    drawTwistArc('z', current_d.gz, '#ffea00', 'Gz');
-  }
-
+  // Attitude readouts
   cx.font = '10px monospace';
   cx.fillStyle = '#00e6ff';
   cx.fillText(`PITCH: ${(current_d.pitch_deg >= 0 ? '+' : '') + current_d.pitch_deg.toFixed(1)}°`, 10, h - 10);
   cx.fillStyle = '#cc66ff';
   cx.fillText(`ROLL:  ${(current_d.roll_deg >= 0 ? '+' : '') + current_d.roll_deg.toFixed(1)}°`, 110, h - 10);
-  cx.fillStyle = '#8899aa';
-  cx.fillText(`LOAD:  ${effLoad.toFixed(1)}`, 200, h - 10);
 
   cx.restore();
 }
@@ -1052,13 +1003,18 @@ function recenterMap() {
 }
 
 // ==============================================================================
-// 6. MAIN MULTI-SERIES CHART
+// 6. CHART 1: FULL STRETCH MULTI-SENSOR TELEMETRY
 // ==============================================================================
 const chartCanvas = document.getElementById('interactiveCanvas');
 const chartCtx = chartCanvas.getContext('2d');
 const chartTooltip = document.getElementById('chartTooltip');
 
-let seriesVisible = { load: true, ax: true, ay: true, az: true, gx: true, gy: true, gz: true };
+let seriesVisible = {
+  load: true, surge: true,
+  ax: true, ay: true, az: true,
+  gx: true, gy: true, gz: true,
+  gpsSpd: true, posSpd: true, posAccel: false
+};
 let viewStart = 0.0;
 let viewEnd = 1.0;
 let isAutoFollow = true;
@@ -1090,12 +1046,14 @@ function zoomChart(scaleFactor) {
   viewEnd = Math.min(1.0, mid + halfSpan);
   if (viewEnd <= viewStart) viewEnd = Math.min(1.0, viewStart + 0.05);
   redrawInteractiveChart();
+  runStrokeAnalysis();
 }
 
 function resetChartZoom() {
   viewStart = 0.0;
   viewEnd = 1.0;
   redrawInteractiveChart();
+  runStrokeAnalysis();
 }
 
 chartCanvas.addEventListener('wheel', (e) => {
@@ -1110,6 +1068,14 @@ let dragStartX = 0;
 let dragStartRange = [0, 1];
 
 chartCanvas.addEventListener('mousedown', (e) => {
+  const rect = chartCanvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+
+  if (isFlatlineSelecting) {
+    flatlineDragStart = mouseX;
+    return;
+  }
+
   isDragging = true;
   dragStartX = e.clientX;
   dragStartRange = [viewStart, viewEnd];
@@ -1117,7 +1083,27 @@ chartCanvas.addEventListener('mousedown', (e) => {
   document.getElementById('btnFollow').classList.remove('active');
 });
 
-window.addEventListener('mouseup', () => { isDragging = false; });
+window.addEventListener('mouseup', (e) => {
+  if (isFlatlineSelecting && flatlineDragStart !== null) {
+    const rect = chartCanvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const gutterL = 60, gutterR = 55;
+    const plotW = rect.width - gutterL - gutterR;
+    const sIdx = Math.floor(viewStart * (chartData.length - 1));
+    const eIdx = Math.ceil(viewEnd * (chartData.length - 1));
+    const count = eIdx - sIdx;
+
+    const r1 = Math.max(0, Math.min(1, (flatlineDragStart - gutterL) / plotW));
+    const r2 = Math.max(0, Math.min(1, (mouseX - gutterL) / plotW));
+    const idxA = Math.round(sIdx + r1 * count);
+    const idxB = Math.round(sIdx + r2 * count);
+
+    flatlineDragStart = null;
+    applyFlatline(idxA, idxB);
+    return;
+  }
+  isDragging = false;
+});
 
 chartCanvas.addEventListener('mousemove', (e) => {
   const rect = chartCanvas.getBoundingClientRect();
@@ -1133,6 +1119,7 @@ chartCanvas.addEventListener('mousemove', (e) => {
     if (viewStart === 0) viewEnd = span;
     if (viewEnd === 1.0) viewStart = 1.0 - span;
     redrawInteractiveChart();
+    runStrokeAnalysis();
     return;
   }
 
@@ -1177,17 +1164,16 @@ function handleChartHover(mouseX, mouseY, w, h) {
 
   chartTooltip.style.display = 'block';
   chartTooltip.style.left = `${Math.min(w - 240, Math.max(10, mouseX + 15))}px`;
-  chartTooltip.style.top = `${Math.min(h - 150, Math.max(30, mouseY - 50))}px`;
+  chartTooltip.style.top = `${Math.min(h - 170, Math.max(30, mouseY - 50))}px`;
 
   chartTooltip.innerHTML = `
     <div style="color:#88aacc; font-weight:bold; margin-bottom:2px;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
-    <div style="color:#00ffcc;">LOAD: ${effL.toFixed(2)}</div>
-    <div style="color:#ff4444;">Ax:   ${d.ax.toFixed(2)} m/s²</div>
-    <div style="color:#00ff66;">Ay:   ${d.ay.toFixed(2)} m/s²</div>
-    <div style="color:#3399ff;">Az:   ${d.az.toFixed(2)} m/s²</div>
-    <div style="color:#ff9900;">Gx:   ${d.gx.toFixed(3)} rad/s</div>
-    <div style="color:#d044ff;">Gy:   ${d.gy.toFixed(3)} rad/s</div>
-    <div style="color:#ffea00;">Gz:   ${d.gz.toFixed(3)} rad/s</div>
+    <div style="color:#00ffcc;">FORCE: ${effL.toFixed(1)}</div>
+    <div style="color:#00ff88;">BOW SURGE: ${d.surge.toFixed(2)} m/s²</div>
+    <div style="color:#ff4444;">Ax: ${d.ax.toFixed(2)} | Ay: ${d.ay.toFixed(2)} | Az: ${d.az.toFixed(2)}</div>
+    <div style="color:#ffaa00;">Gx: ${d.gx.toFixed(2)} | Gy: ${d.gy.toFixed(2)} | Gz: ${d.gz.toFixed(2)}</div>
+    <div style="color:#ffff00;">GPS SPD: ${d.spd.toFixed(1)} km/h</div>
+    <div style="color:#ff88dd;">POS SPD: ${d.posSpd.toFixed(1)} km/h | ACC: ${d.posAccel.toFixed(2)} m/s²</div>
   `;
 
   redrawInteractiveChart();
@@ -1237,7 +1223,9 @@ function redrawInteractiveChart() {
   const eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
   const slice = chartData.slice(sIdx, eIdx + 1);
 
+  // Left Axis: Force Plate Reading
   let fMin = Infinity, fMax = -Infinity;
+  // Right Axis: Motion Units (m/s², rad/s, km/h)
   let mMin = Infinity, mMax = -Infinity;
 
   for (let i = 0; i < slice.length; i++) {
@@ -1248,18 +1236,24 @@ function redrawInteractiveChart() {
       if (effL < fMin) fMin = effL;
       if (effL > fMax) fMax = effL;
     }
+
     const checkMotion = (v, enabled) => {
-      if (enabled) {
+      if (enabled && !isNaN(v)) {
         if (v < mMin) mMin = v;
         if (v > mMax) mMax = v;
       }
     };
+
+    checkMotion(p.surge, seriesVisible.surge);
     checkMotion(p.ax, seriesVisible.ax);
     checkMotion(p.ay, seriesVisible.ay);
     checkMotion(p.az, seriesVisible.az);
     checkMotion(p.gx, seriesVisible.gx);
     checkMotion(p.gy, seriesVisible.gy);
     checkMotion(p.gz, seriesVisible.gz);
+    checkMotion(p.spd, seriesVisible.gpsSpd);
+    checkMotion(p.posSpd, seriesVisible.posSpd);
+    checkMotion(p.posAccel, seriesVisible.posAccel);
   }
 
   if (!isFinite(fMin) || !isFinite(fMax)) { fMin = -100; fMax = 100; }
@@ -1271,6 +1265,7 @@ function redrawInteractiveChart() {
   const mPad = Math.max(1.0, (mMax - mMin) * 0.15);
   mMin -= mPad; mMax += mPad;
 
+  // Grid
   const ticks = 4;
   cx.font = "10px monospace";
   cx.lineWidth = 1;
@@ -1278,16 +1273,13 @@ function redrawInteractiveChart() {
   for (let i = 0; i <= ticks; i++) {
     const y = padTop + plotH - (i / ticks) * plotH;
     cx.strokeStyle = "#161b24";
-    cx.beginPath();
-    cx.moveTo(gutterL, y);
-    cx.lineTo(gutterL + plotW, y);
-    cx.stroke();
+    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
 
     const valF = fMin + (i / ticks) * (fMax - fMin);
     cx.fillStyle = "#00ffcc";
     cx.textAlign = "right";
     cx.textBaseline = "middle";
-    cx.fillText(`${valF.toFixed(1)}`, gutterL - 6, y);
+    cx.fillText(`${valF.toFixed(0)}`, gutterL - 6, y);
 
     const valM = mMin + (i / ticks) * (mMax - mMin);
     cx.fillStyle = "#8899aa";
@@ -1297,20 +1289,43 @@ function redrawInteractiveChart() {
 
   cx.fillStyle = "#00ffcc";
   cx.textAlign = "left";
-  cx.fillText("LOAD (raw)", 6, padTop - 12);
+  cx.fillText("FORCE", 6, padTop - 12);
 
   cx.fillStyle = "#8899aa";
   cx.textAlign = "right";
-  cx.fillText("MOTION (m/s² | rad/s)", w - 6, padTop - 12);
+  cx.fillText("MOTION (m/s² | rad/s | km/h)", w - 6, padTop - 12);
 
-  function drawLine(key, color, minV, maxV) {
+  // Time Jump Representations & Flatlining
+  for (let i = 0; i < slice.length; i++) {
+    const p = slice[i];
+    if (p.isTimeJump) {
+      const nx = i / (slice.length - 1);
+      const x = gutterL + nx * plotW;
+
+      cx.fillStyle = 'rgba(255, 68, 68, 0.12)';
+      cx.fillRect(x - 2, padTop, 4, plotH);
+
+      cx.strokeStyle = '#ff4444';
+      cx.lineWidth = 1;
+      cx.setLineDash([2, 2]);
+      cx.beginPath(); cx.moveTo(x, padTop); cx.lineTo(x, padTop + plotH); cx.stroke();
+      cx.setLineDash([]);
+
+      cx.fillStyle = '#ff4444';
+      cx.font = '8px monospace';
+      cx.fillText(`GAP +${p.jumpDuration.toFixed(1)}s`, x + 3, padTop + 14);
+    }
+  }
+
+  // Draw Series
+  function drawLine(key, color, minV, maxV, isLoad = false, lw = 1.4) {
     if (!seriesVisible[key]) return;
     cx.strokeStyle = color;
-    cx.lineWidth = 1.6;
+    cx.lineWidth = lw;
     cx.beginPath();
     for (let i = 0; i < slice.length; i++) {
       const p = slice[i];
-      const val = key === 'load' ? ((invertLoad ? -1 : 1) * p.raw_w) : p[key];
+      const val = isLoad ? ((invertLoad ? -1 : 1) * p.raw_w) : p[key];
       const normX = i / (slice.length - 1);
       const normY = (val - minV) / (maxV - minV);
       const x = gutterL + normX * plotW;
@@ -1321,76 +1336,53 @@ function redrawInteractiveChart() {
     cx.stroke();
   }
 
-  drawLine('load', '#00ffcc', fMin, fMax);
-  drawLine('ax',   '#ff4444', mMin, mMax);
-  drawLine('ay',   '#00ff66', mMin, mMax);
-  drawLine('az',   '#3399ff', mMin, mMax);
-  drawLine('gx',   '#ff9900', mMin, mMax);
-  drawLine('gy',   '#d044ff', mMin, mMax);
-  drawLine('gz',   '#ffea00', mMin, mMax);
+  drawLine('load', '#00ffcc', fMin, fMax, true, 2.0);
+  drawLine('surge', '#00ff88', mMin, mMax, false, 2.2); // Calculated Green Line
+  drawLine('ax', '#ff4444', mMin, mMax);
+  drawLine('ay', '#22cc88', mMin, mMax);
+  drawLine('az', '#3399ff', mMin, mMax);
+  drawLine('gx', '#ffaa00', mMin, mMax);
+  drawLine('gy', '#d044ff', mMin, mMax);
+  drawLine('gz', '#ffea00', mMin, mMax);
+  drawLine('gpsSpd', '#ffff00', mMin, mMax, false, 1.8);
+  drawLine('posSpd', '#ff88dd', mMin, mMax, false, 1.5);
+  drawLine('posAccel', '#88eeff', mMin, mMax, false, 1.2);
 
-  // Catch Markers overlay on main timeline
+  // Catch Markers overlay
   if (detectedStrokes.length > 0) {
     for (const st of detectedStrokes) {
       if (st.catchIdx >= sIdx && st.catchIdx <= eIdx) {
         const nx = (st.catchIdx - sIdx) / (eIdx - sIdx || 1);
         const x = gutterL + nx * plotW;
         cx.strokeStyle = '#ffaa00';
-        cx.lineWidth = 1.2;
-        cx.setLineDash([3, 3]);
-        cx.beginPath();
-        cx.moveTo(x, padTop);
-        cx.lineTo(x, padTop + plotH);
-        cx.stroke();
+        cx.lineWidth = 1.5;
+        cx.setLineDash([4, 3]);
+        cx.beginPath(); cx.moveTo(x, padTop); cx.lineTo(x, padTop + plotH); cx.stroke();
         cx.setLineDash([]);
+        cx.font = '8px monospace';
+        cx.fillStyle = '#ffaa00';
+        cx.fillText(`CATCH #${st.id}`, x + 2, padTop + 8);
       }
     }
   }
 
-  // Replay Line
-  if (isReplayMode && replayMarkerIndex !== null && replayMarkerIndex >= sIdx && replayMarkerIndex <= eIdx) {
-    const rx = gutterL + ((replayMarkerIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
-    cx.strokeStyle = '#ffffff';
-    cx.lineWidth = 2;
-    cx.setLineDash([4, 3]);
-    cx.beginPath();
-    cx.moveTo(rx, padTop);
-    cx.lineTo(rx, padTop + plotH);
-    cx.stroke();
-    cx.setLineDash([]);
-  }
-
-  // Hover Snapping Dots
+  // Hover dots
   if (chartHoverIndex !== null && chartHoverIndex >= sIdx && chartHoverIndex <= eIdx) {
     const hx = gutterL + ((chartHoverIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
-    const tgt = chartData[chartHoverIndex];
-
     cx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     cx.lineWidth = 1;
     cx.setLineDash([3, 3]);
-    cx.beginPath();
-    cx.moveTo(hx, padTop);
-    cx.lineTo(hx, padTop + plotH);
-    cx.stroke();
+    cx.beginPath(); cx.moveTo(hx, padTop); cx.lineTo(hx, padTop + plotH); cx.stroke();
     cx.setLineDash([]);
-
-    function drawDot(val, minV, maxV, col) {
-      const ny = (val - minV) / (maxV - minV);
-      const y = padTop + plotH - Math.max(0, Math.min(1, ny)) * plotH;
-      cx.beginPath();
-      cx.arc(hx, y, 3.5, 0, Math.PI * 2);
-      cx.fillStyle = col;
-      cx.fill();
-    }
-    if (seriesVisible.load) drawDot((invertLoad ? -1 : 1) * tgt.raw_w, fMin, fMax, '#00ffcc');
-    if (seriesVisible.ax)   drawDot(tgt.ax, mMin, mMax, '#ff4444');
-    if (seriesVisible.ay)   drawDot(tgt.ay, mMin, mMax, '#00ff66');
-    if (seriesVisible.az)   drawDot(tgt.az, mMin, mMax, '#3399ff');
-    if (seriesVisible.gx)   drawDot(tgt.gx, mMin, mMax, '#ff9900');
-    if (seriesVisible.gy)   drawDot(tgt.gy, mMin, mMax, '#d044ff');
-    if (seriesVisible.gz)   drawDot(tgt.gz, mMin, mMax, '#ffea00');
   }
 
+  // Flatline drag box
+  if (isFlatlineSelecting && flatlineDragStart !== null) {
+    cx.fillStyle = 'rgba(255, 68, 0, 0.2)';
+    cx.fillRect(flatlineDragStart, padTop, (chartHoverIndex !== null ? (gutterL + ((chartHoverIndex - sIdx) / (eIdx - sIdx || 1)) * plotW) : flatlineDragStart) - flatlineDragStart, plotH);
+  }
+
+  // Bottom Time Axis
   cx.fillStyle = "#667788";
   cx.textAlign = "left";
   cx.fillText(slice[0].timeStr || `${slice[0].ms}ms`, gutterL, h - 6);
@@ -1401,7 +1393,7 @@ function redrawInteractiveChart() {
 }
 
 // ==============================================================================
-// 7. FILE IMPORT & TRUE REAL-TIME SYNCED REPLAY
+// 7. FILE IMPORT & REAL-TIME SYNCED REPLAY
 // ==============================================================================
 let isReplayMode = false;
 let replayData = [];
@@ -1415,11 +1407,8 @@ let replayAnimId = null;
 function handleFileSelected(e) {
   const file = e.target.files[0];
   if (!file) return;
-
   const reader = new FileReader();
-  reader.onload = function(evt) {
-    parseAndLoadFile(evt.target.result);
-  };
+  reader.onload = function(evt) { parseAndLoadFile(evt.target.result); };
   reader.readAsText(file);
   e.target.value = '';
 }
@@ -1479,6 +1468,7 @@ function parseAndLoadFile(content) {
 
   replayData = [];
   chartData = [];
+  flatlines = [];
   track.setLatLngs([]);
 
   const gpsCoords = [];
@@ -1504,6 +1494,7 @@ function parseAndLoadFile(content) {
   }
 
   enterReplayMode();
+  runStrokeAnalysis();
 }
 
 function enterReplayMode() {
@@ -1625,238 +1616,155 @@ function jumpToReplayIndex(idx, resetClock = true) {
 }
 
 // ==============================================================================
-// 8. STROKE BIOMECHANICS & KINEMATICS ENGINE
+// 8. CATCH-ALIGNED STROKE SEGMENTATION & OVERLAY ENGINE
 // ==============================================================================
 let detectedStrokes = [];
-let selectedStrokeId = null; // null = all / average
-let analyzerRegionMode = 'zoom'; // 'zoom' or 'all'
-let driveDeltaThreshold = 180;
-let minStrokePeriodSec = 1.2;
+let selectedStrokeId = null;
 
-function openStrokeAnalyzer() {
-  if (chartData.length < 10) {
-    alert("Load a CSV file or record telemetry before running Stroke Analysis.");
-    return;
-  }
-  document.getElementById('analyzerModal').style.display = 'flex';
-  runStrokeAnalysis();
-}
-
-function closeStrokeAnalyzer() {
-  document.getElementById('analyzerModal').style.display = 'none';
-  redrawInteractiveChart();
-}
-
-function setAnalyzerRegion(mode) {
-  analyzerRegionMode = mode;
-  document.getElementById('btnRegZoom').classList.toggle('active', mode === 'zoom');
-  document.getElementById('btnRegAll').classList.toggle('active', mode === 'all');
-  document.getElementById('lblRegionMode').innerText = mode === 'zoom' ? 'ZOOM VIEW' : 'ENTIRE SESSION';
-  runStrokeAnalysis();
-}
-
-function onThresholdChange(val) {
-  driveDeltaThreshold = parseFloat(val);
-  document.getElementById('lblDeltaThresh').innerText = driveDeltaThreshold;
-  runStrokeAnalysis();
-}
-
-function onMinPeriodChange(val) {
-  minStrokePeriodSec = parseFloat(val);
-  document.getElementById('lblMinPeriod').innerText = minStrokePeriodSec + "s";
-  runStrokeAnalysis();
-}
-
-// Robust Biomechanical Segmentation: Catch -> Peak -> Finish -> Recovery
 function runStrokeAnalysis() {
-  let sIdx = 0, eIdx = chartData.length - 1;
-  if (analyzerRegionMode === 'zoom') {
-    sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
-    eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
-  }
+  if (chartData.length < 20) return;
 
-  const rawSubset = chartData.slice(sIdx, eIdx + 1);
-  if (rawSubset.length < 20) return;
+  const swivelThresh = (parseFloat(document.getElementById('inpSwivelThresh').value) || 35) * (Math.PI / 180.0); // rad/s
+  const deltaThresh = parseFloat(document.getElementById('inpDriveDelta').value) || 180;
+  const minPeriodSec = parseFloat(document.getElementById('inpMinPeriod').value) || 1.2;
 
-  // 1. Compute effective force array based on load polarity
-  const fArr = rawSubset.map(d => (invertLoad ? -1 : 1) * d.raw_w);
+  // Selected stretch on the timeline
+  const sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
+  const eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
+  const stretch = chartData.slice(sIdx, eIdx + 1);
 
-  // 2. Compute local recovery baseline (25th percentile of window)
-  const sorted = [...fArr].sort((a,b) => a - b);
-  const baseline = sorted[Math.floor(sorted.length * 0.25)];
+  if (stretch.length < 15) return;
 
-  // 3. Peak Finding based on ΔF threshold
-  const peaks = [];
-  const minSamplesBetween = Math.max(8, Math.floor(minStrokePeriodSec / 0.1));
+  // 1. Identify Catch Candidates using Gyro Swivel (~90 deg rotation transition)
+  const catches = [];
+  const minSamples = Math.max(6, Math.floor(minPeriodSec / 0.1));
 
-  for (let i = 2; i < fArr.length - 2; i++) {
-    const val = fArr[i];
-    const deflection = val - baseline;
-    if (deflection > driveDeltaThreshold) {
-      if (val >= fArr[i-1] && val >= fArr[i-2] && val > fArr[i+1] && val >= fArr[i+2]) {
-        if (peaks.length === 0 || (i - peaks[peaks.length - 1]) >= minSamplesBetween) {
-          peaks.push(i);
-        } else if (val > fArr[peaks[peaks.length - 1]]) {
-          peaks[peaks.length - 1] = i; // Retain highest peak
+  for (let i = 2; i < stretch.length - 2; i++) {
+    const pt = stretch[i];
+    // Swivel magnitude in gyro
+    const rotSpeed = Math.hypot(pt.gx, pt.gy, pt.gz);
+
+    if (rotSpeed > swivelThresh) {
+      // Local peak of swivel rotation
+      if (rotSpeed >= Math.hypot(stretch[i-1].gx, stretch[i-1].gy, stretch[i-1].gz) &&
+          rotSpeed > Math.hypot(stretch[i+1].gx, stretch[i+1].gy, stretch[i+1].gz)) {
+
+        // Check if a force drive hump follows this swivel
+        const baseForce = (invertLoad ? -1 : 1) * stretch[Math.max(0, i - 1)].raw_w;
+        let peakAfter = baseForce;
+
+        for (let j = i; j < Math.min(stretch.length, i + 35); j++) {
+          const fJ = (invertLoad ? -1 : 1) * stretch[j].raw_w;
+          if (fJ > peakAfter) peakAfter = fJ;
+        }
+
+        if ((peakAfter - baseForce) > deltaThresh) {
+          if (catches.length === 0 || (i - catches[catches.length - 1]) >= minSamples) {
+            catches.push(i);
+          }
         }
       }
     }
   }
 
   detectedStrokes = [];
-  for (let p = 0; p < peaks.length - 1; p++) {
-    const pIdx = peaks[p];
-    const nextPIdx = peaks[p+1];
 
-    // Find Catch: search backwards for deflection falling to 12% of peak
-    const peakDeflection = fArr[pIdx] - baseline;
-    const catchCutoff = baseline + peakDeflection * 0.15;
-    let catchRel = pIdx;
-    while (catchRel > (p === 0 ? 0 : peaks[p-1]) && fArr[catchRel] > catchCutoff) {
-      catchRel--;
-    }
+  for (let c = 0; c < catches.length - 1; c++) {
+    const relCatch = catches[c];
+    const relNextCatch = catches[c + 1];
 
-    // Find Finish: search forwards for force returning to baseline
-    let finishRel = pIdx;
-    while (finishRel < nextPIdx && fArr[finishRel] > catchCutoff) {
-      finishRel++;
-    }
+    const globalCatch = sIdx + relCatch;
+    const globalNextCatch = sIdx + relNextCatch;
 
-    // Next Catch is the start of following stroke
-    let nextCatchRel = nextPIdx;
-    const nextPeakDeflection = fArr[nextPIdx] - baseline;
-    const nextCutoff = baseline + nextPeakDeflection * 0.15;
-    while (nextCatchRel > finishRel && fArr[nextCatchRel] > nextCutoff) {
-      nextCatchRel--;
-    }
-
-    const strokeGlobalCatch = sIdx + catchRel;
-    const strokeGlobalFinish = sIdx + finishRel;
-    const strokeGlobalNextCatch = sIdx + nextCatchRel;
-
-    const strokePts = chartData.slice(strokeGlobalCatch, strokeGlobalNextCatch + 1);
+    const strokePts = chartData.slice(globalCatch, globalNextCatch + 1);
     if (strokePts.length < 5) continue;
 
+    // Level Force Plate at reading taken immediately BEFORE catch swivel (factoring out inter-stroke drift)
+    const tareForce = (invertLoad ? -1 : 1) * chartData[Math.max(0, globalCatch - 1)].raw_w;
+
     const t0 = strokePts[0].ms / 1000.0;
-    const tDrive = (chartData[strokeGlobalFinish].ms - chartData[strokeGlobalCatch].ms) / 1000.0;
     const tTotal = (strokePts[strokePts.length - 1].ms - strokePts[0].ms) / 1000.0;
-    const tRecov = Math.max(0.1, tTotal - tDrive);
 
-    // Kinematic Decomposition across the stroke
     const times = [];
-    const forceVals = [];
-    const bladeRotVals = [];
-    const bowSurgeVals = [];
-    const axVals = [], ayVals = [], azVals = [];
-    const gpsSpdVals = [];
-    const distVals = [];
+    const humps = []; // Leveled force hump values
+    const surgeVals = [];
+    const spdVals = [];
 
-    let cumDist = 0;
-    let lastP = strokePts[0];
+    let peakHump = -Infinity;
+    let peakIdxInStroke = 0;
 
     for (let k = 0; k < strokePts.length; k++) {
       const pt = strokePts[k];
-      const dtK = k === 0 ? 0.033 : (pt.ms - strokePts[k-1].ms) / 1000.0;
       const tRel = (pt.ms / 1000.0) - t0;
       times.push(tRel);
 
-      // Force
-      const fK = (invertLoad ? -1 : 1) * pt.raw_w - baseline;
-      forceVals.push(fK);
+      // Leveled at reading before swivel
+      const humpVal = Math.max(0, ((invertLoad ? -1 : 1) * pt.raw_w) - tareForce);
+      humps.push(humpVal);
+      if (humpVal > peakHump) {
+        peakHump = humpVal;
+        peakIdxInStroke = k;
+      }
 
-      // 1. Blade Rotation Magnitude (deg/s) from Gyro Vector
-      const rotMagnitude = Math.hypot(pt.gx, pt.gy, pt.gz) * (180.0 / Math.PI);
-      bladeRotVals.push(rotMagnitude);
-
-      // 2. Boat Bow Surge Acceleration (m/s²): Hull forward surge isolated from gravity tilt & arm whip
-      const pitchRad = (pt.pitch_deg * Math.PI) / 180.0;
-      const cleanSurge = pt.ax - (9.80665 * Math.sin(pitchRad));
-      bowSurgeVals.push(cleanSurge);
-
-      axVals.push(pt.ax);
-      ayVals.push(pt.ay);
-      azVals.push(pt.az);
-
-      // 3. Satellite GPS Velocity & Incremental Displacement
-      const spdKmh = pt.spd || 0;
-      gpsSpdVals.push(spdKmh);
-      const vMps = spdKmh / 3.6;
-      cumDist += vMps * dtK;
-      distVals.push(cumDist);
+      surgeVals.push(pt.surge);
+      spdVals.push(pt.spd || 0);
     }
 
-    const maxF = Math.max(...forceVals);
-    const avgSpd = gpsSpdVals.reduce((a,b)=>a+b, 0) / gpsSpdVals.length;
-    const spm = tTotal > 0 ? (60.0 / tTotal) : 0;
+    // Drive finish: where force returns to near baseline
+    let finishK = peakIdxInStroke;
+    const finishThreshold = peakHump * 0.15;
+    while (finishK < humps.length - 1 && humps[finishK] > finishThreshold) {
+      finishK++;
+    }
+
+    const tDrive = times[finishK] || (tTotal * 0.4);
+    const tRecov = Math.max(0.1, tTotal - tDrive);
+    const meanDriveF = humps.slice(0, finishK + 1).reduce((a,b)=>a+b, 0) / (finishK + 1);
 
     detectedStrokes.push({
-      id: p + 1,
+      id: c + 1,
       enabled: true,
-      catchIdx: strokeGlobalCatch,
-      finishIdx: strokeGlobalFinish,
-      nextCatchIdx: strokeGlobalNextCatch,
+      catchIdx: globalCatch,
+      nextCatchIdx: globalNextCatch,
       tTotal, tDrive, tRecov,
-      ratio: (tDrive / tTotal) * 100.0,
-      peakF: maxF,
-      spm,
-      avgSpd,
-      distTotal: cumDist,
-      peakSurge: Math.max(...bowSurgeVals),
-      times, forceVals, bladeRotVals, bowSurgeVals,
-      axVals, ayVals, azVals, gpsSpdVals, distVals
+      rhythm: tDrive > 0 ? (tRecov / tDrive) : 1.8,
+      spm: tTotal > 0 ? (60.0 / tTotal) : 0,
+      peakF: peakHump,
+      meanF: meanDriveF,
+      avgSpd: spdVals.reduce((a,b)=>a+b, 0) / spdVals.length,
+      peakSurge: Math.max(...surgeVals),
+      times, humps, surgeVals, spdVals
     });
   }
 
-  document.getElementById('analyzerStrokeBadge').innerText = `${detectedStrokes.length} STROKES DETECTED`;
-  populateStrokeListUI();
+  document.getElementById('strokeCountBadge').innerText = `${detectedStrokes.length} STROKES DETECTED`;
+  populateStrokePills();
   updateScorecard();
-  renderAllOverlayCharts();
+  renderEnsembleForceChart();
+  redrawInteractiveChart();
 }
 
-function populateStrokeListUI() {
-  const container = document.getElementById('strokeListContainer');
+function populateStrokePills() {
+  const container = document.getElementById('strokePillsContainer');
   container.innerHTML = '';
 
-  const allItem = document.createElement('div');
-  allItem.className = `stroke-list-item ${selectedStrokeId === null ? 'selected' : ''}`;
-  allItem.innerHTML = `<span style="font-weight:bold; color:#ffaa00;">★ ENSEMBLE AVERAGE (${detectedStrokes.filter(s=>s.enabled).length})</span>`;
-  allItem.onclick = () => { selectedStrokeId = null; populateStrokeListUI(); updateScorecard(); renderAllOverlayCharts(); };
-  container.appendChild(allItem);
+  const allChip = document.createElement('div');
+  allChip.className = `stroke-chip ${selectedStrokeId === null ? 'active' : ''}`;
+  allChip.innerText = `★ ALL STROKES (${detectedStrokes.length})`;
+  allChip.onclick = () => { selectedStrokeId = null; populateStrokePills(); updateScorecard(); renderEnsembleForceChart(); };
+  container.appendChild(allChip);
 
   detectedStrokes.forEach(s => {
-    const it = document.createElement('div');
-    it.className = `stroke-list-item ${selectedStrokeId === s.id ? 'selected' : ''} ${!s.enabled ? 'dimmed' : ''}`;
-    it.innerHTML = `
-      <div style="display:flex; align-items:center; gap:6px;">
-        <input type="checkbox" ${s.enabled ? 'checked' : ''} onclick="event.stopPropagation(); toggleStrokeEnabled(${s.id})">
-        <b>#${s.id}</b> 
-        <span style="color:#aaa;">${s.spm.toFixed(0)} SPM | ${s.distTotal.toFixed(1)}m</span>
-      </div>
-      <b style="color:#ffaa00;">${s.peakF.toFixed(0)}</b>
-    `;
-    it.onclick = () => { selectedStrokeId = s.id; populateStrokeListUI(); updateScorecard(); renderAllOverlayCharts(); };
-    container.appendChild(it);
+    const chip = document.createElement('div');
+    chip.className = `stroke-chip ${selectedStrokeId === s.id ? 'active' : ''}`;
+    chip.innerText = `#${s.id} (${s.spm.toFixed(0)} SPM)`;
+    chip.onclick = () => { selectedStrokeId = s.id; populateStrokePills(); updateScorecard(); renderEnsembleForceChart(); };
+    container.appendChild(chip);
   });
 }
 
-function toggleStrokeEnabled(id) {
-  const st = detectedStrokes.find(s => s.id === id);
-  if (st) st.enabled = !st.enabled;
-  populateStrokeListUI();
-  updateScorecard();
-  renderAllOverlayCharts();
-}
-
-function selectAllStrokes(val) {
-  detectedStrokes.forEach(s => s.enabled = val);
-  populateStrokeListUI();
-  updateScorecard();
-  renderAllOverlayCharts();
-}
-
 function updateScorecard() {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) return;
+  if (detectedStrokes.length === 0) return;
 
   let target = null;
   if (selectedStrokeId !== null) {
@@ -1867,81 +1775,25 @@ function updateScorecard() {
     document.getElementById('scRate').innerText   = target.spm.toFixed(1);
     document.getElementById('scDriveT').innerText  = target.tDrive.toFixed(2);
     document.getElementById('scRecovT').innerText  = target.tRecov.toFixed(2);
-    document.getElementById('scRatio').innerText   = target.ratio.toFixed(0);
-    document.getElementById('scPeakF').innerText   = target.peakF.toFixed(1);
-    document.getElementById('scDPS').innerText     = target.distTotal.toFixed(2);
+    document.getElementById('scRhythm').innerText  = `1 : ${target.rhythm.toFixed(1)}`; // Proper Drive:Recovery ratio!
+    document.getElementById('scPeakF').innerText   = target.peakF.toFixed(0);
+    document.getElementById('scMeanF').innerText   = target.meanF.toFixed(0);
     document.getElementById('scSpd').innerText     = target.avgSpd.toFixed(1);
     document.getElementById('scSurge').innerText   = target.peakSurge.toFixed(2);
   } else {
-    // Average metrics
-    const avg = (fn) => (active.reduce((acc, s) => acc + fn(s), 0) / active.length);
+    const avg = (fn) => (detectedStrokes.reduce((acc, s) => acc + fn(s), 0) / detectedStrokes.length);
     document.getElementById('scRate').innerText   = avg(s=>s.spm).toFixed(1);
     document.getElementById('scDriveT').innerText  = avg(s=>s.tDrive).toFixed(2);
     document.getElementById('scRecovT').innerText  = avg(s=>s.tRecov).toFixed(2);
-    document.getElementById('scRatio').innerText   = avg(s=>s.ratio).toFixed(0);
-    document.getElementById('scPeakF').innerText   = avg(s=>s.peakF).toFixed(1);
-    document.getElementById('scDPS').innerText     = avg(s=>s.distTotal).toFixed(2);
+    document.getElementById('scRhythm').innerText  = `1 : ${avg(s=>s.rhythm).toFixed(1)}`;
+    document.getElementById('scPeakF').innerText   = avg(s=>s.peakF).toFixed(0);
+    document.getElementById('scMeanF').innerText   = avg(s=>s.meanF).toFixed(0);
     document.getElementById('scSpd').innerText     = avg(s=>s.avgSpd).toFixed(1);
     document.getElementById('scSurge').innerText   = avg(s=>s.peakSurge).toFixed(2);
   }
 }
 
-// ==============================================================================
-// 9. OVERLAY GRAPH RENDERING ENGINE (TIME SYNCHRONIZED AT CATCH)
-// ==============================================================================
-function renderAllOverlayCharts() {
-  renderEnsembleForceChart();
-  renderEnsembleKinematicsChart();
-  renderEnsembleGpsChart();
-}
-
-// Compute resampled mean and standard deviation curve on uniform time grid
-function computeResampledAverage(key, maxTime, numSteps = 120) {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) return { times: [], mean: [], stdDevUpper: [], stdDevLower: [] };
-
-  const timeGrid = [];
-  const mean = [];
-  const stdDevUpper = [];
-  const stdDevLower = [];
-
-  for (let step = 0; step <= numSteps; step++) {
-    const t = (step / numSteps) * maxTime;
-    timeGrid.push(t);
-
-    const values = [];
-    for (const st of active) {
-      if (t > st.tTotal) continue;
-      // Linear interpolation
-      const tArr = st.times;
-      const vArr = st[key];
-      let vInterp = vArr[0];
-      for (let i = 0; i < tArr.length - 1; i++) {
-        if (t >= tArr[i] && t <= tArr[i+1]) {
-          const frac = (t - tArr[i]) / (tArr[i+1] - tArr[i] || 1);
-          vInterp = vArr[i] + frac * (vArr[i+1] - vArr[i]);
-          break;
-        }
-      }
-      values.push(vInterp);
-    }
-
-    if (values.length > 0) {
-      const avg = values.reduce((a, b) => a + b, 0) / values.length;
-      const variance = values.reduce((acc, v) => acc + Math.pow(v - avg, 2), 0) / values.length;
-      const sd = Math.sqrt(variance);
-      mean.push(avg);
-      stdDevUpper.push(avg + sd);
-      stdDevLower.push(avg - sd);
-    } else {
-      mean.push(0); stdDevUpper.push(0); stdDevLower.push(0);
-    }
-  }
-
-  return { times: timeGrid, mean, stdDevUpper, stdDevLower };
-}
-
-// Chart 1: Catch-Synchronized Force Ensemble
+// Chart 2: Catch-Aligned Humps Laid Atop One Another + Bold Average Line
 function renderEnsembleForceChart() {
   const cn = document.getElementById('overlayForceCanvas');
   const cx = cn.getContext('2d');
@@ -1956,257 +1808,112 @@ function renderEnsembleForceChart() {
   cx.scale(dpr, dpr);
   cx.clearRect(0, 0, w, h);
 
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { cx.restore(); return; }
+  if (detectedStrokes.length === 0) {
+    cx.fillStyle = "#444";
+    cx.font = "11px monospace";
+    cx.textAlign = "center";
+    cx.fillText("No strokes detected. Adjust threshold and click Re-Analyze.", w / 2, h / 2);
+    cx.restore();
+    return;
+  }
 
-  const maxT = Math.max(...active.map(s => s.tTotal));
-  const maxF = Math.max(10, Math.max(...active.map(s => s.peakF)) * 1.15);
-  const avgDriveT = active.reduce((a,s)=>a+s.tDrive,0) / active.length;
+  // Time held constant across strokes: from 0.0s to longest stroke duration
+  const maxT = Math.max(...detectedStrokes.map(s => s.tTotal));
+  const maxF = Math.max(50, Math.max(...detectedStrokes.map(s => s.peakF)) * 1.15);
+  const avgDriveT = detectedStrokes.reduce((a,s)=>a+s.tDrive,0) / detectedStrokes.length;
 
   const gutterL = 50, gutterR = 25, padTop = 28, padBottom = 22;
   const plotW = w - gutterL - gutterR;
   const plotH = h - padTop - padBottom;
 
-  // Background phase tint (Drive vs Recovery)
-  const driveX = gutterL + (avgDriveT / maxT) * plotW;
-  cx.fillStyle = 'rgba(0, 255, 204, 0.05)';
-  cx.fillRect(gutterL, padTop, driveX - gutterL, plotH);
-  cx.fillStyle = 'rgba(255, 170, 0, 0.03)';
-  cx.fillRect(driveX, padTop, plotW - (driveX - gutterL), plotH);
-
-  // Drive/Recovery Boundary Line
-  cx.strokeStyle = '#00ffcc';
-  cx.lineWidth = 1;
-  cx.setLineDash([3, 3]);
-  cx.beginPath();
-  cx.moveTo(driveX, padTop);
-  cx.lineTo(driveX, padTop + plotH);
-  cx.stroke();
-  cx.setLineDash([]);
-  cx.font = '9px monospace';
-  cx.fillStyle = '#00ffcc';
-  cx.fillText("AVG FINISH", driveX - 30, padTop + 10);
-
-  // Ticks
-  cx.strokeStyle = '#1a2230';
+  // Grid
+  cx.strokeStyle = '#181f2b';
   cx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = padTop + plotH - (i / 4) * plotH;
     cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-    cx.fillStyle = '#778899';
+    cx.fillStyle = '#667788';
+    cx.font = '9px monospace';
     cx.textAlign = 'right';
     cx.fillText(((i / 4) * maxF).toFixed(0), gutterL - 6, y + 3);
   }
 
-  // Draw Individual Faint Stroke Curves
-  for (const st of active) {
+  // Average Finish Divider
+  const finishX = gutterL + (avgDriveT / maxT) * plotW;
+  cx.strokeStyle = '#00ffcc';
+  cx.lineWidth = 1;
+  cx.setLineDash([3, 3]);
+  cx.beginPath(); cx.moveTo(finishX, padTop); cx.lineTo(finishX, padTop + plotH); cx.stroke();
+  cx.setLineDash([]);
+  cx.fillStyle = '#00ffcc';
+  cx.textAlign = 'center';
+  cx.fillText("AVG FINISH", finishX, padTop - 6);
+
+  // 1. Draw ALL Individual Humps Laid Atop One Another
+  for (const st of detectedStrokes) {
     const isTarget = selectedStrokeId === st.id;
-    cx.strokeStyle = isTarget ? '#ff0055' : 'rgba(0, 229, 255, 0.22)';
-    cx.lineWidth = isTarget ? 2.8 : 1.2;
+    cx.strokeStyle = isTarget ? '#ff0055' : 'rgba(0, 229, 255, 0.28)';
+    cx.lineWidth = isTarget ? 3.0 : 1.3;
     cx.beginPath();
     for (let k = 0; k < st.times.length; k++) {
       const x = gutterL + (st.times[k] / maxT) * plotW;
-      const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
+      const y = padTop + plotH - (st.humps[k] / maxF) * plotH;
       if (k === 0) cx.moveTo(x, y);
       else cx.lineTo(x, y);
     }
     cx.stroke();
   }
 
-  // Compute and Draw Bold Gold Average Force Curve + Standard Deviation Band
-  const avgCurve = computeResampledAverage('forceVals', maxT);
-
-  // Shaded SD Envelope
-  cx.fillStyle = 'rgba(255, 215, 0, 0.12)';
-  cx.beginPath();
-  for (let i = 0; i < avgCurve.times.length; i++) {
-    const x = gutterL + (avgCurve.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (Math.max(0, avgCurve.stdDevUpper[i]) / maxF) * plotH;
-    if (i === 0) cx.moveTo(x, y);
-    else cx.lineTo(x, y);
+  // 2. Compute Point-by-Point Average of All the Humps
+  const numSteps = 100;
+  const avgCurve = [];
+  for (let s = 0; s <= numSteps; s++) {
+    const t = (s / numSteps) * maxT;
+    const vals = [];
+    for (const st of detectedStrokes) {
+      if (t > st.tTotal) continue;
+      // Interpolate
+      for (let k = 0; k < st.times.length - 1; k++) {
+        if (t >= st.times[k] && t <= st.times[k+1]) {
+          const f = (t - st.times[k]) / (st.times[k+1] - st.times[k] || 1);
+          vals.push(st.humps[k] + f * (st.humps[k+1] - st.humps[k]));
+          break;
+        }
+      }
+    }
+    if (vals.length > 0) {
+      avgCurve.push({ t, avg: vals.reduce((a,b)=>a+b, 0) / vals.length });
+    }
   }
-  for (let i = avgCurve.times.length - 1; i >= 0; i--) {
-    const x = gutterL + (avgCurve.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (Math.max(0, avgCurve.stdDevLower[i]) / maxF) * plotH;
-    cx.lineTo(x, y);
-  }
-  cx.closePath();
-  cx.fill();
 
-  // Bold Average Line
+  // 3. Draw Additional Bold Yellow Line on Top Representing the Average of the Humps
   cx.strokeStyle = '#ffd700';
-  cx.lineWidth = 3.2;
+  cx.lineWidth = 3.8;
   cx.beginPath();
-  for (let i = 0; i < avgCurve.times.length; i++) {
-    const x = gutterL + (avgCurve.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (avgCurve.mean[i] / maxF) * plotH;
+  for (let i = 0; i < avgCurve.length; i++) {
+    const x = gutterL + (avgCurve[i].t / maxT) * plotW;
+    const y = padTop + plotH - (avgCurve[i].avg / maxF) * plotH;
     if (i === 0) cx.moveTo(x, y);
     else cx.lineTo(x, y);
   }
   cx.stroke();
 
-  // Labels
+  // X Axis
   cx.fillStyle = '#88a0cc';
   cx.textAlign = 'left';
   cx.fillText("0.00s (CATCH)", gutterL, h - 6);
   cx.textAlign = 'right';
-  cx.fillText(`+${maxT.toFixed(2)}s (STROKE END)`, gutterL + plotW, h - 6);
-
-  cx.restore();
-}
-
-// Chart 2: Kinematic Decomposition (Blade Rotation vs. Boat Bow Surge)
-function renderEnsembleKinematicsChart() {
-  const cn = document.getElementById('overlayKinematicsCanvas');
-  const cx = cn.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth, h = cn.clientHeight;
-
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr; cn.height = h * dpr;
-  }
-
-  cx.save();
-  cx.scale(dpr, dpr);
-  cx.clearRect(0, 0, w, h);
-
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { cx.restore(); return; }
-
-  const maxT = Math.max(...active.map(s => s.tTotal));
-  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
-  const plotW = w - gutterL - gutterR;
-  const plotH = h - padTop - padBottom;
-
-  const avgRot = computeResampledAverage('bladeRotVals', maxT);
-  const avgSurge = computeResampledAverage('bowSurgeVals', maxT);
-
-  const maxRot = Math.max(90, Math.max(...avgRot.mean) * 1.25);
-  let minS = Math.min(-2, Math.min(...avgSurge.mean) - 0.5);
-  let maxS = Math.max(3, Math.max(...avgSurge.mean) + 0.5);
-
-  // Left Ticks (Rotation deg/s) & Right Ticks (Surge m/s²)
-  for (let i = 0; i <= 4; i++) {
-    const y = padTop + plotH - (i / 4) * plotH;
-    cx.strokeStyle = "#161b24";
-    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-
-    cx.fillStyle = '#ff9900';
-    cx.textAlign = 'right';
-    cx.fillText(((i / 4) * maxRot).toFixed(0) + "°/s", gutterL - 6, y + 3);
-
-    const valS = minS + (i / 4) * (maxS - minS);
-    cx.fillStyle = '#00ff88';
-    cx.textAlign = 'left';
-    cx.fillText(valS.toFixed(1) + "m/s²", gutterL + plotW + 6, y + 3);
-  }
-
-  // Draw Blade Rotation Curve (Orange)
-  cx.strokeStyle = '#ff9900';
-  cx.lineWidth = 2.4;
-  cx.beginPath();
-  for (let i = 0; i < avgRot.times.length; i++) {
-    const x = gutterL + (avgRot.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (avgRot.mean[i] / maxRot) * plotH;
-    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-  }
-  cx.stroke();
-
-  // Draw Boat Bow Surge Acceleration Curve (Luminous Green)
-  cx.strokeStyle = '#00ff88';
-  cx.lineWidth = 2.4;
-  cx.beginPath();
-  for (let i = 0; i < avgSurge.times.length; i++) {
-    const x = gutterL + (avgSurge.times[i] / maxT) * plotW;
-    const normY = (avgSurge.mean[i] - minS) / (maxS - minS);
-    const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-  }
-  cx.stroke();
-
-  cx.restore();
-}
-
-// Chart 3: GPS Boat Velocity & Incremental Displacement Profile
-function renderEnsembleGpsChart() {
-  const cn = document.getElementById('overlayGpsCanvas');
-  const cx = cn.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth, h = cn.clientHeight;
-
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr; cn.height = h * dpr;
-  }
-
-  cx.save();
-  cx.scale(dpr, dpr);
-  cx.clearRect(0, 0, w, h);
-
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { cx.restore(); return; }
-
-  const maxT = Math.max(...active.map(s => s.tTotal));
-  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
-  const plotW = w - gutterL - gutterR;
-  const plotH = h - padTop - padBottom;
-
-  const avgSpd = computeResampledAverage('gpsSpdVals', maxT);
-  const avgDist = computeResampledAverage('distVals', maxT);
-
-  let minV = Math.max(0, Math.min(...avgSpd.mean) - 1.0);
-  let maxV = Math.max(5, Math.max(...avgSpd.mean) + 1.0);
-  const maxD = Math.max(2, Math.max(...avgDist.mean) * 1.15);
-
-  for (let i = 0; i <= 4; i++) {
-    const y = padTop + plotH - (i / 4) * plotH;
-    cx.strokeStyle = "#161b24";
-    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-
-    const valV = minV + (i / 4) * (maxV - minV);
-    cx.fillStyle = '#ffff00';
-    cx.textAlign = 'right';
-    cx.fillText(valV.toFixed(1) + "k/h", gutterL - 6, y + 3);
-
-    const valD = (i / 4) * maxD;
-    cx.fillStyle = '#33aaff';
-    cx.textAlign = 'left';
-    cx.fillText(valD.toFixed(1) + "m", gutterL + plotW + 6, y + 3);
-  }
-
-  // Draw GPS Speed (Yellow)
-  cx.strokeStyle = '#ffff00';
-  cx.lineWidth = 2.4;
-  cx.beginPath();
-  for (let i = 0; i < avgSpd.times.length; i++) {
-    const x = gutterL + (avgSpd.times[i] / maxT) * plotW;
-    const y = padTop + plotH - ((avgSpd.mean[i] - minV) / (maxV - minV)) * plotH;
-    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-  }
-  cx.stroke();
-
-  // Draw Stroke Displacement (Cyan Blue)
-  cx.strokeStyle = '#33aaff';
-  cx.lineWidth = 2.4;
-  cx.beginPath();
-  for (let i = 0; i < avgDist.times.length; i++) {
-    const x = gutterL + (avgDist.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (avgDist.mean[i] / maxD) * plotH;
-    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-  }
-  cx.stroke();
+  cx.fillText(`+${maxT.toFixed(2)}s (END OF STROKE)`, gutterL + plotW, h - 6);
 
   cx.restore();
 }
 
 function exportStrokeAnalyticsCSV() {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { alert("No strokes available to export."); return; }
-
-  let csv = "stroke_id,duration_s,drive_time_s,recovery_time_s,ratio_pct,spm,peak_force,distance_m,avg_spd_kmh,peak_surge_mps2\n";
-  active.forEach(s => {
-    csv += `${s.id},${s.tTotal.toFixed(3)},${s.tDrive.toFixed(3)},${s.tRecov.toFixed(3)},${s.ratio.toFixed(1)},${s.spm.toFixed(1)},${s.peakF.toFixed(2)},${s.distTotal.toFixed(2)},${s.avgSpd.toFixed(2)},${s.peakSurge.toFixed(2)}\n`;
+  if (detectedStrokes.length === 0) { alert("No strokes available to export."); return; }
+  let csv = "stroke_id,duration_s,drive_time_s,recovery_time_s,drive_recovery_ratio,spm,peak_force,mean_force,avg_spd_kmh,peak_surge_mps2\n";
+  detectedStrokes.forEach(s => {
+    csv += `${s.id},${s.tTotal.toFixed(3)},${s.tDrive.toFixed(3)},${s.tRecov.toFixed(3)},1:${s.rhythm.toFixed(2)},${s.spm.toFixed(1)},${s.peakF.toFixed(1)},${s.meanF.toFixed(1)},${s.avgSpd.toFixed(2)},${s.peakSurge.toFixed(2)}\n`;
   });
-
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -2218,7 +1925,7 @@ function exportStrokeAnalyticsCSV() {
 }
 
 // ==============================================================================
-// 10. MASTER RENDER LOOP
+// 9. MASTER RENDER LOOP
 // ==============================================================================
 function renderLoop() {
   renderPlateCanvas();
@@ -2232,7 +1939,7 @@ window.addEventListener('resize', () => {
   map.invalidateSize();
   redrawInteractiveChart();
   renderPlateCanvas();
-  if (document.getElementById('analyzerModal').style.display === 'flex') renderAllOverlayCharts();
+  renderEnsembleForceChart();
 });
 
 setTimeout(() => map.invalidateSize(), 500);
