@@ -53,8 +53,8 @@
     .grid-top {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      height: 250px;
-      min-height: 220px;
+      height: 240px;
+      min-height: 210px;
       gap: 6px;
     }
 
@@ -387,9 +387,9 @@
       <div class="legend-group">
         <span class="legend-pill" id="leg_load" onclick="toggleSeries('load')" style="color:#00ffcc;">● Force Plate</span>
         <span class="legend-pill" id="leg_surge" onclick="toggleSeries('surge')" style="color:#00ff88; font-weight:800;">● Calc Bow Surge (m/s²)</span>
-        <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax</span>
+        <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444; font-weight:bold;">● Ax (Red)</span>
+        <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff; font-weight:bold;">● Az (Blue)</span>
         <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#22cc88;">● Ay</span>
-        <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff;">● Az</span>
         <span class="legend-pill" id="leg_gx" onclick="toggleSeries('gx')" style="color:#ffaa00;">● Gx (rad/s)</span>
         <span class="legend-pill" id="leg_gy" onclick="toggleSeries('gy')" style="color:#d044ff;">● Gy (rad/s)</span>
         <span class="legend-pill" id="leg_gz" onclick="toggleSeries('gz')" style="color:#ffea00;">● Gz (rad/s)</span>
@@ -399,6 +399,7 @@
       </div>
       <div class="chart-controls">
         <button class="btn-boxselect" id="btnBoxSelect" onclick="toggleBoxSelect()">📦 BOX-SELECT DRIVE</button>
+        <button class="btn-ctrl" id="btnManualAdd" onclick="toggleManualAddStroke()">+ ADD STROKE MANUALLY</button>
         <button class="btn-ctrl" onclick="zoomChart(0.7)">+ ZOOM</button>
         <button class="btn-ctrl" onclick="zoomChart(1.4)">- ZOOM</button>
         <button class="btn-ctrl" onclick="resetChartZoom()">FIT ALL</button>
@@ -424,12 +425,12 @@
           <input type="number" id="inpDriveDelta" class="num-input" value="180" step="10" onchange="runStrokeAnalysis()">
         </div>
         <div class="stroke-input-group">
-          <label style="color:#8899aa; font-size:10px;">CATCH SWIVEL (deg/s):</label>
-          <input type="number" id="inpSwivelThresh" class="num-input" value="35" step="5" onchange="runStrokeAnalysis()">
+          <label style="color:#8899aa; font-size:10px;">90° SWITCH THRESHOLD:</label>
+          <input type="number" id="inpSwitchThresh" class="num-input" value="1.8" step="0.2" onchange="runStrokeAnalysis()">
         </div>
         <div class="stroke-input-group">
           <label style="color:#8899aa; font-size:10px;">MIN PERIOD (s):</label>
-          <input type="number" id="inpMinPeriod" class="num-input" value="1.2" step="0.1" onchange="runStrokeAnalysis()">
+          <input type="number" id="inpMinPeriod" class="num-input" value="1.1" step="0.1" onchange="runStrokeAnalysis()">
         </div>
         <button class="btn-ctrl" onclick="runStrokeAnalysis()" style="background:#0070e0; color:#fff;">RE-ANALYZE</button>
         <button class="btn-ctrl" onclick="exportStrokeAnalyticsCSV()" style="background:#009955; color:#fff;">EXPORT STROKES CSV</button>
@@ -462,7 +463,7 @@
     </div>
 
     <!-- CHART 3: NORMALIZED SQUEEZED STROKE (CATCH -> FINISH -> RECOVERY KINEMATICS) -->
-    <div class="card" style="height: 250px; min-height: 220px; position: relative;">
+    <div class="card" style="height: 260px; min-height: 230px; position: relative;">
       <div class="card-title">Chart 3: Squeezed Stroke Kinematics (Blade Squaring/Feathering & Bow Accel/Decel Breakdown)</div>
       <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
         <span style="font-size:9px; background:#251608; border:1px solid #542f10; color:#ff9900; padding:2px 6px; border-radius:3px;">● ROTATION RATE (0° ⇄ 90°)</span>
@@ -499,6 +500,7 @@ let isFlatlineSelecting = false;
 let flatlineDragStart = null;
 let isBoxSelecting = false;
 let boxSelectStart = null;
+let isManualAddingStroke = false;
 
 function toggleLoadInversion() {
   invertLoad = !invertLoad;
@@ -515,7 +517,9 @@ function toggleLoadInversion() {
 function toggleFlatlineMode() {
   isFlatlineSelecting = !isFlatlineSelecting;
   isBoxSelecting = false;
+  isManualAddingStroke = false;
   document.getElementById('btnBoxSelect').classList.remove('active');
+  document.getElementById('btnManualAdd').classList.remove('active');
   document.getElementById('btnFlatlineTool').classList.toggle('active', isFlatlineSelecting);
   document.getElementById('btnFlatlineTool').innerText = isFlatlineSelecting ? "CANCEL FLATLINE" : "✏️ FLATLINE SPIKE";
 }
@@ -523,9 +527,21 @@ function toggleFlatlineMode() {
 function toggleBoxSelect() {
   isBoxSelecting = !isBoxSelecting;
   isFlatlineSelecting = false;
+  isManualAddingStroke = false;
   document.getElementById('btnFlatlineTool').classList.remove('active');
+  document.getElementById('btnManualAdd').classList.remove('active');
   document.getElementById('btnBoxSelect').classList.toggle('active', isBoxSelecting);
   document.getElementById('btnBoxSelect').innerText = isBoxSelecting ? "CANCEL BOX SELECT" : "📦 BOX-SELECT DRIVE";
+}
+
+function toggleManualAddStroke() {
+  isManualAddingStroke = !isManualAddingStroke;
+  isBoxSelecting = false;
+  isFlatlineSelecting = false;
+  document.getElementById('btnFlatlineTool').classList.remove('active');
+  document.getElementById('btnBoxSelect').classList.remove('active');
+  document.getElementById('btnManualAdd').classList.toggle('active', isManualAddingStroke);
+  document.getElementById('btnManualAdd').innerText = isManualAddingStroke ? "CANCEL ADD" : "+ ADD STROKE MANUALLY";
 }
 
 function applyFlatline(idx1, idx2) {
@@ -790,7 +806,6 @@ function ingestTelemetry(row, updateLiveChart = true) {
       const dLng = (lng - prev.lng) * (Math.PI / 180.0) * 6371000.0 * Math.cos(lat * (Math.PI / 180.0));
       const dist = Math.hypot(dLat, dLng);
       const vMps = dist / dt;
-      // Filter out discrete coordinate jumps
       posSpd = Math.min(45, vMps * 3.6); 
       posAccel = Math.max(-15, Math.min(15, (posSpd / 3.6 - (prev.posSpd / 3.6 || 0)) / dt));
     }
@@ -907,7 +922,6 @@ function renderPlateCanvas() {
   cx.fillStyle = '#0f1116';
   cx.fillRect(0, 0, w, h);
 
-  // Purely Driven by Kinematic IMU Attitude + User Mounting Offsets (ZERO Load cell displacement)
   const pitchRad = ((current_d.pitch_deg - zeroPitchOffset + mountPitchTrim) * Math.PI) / 180.0;
   const rollRad  = ((current_d.roll_deg - zeroRollOffset + mountRollTrim) * Math.PI) / 180.0;
   const mountYaw = (mountYawDeg * Math.PI) / 180.0;
@@ -970,7 +984,6 @@ function renderPlateCanvas() {
   drawPoly([1, 2, 6, 5], '#252c38', '#424c61');
   drawPoly([0, 1, 2, 3], '#114466', '#00ffcc');
 
-  // ONLY Draw the Force Arrow if toggled (visualizing the load, without affecting plate motion)
   const effLoad = (invertLoad ? -1 : 1) * current_d.raw_w;
   if (showForceArrow) {
     const fMag = Math.max(-70, Math.min(70, effLoad * 0.12));
@@ -1090,6 +1103,10 @@ chartCanvas.addEventListener('mousedown', (e) => {
   const rect = chartCanvas.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
 
+  if (isManualAddingStroke && chartHoverIndex !== null) {
+    addManualStrokeAt(chartHoverIndex);
+    return;
+  }
   if (isFlatlineSelecting) {
     flatlineDragStart = mouseX;
     return;
@@ -1132,17 +1149,17 @@ window.addEventListener('mouseup', (e) => {
     let idxB = Math.round(sIdx + r2 * count);
     if (idxA > idxB) { const t = idxA; idxA = idxB; idxB = t; }
 
-    // Auto-calibrate Drive Delta (ΔF) directly from the boxed drive hump!
+    // Direct Calibration from Box Selection
     if (idxB - idxA >= 3) {
       const boxedPoints = chartData.slice(idxA, idxB + 1);
       const loads = boxedPoints.map(p => (invertLoad ? -1 : 1) * p.raw_w);
       const maxF = Math.max(...loads);
       const minF = Math.min(...loads);
       const measuredDelta = Math.round(maxF - minF);
-      const measuredPeriod = Math.max(0.8, ((boxedPoints[boxedPoints.length - 1].ms - boxedPoints[0].ms) / 1000.0) * 0.9);
+      const measuredPeriod = Math.max(0.8, ((boxedPoints[boxedPoints.length - 1].ms - boxedPoints[0].ms) / 1000.0) * 0.85);
 
       if (measuredDelta > 20) {
-        document.getElementById('inpDriveDelta').value = Math.max(30, Math.round(measuredDelta * 0.55));
+        document.getElementById('inpDriveDelta').value = Math.max(30, Math.round(measuredDelta * 0.5));
         document.getElementById('inpMinPeriod').value = measuredPeriod.toFixed(1);
       }
     }
@@ -1224,7 +1241,8 @@ function handleChartHover(mouseX, mouseY, w, h) {
     <div style="color:#88aacc; font-weight:bold; margin-bottom:2px;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
     <div style="color:#00ffcc;">FORCE: ${effL.toFixed(1)}</div>
     <div style="color:#00ff88; font-weight:bold;">BOW SURGE: ${d.surge.toFixed(2)} m/s²</div>
-    <div style="color:#ff4444;">Ax: ${d.ax.toFixed(2)} | Ay: ${d.ay.toFixed(2)} | Az: ${d.az.toFixed(2)}</div>
+    <div style="color:#ff4444; font-weight:bold;">Ax: ${d.ax.toFixed(2)} | Az: ${d.az.toFixed(2)}</div>
+    <div style="color:#22cc88;">Ay: ${d.ay.toFixed(2)}</div>
     <div style="color:#ffaa00;">Gx: ${d.gx.toFixed(2)} | Gy: ${d.gy.toFixed(2)} | Gz: ${d.gz.toFixed(2)}</div>
     <div style="color:#ffff00;">GPS SPD: ${d.spd.toFixed(1)} km/h</div>
     <div style="color:#ff88dd;">POS SPD: ${d.posSpd.toFixed(1)} km/h | ACC: ${d.posAccel.toFixed(2)} m/s²</div>
@@ -1347,7 +1365,7 @@ function redrawInteractiveChart() {
   cx.textAlign = "right";
   cx.fillText("MOTION (m/s² | rad/s | km/h)", w - 6, padTop - 12);
 
-  // Time Jump Representation
+  // Time Jump Markers
   for (let i = 0; i < slice.length; i++) {
     const p = slice[i];
     if (p.isTimeJump) {
@@ -1390,9 +1408,9 @@ function redrawInteractiveChart() {
 
   drawLine('load', '#00ffcc', fMin, fMax, true, 2.0);
   drawLine('surge', '#00ff88', mMin, mMax, false, 2.2); // CALCULATED GREEN LINE (BOW SURGE)
-  drawLine('ax', '#ff4444', mMin, mMax);
+  drawLine('ax', '#ff4444', mMin, mMax, false, 2.0);    // Ax (Red)
+  drawLine('az', '#3399ff', mMin, mMax, false, 2.0);    // Az (Blue)
   drawLine('ay', '#22cc88', mMin, mMax);
-  drawLine('az', '#3399ff', mMin, mMax);
   drawLine('gx', '#ffaa00', mMin, mMax);
   drawLine('gy', '#d044ff', mMin, mMax);
   drawLine('gz', '#ffea00', mMin, mMax);
@@ -1404,37 +1422,37 @@ function redrawInteractiveChart() {
   if (detectedStrokes.length > 0) {
     for (const st of detectedStrokes) {
       if (!st.discarded) {
-        // CATCH LINE (Gold Dashed)
+        // CATCH LINE (Green Dashed)
         if (st.catchIdx >= sIdx && st.catchIdx <= eIdx) {
           const nx = (st.catchIdx - sIdx) / (eIdx - sIdx || 1);
           const x = gutterL + nx * plotW;
-          cx.strokeStyle = '#ffaa00';
-          cx.lineWidth = 1.5;
+          cx.strokeStyle = '#00ff88';
+          cx.lineWidth = 1.8;
           cx.setLineDash([4, 3]);
           cx.beginPath(); cx.moveTo(x, padTop); cx.lineTo(x, padTop + plotH); cx.stroke();
           cx.setLineDash([]);
-          cx.font = '8px monospace';
-          cx.fillStyle = '#ffaa00';
+          cx.font = '9px monospace';
+          cx.fillStyle = '#00ff88';
           cx.fillText(`CATCH #${st.id}`, x + 2, padTop + 8);
         }
-        // FINISH LINE (Cyan Dashed)
+        // FINISH LINE (Magenta Dashed)
         if (st.finishIdx >= sIdx && st.finishIdx <= eIdx) {
           const nx = (st.finishIdx - sIdx) / (eIdx - sIdx || 1);
           const x = gutterL + nx * plotW;
-          cx.strokeStyle = '#00e5ff';
-          cx.lineWidth = 1.2;
+          cx.strokeStyle = '#ff00aa';
+          cx.lineWidth = 1.5;
           cx.setLineDash([3, 3]);
           cx.beginPath(); cx.moveTo(x, padTop); cx.lineTo(x, padTop + plotH); cx.stroke();
           cx.setLineDash([]);
-          cx.font = '8px monospace';
-          cx.fillStyle = '#00e5ff';
-          cx.fillText(`FINISH #${st.id}`, x + 2, padTop + 18);
+          cx.font = '9px monospace';
+          cx.fillStyle = '#ff00aa';
+          cx.fillText(`FINISH #${st.id}`, x + 2, padTop + 20);
         }
       }
     }
   }
 
-  // REPLAY TIME-SCROLL LINE (Prominent White Moving Line)
+  // PROMINENT REPLAY TIME-SCROLL SCRUBBER LINE
   if (isReplayMode && replayMarkerIndex !== null && replayMarkerIndex >= sIdx && replayMarkerIndex <= eIdx) {
     const rx = gutterL + ((replayMarkerIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
     cx.strokeStyle = '#ffffff';
@@ -1444,10 +1462,9 @@ function redrawInteractiveChart() {
     cx.lineTo(rx, padTop + plotH);
     cx.stroke();
 
-    // Glow head
     cx.fillStyle = '#ffff00';
     cx.beginPath();
-    cx.arc(rx, padTop + 3, 4, 0, Math.PI * 2);
+    cx.arc(rx, padTop + 3, 4.5, 0, Math.PI * 2);
     cx.fill();
   }
 
@@ -1700,17 +1717,88 @@ function jumpToReplayIndex(idx, resetClock = true) {
 }
 
 // ==============================================================================
-// 8. CATCH & FINISH SEGMENTATION & OVERLAY ENGINES
+// 8. 90° ACCELEROMETER ORIENTATION SWITCH DETECTION (RED/BLUE LINE CROSS)
 // ==============================================================================
 let detectedStrokes = [];
 let selectedStrokeId = null;
 
+function addManualStrokeAt(idx) {
+  isManualAddingStroke = false;
+  document.getElementById('btnManualAdd').classList.remove('active');
+  document.getElementById('btnManualAdd').innerText = "+ ADD STROKE MANUALLY";
+
+  // Create manual stroke starting from clicked catch index
+  const nextIdx = Math.min(chartData.length - 1, idx + 25);
+  const finishIdx = Math.round((idx + nextIdx) / 2);
+  buildStrokeFromIndices(idx, finishIdx, nextIdx);
+}
+
+function buildStrokeFromIndices(globalCatch, globalFinish, globalNextCatch) {
+  const strokePts = chartData.slice(globalCatch, globalNextCatch + 1);
+  if (strokePts.length < 4) return;
+
+  const tareForce = (invertLoad ? -1 : 1) * chartData[Math.max(0, globalCatch - 1)].raw_w;
+  const t0 = strokePts[0].ms / 1000.0;
+  const tTotal = (strokePts[strokePts.length - 1].ms - strokePts[0].ms) / 1000.0;
+
+  const times = [];
+  const humps = [];
+  const surgeVals = [];
+  const rotRateVals = [];
+  const spdVals = [];
+
+  let peakHump = -Infinity;
+  let peakK = 0;
+
+  for (let k = 0; k < strokePts.length; k++) {
+    const pt = strokePts[k];
+    times.push((pt.ms / 1000.0) - t0);
+    const humpVal = Math.max(0, ((invertLoad ? -1 : 1) * pt.raw_w) - tareForce);
+    humps.push(humpVal);
+    if (humpVal > peakHump) {
+      peakHump = humpVal;
+      peakK = k;
+    }
+    surgeVals.push(pt.surge);
+    rotRateVals.push(Math.hypot(pt.gx, pt.gy, pt.gz) * (180.0 / Math.PI));
+    spdVals.push(pt.spd || 0);
+  }
+
+  const finishK = Math.max(1, globalFinish - globalCatch);
+  const tDrive = times[finishK] || (tTotal * 0.42);
+  const tRecov = Math.max(0.1, tTotal - tDrive);
+  const meanDriveF = humps.slice(0, finishK + 1).reduce((a,b)=>a+b, 0) / (finishK + 1);
+
+  detectedStrokes.push({
+    id: detectedStrokes.length + 1,
+    discarded: false,
+    catchIdx: globalCatch,
+    finishIdx: globalFinish,
+    nextCatchIdx: globalNextCatch,
+    tTotal, tDrive, tRecov,
+    rhythm: tDrive > 0 ? (tRecov / tDrive) : 1.8,
+    spm: tTotal > 0 ? (60.0 / tTotal) : 0,
+    peakF: peakHump,
+    meanF: meanDriveF,
+    avgSpd: spdVals.reduce((a,b)=>a+b, 0) / spdVals.length,
+    peakSurge: Math.max(...surgeVals),
+    times, humps, surgeVals, rotRateVals, spdVals
+  });
+
+  detectedStrokes.sort((a,b) => a.catchIdx - b.catchIdx);
+  document.getElementById('strokeCountBadge').innerText = `${detectedStrokes.length} STROKES FOUND`;
+  populateStrokePills();
+  updateScorecard();
+  renderAllOverlayCharts();
+  redrawInteractiveChart();
+}
+
 function runStrokeAnalysis() {
   if (chartData.length < 20) return;
 
-  const swivelThresh = (parseFloat(document.getElementById('inpSwivelThresh').value) || 35) * (Math.PI / 180.0);
   const deltaThresh = parseFloat(document.getElementById('inpDriveDelta').value) || 180;
-  const minPeriodSec = parseFloat(document.getElementById('inpMinPeriod').value) || 1.2;
+  const switchThresh = parseFloat(document.getElementById('inpSwitchThresh').value) || 1.8;
+  const minPeriodSec = parseFloat(document.getElementById('inpMinPeriod').value) || 1.1;
 
   const sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
   const eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
@@ -1718,44 +1806,103 @@ function runStrokeAnalysis() {
 
   if (stretch.length < 15) return;
 
-  const catches = [];
-  const minSamples = Math.max(5, Math.floor(minPeriodSec / 0.12));
+  // 1. Identify Drive Humps from Force Plate
+  const fArr = stretch.map(p => (invertLoad ? -1 : 1) * p.raw_w);
+  const sorted = [...fArr].sort((a,b) => a - b);
+  const baseline = sorted[Math.floor(sorted.length * 0.2)];
 
-  // Detect Catch using Force Hump Departure + Gyro Swivel Transition
-  for (let i = 2; i < stretch.length - 2; i++) {
-    const pt = stretch[i];
-    const rotSpeed = Math.hypot(pt.gx, pt.gy, pt.gz);
+  const candidateDrives = [];
+  const minSamples = Math.max(5, Math.floor(minPeriodSec / 0.1));
 
-    const baseForce = (invertLoad ? -1 : 1) * stretch[Math.max(0, i - 1)].raw_w;
-    let peakAfter = baseForce;
+  let inDrive = false;
+  let driveStartRel = 0;
+  let peakVal = -Infinity;
+  let peakRel = 0;
 
-    for (let j = i; j < Math.min(stretch.length, i + 30); j++) {
-      const fJ = (invertLoad ? -1 : 1) * stretch[j].raw_w;
-      if (fJ > peakAfter) peakAfter = fJ;
-    }
+  for (let i = 0; i < stretch.length; i++) {
+    const val = fArr[i];
+    const defl = val - baseline;
 
-    if ((peakAfter - baseForce) > deltaThresh) {
-      if (catches.length === 0 || (i - catches[catches.length - 1]) >= minSamples) {
-        catches.push(i);
+    if (!inDrive && defl > deltaThresh * 0.5) {
+      inDrive = true;
+      driveStartRel = i;
+      peakVal = val;
+      peakRel = i;
+    } else if (inDrive) {
+      if (val > peakVal) {
+        peakVal = val;
+        peakRel = i;
+      }
+      if (defl < deltaThresh * 0.25 || i === stretch.length - 1) {
+        inDrive = false;
+        if (peakVal - baseline >= deltaThresh && (i - driveStartRel) >= 3) {
+          candidateDrives.push({
+            startRel: driveStartRel,
+            endRel: i,
+            peakRel: peakRel,
+            peakVal: peakVal
+          });
+        }
       }
     }
   }
 
   detectedStrokes = [];
 
-  for (let c = 0; c < catches.length - 1; c++) {
-    const relCatch = catches[c];
-    const relNextCatch = catches[c + 1];
+  // 2. Pinpoint CATCH and FINISH via the 90° Red (Ax) / Blue (Az) Accelerometer Switch!
+  for (let d = 0; d < candidateDrives.length; d++) {
+    const cd = candidateDrives[d];
 
-    const globalCatch = sIdx + relCatch;
-    const globalNextCatch = sIdx + relNextCatch;
+    // Catch: Look near drive start for the red & blue lines switching (90° square transition)
+    let bestCatchRel = cd.startRel;
+    let maxDiffRate = 0;
+    const searchCatchStart = Math.max(0, cd.startRel - 6);
+    const searchCatchEnd = Math.min(stretch.length - 1, cd.peakRel);
+
+    for (let j = searchCatchStart; j < searchCatchEnd; j++) {
+      const p1 = stretch[j];
+      const p2 = stretch[j + 1];
+      // Switch metric: rate of change between Red (Ax) and Blue (Az)
+      const diff1 = p1.ax - p1.az;
+      const diff2 = p2.ax - p2.az;
+      const switchRate = Math.abs(diff2 - diff1);
+
+      if (switchRate > maxDiffRate) {
+        maxDiffRate = switchRate;
+        bestCatchRel = j;
+      }
+    }
+
+    // Finish: Look near drive end for the red & blue lines switching back (90° feathering transition)
+    let bestFinishRel = cd.endRel;
+    let maxFinishRate = 0;
+    const searchFinStart = Math.max(cd.peakRel, cd.endRel - 6);
+    const searchFinEnd = Math.min(stretch.length - 1, cd.endRel + 6);
+
+    for (let j = searchFinStart; j < searchFinEnd; j++) {
+      const p1 = stretch[j];
+      const p2 = stretch[j + 1];
+      const diff1 = p1.ax - p1.az;
+      const diff2 = p2.ax - p2.az;
+      const switchRate = Math.abs(diff2 - diff1);
+
+      if (switchRate > maxFinishRate) {
+        maxFinishRate = switchRate;
+        bestFinishRel = j;
+      }
+    }
+
+    // Next Catch boundary
+    let nextCatchRel = (d < candidateDrives.length - 1) ? candidateDrives[d + 1].startRel : Math.min(stretch.length - 1, cd.endRel + 14);
+
+    const globalCatch = sIdx + bestCatchRel;
+    const globalFinish = sIdx + bestFinishRel;
+    const globalNextCatch = sIdx + nextCatchRel;
 
     const strokePts = chartData.slice(globalCatch, globalNextCatch + 1);
-    if (strokePts.length < 5) continue;
+    if (strokePts.length < 4) continue;
 
-    // Tare / Level Force at the reading immediately before catch swivel
     const tareForce = (invertLoad ? -1 : 1) * chartData[Math.max(0, globalCatch - 1)].raw_w;
-
     const t0 = strokePts[0].ms / 1000.0;
     const tTotal = (strokePts[strokePts.length - 1].ms - strokePts[0].ms) / 1000.0;
 
@@ -1766,41 +1913,27 @@ function runStrokeAnalysis() {
     const spdVals = [];
 
     let peakHump = -Infinity;
-    let peakIdxInStroke = 0;
-
     for (let k = 0; k < strokePts.length; k++) {
       const pt = strokePts[k];
-      const tRel = (pt.ms / 1000.0) - t0;
-      times.push(tRel);
-
+      times.push((pt.ms / 1000.0) - t0);
       const humpVal = Math.max(0, ((invertLoad ? -1 : 1) * pt.raw_w) - tareForce);
       humps.push(humpVal);
-      if (humpVal > peakHump) {
-        peakHump = humpVal;
-        peakIdxInStroke = k;
-      }
-
+      if (humpVal > peakHump) peakHump = humpVal;
       surgeVals.push(pt.surge);
       rotRateVals.push(Math.hypot(pt.gx, pt.gy, pt.gz) * (180.0 / Math.PI));
       spdVals.push(pt.spd || 0);
     }
 
-    // Finish detection: where force drops back to near baseline + oar feathers
-    let finishK = peakIdxInStroke;
-    const finishThreshold = peakHump * 0.15;
-    while (finishK < humps.length - 1 && humps[finishK] > finishThreshold) {
-      finishK++;
-    }
-
-    const tDrive = times[finishK] || (tTotal * 0.4);
+    const finishK = Math.max(1, Math.min(humps.length - 1, globalFinish - globalCatch));
+    const tDrive = times[finishK] || (tTotal * 0.42);
     const tRecov = Math.max(0.1, tTotal - tDrive);
     const meanDriveF = humps.slice(0, finishK + 1).reduce((a,b)=>a+b, 0) / (finishK + 1);
 
     detectedStrokes.push({
-      id: c + 1,
+      id: d + 1,
       discarded: false,
       catchIdx: globalCatch,
-      finishIdx: globalCatch + finishK,
+      finishIdx: globalFinish,
       nextCatchIdx: globalNextCatch,
       tTotal, tDrive, tRecov,
       rhythm: tDrive > 0 ? (tRecov / tDrive) : 1.8,
@@ -1838,6 +1971,7 @@ function populateStrokePills() {
       <span>#${s.id}</span>
       <b style="color:#ffaa00;">${s.peakF.toFixed(0)}</b>
       <span style="color:#88a0cc;">${s.spm.toFixed(0)} SPM</span>
+      <span onclick="event.stopPropagation(); deleteStroke(${s.id})" style="color:#ff4444; font-weight:bold; margin-left:4px;">✕</span>
     `;
     card.onclick = () => { selectedStrokeId = s.id; populateStrokePills(); updateScorecard(); renderAllOverlayCharts(); };
     container.appendChild(card);
@@ -1847,6 +1981,14 @@ function populateStrokePills() {
 function toggleStrokeDiscard(id) {
   const st = detectedStrokes.find(s => s.id === id);
   if (st) st.discarded = !st.discarded;
+  populateStrokePills();
+  updateScorecard();
+  renderAllOverlayCharts();
+  redrawInteractiveChart();
+}
+
+function deleteStroke(id) {
+  detectedStrokes = detectedStrokes.filter(s => s.id !== id);
   populateStrokePills();
   updateScorecard();
   renderAllOverlayCharts();
@@ -1866,7 +2008,7 @@ function updateScorecard() {
     document.getElementById('scRate').innerText   = target.spm.toFixed(1);
     document.getElementById('scDriveT').innerText  = target.tDrive.toFixed(2);
     document.getElementById('scRecovT').innerText  = target.tRecov.toFixed(2);
-    document.getElementById('scRhythm').innerText  = `1 : ${target.rhythm.toFixed(1)}`; // Drive:Recovery Ratio
+    document.getElementById('scRhythm').innerText  = `1 : ${target.rhythm.toFixed(1)}`;
     document.getElementById('scPeakF').innerText   = target.peakF.toFixed(0);
     document.getElementById('scMeanF').innerText   = target.meanF.toFixed(0);
     document.getElementById('scSpd').innerText     = target.avgSpd.toFixed(1);
@@ -1909,7 +2051,7 @@ function renderEnsembleForceChart() {
     cx.fillStyle = "#555";
     cx.font = "11px monospace";
     cx.textAlign = "center";
-    cx.fillText("No active strokes. Adjust threshold or un-discard strokes.", w / 2, h / 2);
+    cx.fillText("No active strokes. Adjust threshold or box-select a drive hump.", w / 2, h / 2);
     cx.restore();
     return;
   }
@@ -1922,7 +2064,6 @@ function renderEnsembleForceChart() {
   const plotW = w - gutterL - gutterR;
   const plotH = h - padTop - padBottom;
 
-  // Background phase tint (Drive vs Recovery)
   const finishX = gutterL + (avgDriveT / maxT) * plotW;
   cx.fillStyle = 'rgba(0, 255, 204, 0.04)';
   cx.fillRect(gutterL, padTop, finishX - gutterL, plotH);
@@ -1938,7 +2079,6 @@ function renderEnsembleForceChart() {
     cx.fillText(((i / 4) * maxF).toFixed(0), gutterL - 6, y + 3);
   }
 
-  // Finish Indicator
   cx.strokeStyle = '#00ffcc';
   cx.lineWidth = 1;
   cx.setLineDash([3, 3]);
@@ -1951,7 +2091,7 @@ function renderEnsembleForceChart() {
   // 1. Draw ALL Individual Stroke Humps Laid Atop One Another
   for (const st of active) {
     const isTarget = selectedStrokeId === st.id;
-    cx.strokeStyle = isTarget ? '#ff0055' : 'rgba(0, 229, 255, 0.28)';
+    cx.strokeStyle = isTarget ? '#ff0055' : 'rgba(0, 229, 255, 0.32)';
     cx.lineWidth = isTarget ? 3.0 : 1.3;
     cx.beginPath();
     for (let k = 0; k < st.times.length; k++) {
@@ -2023,11 +2163,10 @@ function renderSqueezedKinematicsChart() {
   const active = detectedStrokes.filter(s => !s.discarded);
   if (active.length === 0) { cx.restore(); return; }
 
-  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 24;
+  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 26;
   const plotW = w - gutterL - gutterR;
   const plotH = h - padTop - padBottom;
 
-  // Phase split: Drive 0% to 50%, Recovery 50% to 100%
   const finishX = gutterL + 0.5 * plotW;
 
   // Background regions
@@ -2036,7 +2175,6 @@ function renderSqueezedKinematicsChart() {
   cx.fillStyle = 'rgba(255, 170, 0, 0.03)';
   cx.fillRect(finishX, padTop, 0.5 * plotW, plotH);
 
-  // Finish Boundary
   cx.strokeStyle = '#ffaa00';
   cx.lineWidth = 1.2;
   cx.setLineDash([3, 3]);
@@ -2045,9 +2183,8 @@ function renderSqueezedKinematicsChart() {
   cx.fillStyle = '#ffaa00';
   cx.font = '9px monospace';
   cx.textAlign = 'center';
-  cx.fillText("BLADE FEATHERS (90° → 0°)", finishX, padTop - 6);
+  cx.fillText("FINISH (BLADE FLAT 90°→0°)", finishX, padTop - 6);
 
-  // Squeeze & Average Curves for Squeezed Representation
   const numSteps = 100;
   const avgSqueezed = [];
 
@@ -2065,7 +2202,6 @@ function renderSqueezedKinematicsChart() {
         tRel = st.tDrive + ((phase - 0.5) / 0.5) * st.tRecov;
       }
 
-      // Interpolate
       for (let k = 0; k < st.times.length - 1; k++) {
         if (tRel >= st.times[k] && tRel <= st.times[k+1]) {
           const frac = (tRel - st.times[k]) / (st.times[k+1] - st.times[k] || 1);
@@ -2092,7 +2228,6 @@ function renderSqueezedKinematicsChart() {
   let maxS = Math.max(3, Math.max(...avgSqueezed.map(d=>d.surge)) + 0.5);
   const maxF = Math.max(10, Math.max(...avgSqueezed.map(d=>d.force)) * 1.15);
 
-  // Left & Right Axis Ticks
   for (let i = 0; i <= 4; i++) {
     const y = padTop + plotH - (i / 4) * plotH;
     cx.strokeStyle = "#161b24";
@@ -2108,7 +2243,7 @@ function renderSqueezedKinematicsChart() {
     cx.fillText(valS.toFixed(1) + "m/s²", gutterL + plotW + 6, y + 3);
   }
 
-  // 1. Draw Blade Squaring / Feathering Velocity (Orange Line: Shows 0°->90° & 90°->0°)
+  // 1. Blade Squaring/Feathering Angular Velocity (Orange Line: 0°->90° & 90°->0°)
   cx.strokeStyle = '#ff9900';
   cx.lineWidth = 2.4;
   cx.beginPath();
@@ -2119,7 +2254,7 @@ function renderSqueezedKinematicsChart() {
   }
   cx.stroke();
 
-  // 2. Draw Bow Surge Acceleration/Deceleration (Green Line)
+  // 2. Bow Surge Accel / Decel (Green Line: Shows Entry Check, Drive Thrust, and Recovery Glide Decel)
   cx.strokeStyle = '#00ff88';
   cx.lineWidth = 2.4;
   cx.beginPath();
@@ -2131,7 +2266,7 @@ function renderSqueezedKinematicsChart() {
   }
   cx.stroke();
 
-  // 3. Draw Squeezed Normalized Force Hump (Gold Dashed Line)
+  // 3. Squeezed Normalized Force Hump (Gold Dashed Line)
   cx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
   cx.lineWidth = 1.8;
   cx.setLineDash([3, 2]);
@@ -2144,8 +2279,9 @@ function renderSqueezedKinematicsChart() {
   cx.stroke();
   cx.setLineDash([]);
 
-  // Phase Annotations on Bottom
+  // Phase Annotations
   cx.fillStyle = '#88a0cc';
+  cx.font = '9px monospace';
   cx.textAlign = 'left';
   cx.fillText("CATCH: BLADE SQUARES (0°→90°)", gutterL, h - 6);
   cx.textAlign = 'right';
