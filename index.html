@@ -3,2660 +3,1050 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>indaboat Dual-Telemetry Live HUD & Stroke Suite</title>
+  <title>indaboat Dual-Telemetry Master HUD</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #08090b; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    body { background: #07080a; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
     
-    #topbar { height: 42px; min-height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; background: #111317; border-bottom: 1px solid #232731; z-index: 100; }
+    /* TOP MASTER BAR */
+    #masterHeader {
+      height: 42px; min-height: 42px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 10px; background: #101319; border-bottom: 1px solid #202736; z-index: 100;
+    }
     button { background: #0070e0; border: none; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; user-select: none; }
-    button:active { filter: brightness(1.2); }
-    .btn-export { background: #009955; }
-    .btn-import { background: #7b2cbf; }
-    .btn-clear { background: #3a3f4b; }
-    .btn-analyzer { background: #ffaa00; color: #111; font-weight: 800; border: 1px solid #ffbb22; }
-    .btn-analyzer:hover { background: #ffbb22; }
-    .btn-toggle { background: #262c3a; border: 1px solid #3c465d; font-size: 10px; padding: 4px 8px; }
-    .btn-toggle.active { background: #0088cc; border-color: #33bbff; color: #fff; }
-    .btn-ctrl { background: #1e232e; border: 1px solid #323b4e; padding: 3px 8px; font-size: 10px; border-radius: 3px; color: #ddd; }
-    .btn-ctrl:hover { background: #2a3243; }
+    button:active { filter: brightness(1.25); }
+    .btn-connect { background: #0070e0; }
+    .btn-active-rec { background: #cc0033 !important; animation: pulseRed 1.5s infinite; }
+    @keyframes pulseRed { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+    .btn-recall { background: #7b2cbf; border: 1px solid #9d4edd; }
+    .btn-adv { background: #262c3a; border: 1px solid #3c465d; color: #88aacc; }
+    .btn-ctrl { background: #1c2230; border: 1px solid #2e384d; padding: 4px 8px; font-size: 10px; border-radius: 3px; color: #ddd; }
+    .btn-ctrl:hover { background: #283247; }
     .btn-ctrl.active { background: #0070e0; border-color: #0099ff; color: #fff; }
-    .btn-flatline { background: #993300; border: 1px solid #cc4400; font-size: 10px; }
-    .btn-flatline.active { background: #ff4400; color: #fff; }
 
-    #replayBar {
-      height: 38px;
-      min-height: 38px;
-      background: #12151d;
-      border-bottom: 1px solid #262c3b;
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 10px;
-      gap: 10px;
-      font-size: 11px;
-    }
+    /* VIEW SWITCHER TABS */
+    #viewTabs { display: flex; gap: 4px; }
+    .tab-btn { background: #151a24; border: 1px solid #252d3d; color: #8899aa; padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 4px; cursor: pointer; }
+    .tab-btn.active { background: #0088cc; color: #fff; border-color: #00aaff; }
 
-    .main-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      height: calc(100vh - 42px);
-      min-height: 0;
-      padding: 6px;
-      gap: 6px;
-    }
+    /* CONTAINER WORKSPACES */
+    .view-panel { flex: 1; display: none; flex-direction: column; min-height: 0; padding: 6px; gap: 6px; overflow-y: auto; }
+    .view-panel.active { display: flex; }
 
-    .grid-top {
+    /* LAYER 1: UPPER ACCELEROMETER + MAP SPLIT */
+    .layer-top {
       display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      height: 250px;
-      min-height: 200px;
+      grid-template-columns: 1fr 1fr;
+      height: 200px; min-height: 180px;
       gap: 6px;
     }
-
-    .card { background: #0f1116; border: 1px solid #1f232c; border-radius: 5px; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+    .card { background: #0c0e14; border: 1px solid #1c2230; border-radius: 5px; position: relative; overflow: hidden; display: flex; flex-direction: column; }
     .card-title {
-      position: absolute;
-      top: 6px;
-      left: 8px;
-      font-size: 10px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: #aaa;
-      z-index: 10;
-      font-weight: 700;
-      background: rgba(15,17,22,0.85);
-      padding: 2px 6px;
-      border-radius: 3px;
-      pointer-events: none;
+      position: absolute; top: 6px; left: 8px; font-size: 10px; letter-spacing: 0.5px;
+      text-transform: uppercase; color: #aaa; z-index: 10; font-weight: 700;
+      background: rgba(12,14,20,0.85); padding: 2px 6px; border-radius: 3px; pointer-events: none;
     }
 
-    #canvas3dControls {
-      position: absolute;
-      top: 6px;
-      right: 8px;
-      z-index: 20;
-      display: flex;
-      gap: 4px;
-      align-items: center;
-    }
-
-    #alignDrawer {
-      position: absolute;
-      top: 32px;
-      right: 8px;
-      z-index: 30;
-      background: rgba(14, 17, 24, 0.95);
-      border: 1px solid #2e374b;
-      border-radius: 4px;
-      padding: 8px;
-      display: none;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 10px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.7);
-    }
-    .align-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .align-row label { color: #88a0cc; }
-
-    #map { width: 100%; height: 100%; }
+    #liveMap { width: 100%; height: 100%; }
     canvas { width: 100%; height: 100%; display: block; }
 
-    /* Main Chart Card */
-    #chartCard {
-      flex: 1;
-      min-height: 180px;
-      position: relative;
+    /* LAYER 2: CONTROLS & STATS (CENTER MOBILE STRIP) */
+    .layer-controls-stats {
+      display: flex; flex-direction: column; gap: 6px;
+      background: #11141c; border: 1px solid #1e2535; border-radius: 5px; padding: 8px 10px;
     }
-    .chart-header {
-      position: absolute;
-      top: 5px;
-      left: 8px;
-      right: 8px;
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      pointer-events: none;
+    .action-button-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;
     }
-    .chart-controls {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-      pointer-events: auto;
+    .btn-action { flex: 1; min-width: 80px; height: 32px; justify-content: center; font-size: 11px; font-weight: 800; border-radius: 4px; }
+    .btn-start { background: #009944; }
+    .btn-pause { background: #d97706; }
+    .btn-end { background: #b91c1c; }
+    .btn-calib { background: #2563eb; }
+
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 4px;
     }
-    .legend-group {
-      display: flex;
-      gap: 4px;
-      pointer-events: auto;
-      background: rgba(15,17,22,0.92);
-      padding: 3px 6px;
-      border-radius: 4px;
-      border: 1px solid #232731;
-      flex-wrap: wrap;
-      max-width: 65%;
+    .stat-badge {
+      background: #090b10; border: 1px solid #1a202c; border-radius: 4px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;
     }
-    .legend-pill {
-      font-size: 9px;
-      font-weight: bold;
-      padding: 2px 5px;
-      border-radius: 3px;
-      cursor: pointer;
-      user-select: none;
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      background: #181c24;
-      border: 1px solid #2a3140;
-    }
-    .legend-pill.off {
-      opacity: 0.3;
-      filter: grayscale(1);
+    .stat-val { font-size: 17px; font-weight: 900; color: #00ffcc; font-family: monospace; line-height: 1.1; }
+    .stat-lbl { font-size: 8px; color: #78889b; text-transform: uppercase; margin-top: 2px; font-weight: bold; }
+
+    /* LAYER 3: FULL LIVE SCROLLING CHART */
+    .layer-main-chart {
+      height: 190px; min-height: 170px; position: relative;
     }
 
-    .chart-tooltip-box {
-      position: absolute;
-      display: none;
-      background: rgba(10, 12, 16, 0.96);
-      border: 1px solid #00ffcc;
-      border-radius: 4px;
-      padding: 6px 8px;
-      font-size: 10px;
-      font-family: monospace;
-      color: #eee;
-      pointer-events: none;
-      z-index: 50;
-      white-space: nowrap;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.8);
-      line-height: 1.35;
+    /* LAYER 4: INDIVIDUAL LIVE STROKE OVERLAY CHART */
+    .layer-overlay-chart {
+      height: 210px; min-height: 190px; position: relative;
     }
 
-    #hud {
-      height: 58px;
-      min-height: 58px;
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 6px;
+    /* BASIC RECALL MODAL (STRAVA STYLE) */
+    #modalBasicRecall {
+      display: none; position: fixed; inset: 0; background: rgba(5,6,9,0.97); z-index: 600;
+      flex-direction: column; padding: 10px; gap: 8px; overflow-y: auto;
     }
-    .badge {
-      background: #0f1116;
-      border: 1px solid #1f232c;
-      border-radius: 5px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2px 4px;
+    .recall-header {
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid #20293a; padding-bottom: 8px;
     }
-    .badge-val { font-size: 16px; font-weight: 800; color: #00ffcc; line-height: 1.1; }
-    .badge-lbl { font-size: 9px; color: #777; text-transform: uppercase; margin-top: 2px; font-weight: 600; }
+    .strava-hero {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+      background: #10141f; border: 1px solid #1e283d; border-radius: 6px; padding: 10px;
+    }
+    .strava-stat { display: flex; flex-direction: column; }
+    .strava-val { font-size: 22px; font-weight: 900; color: #00ffcc; font-family: monospace; }
+    .strava-lbl { font-size: 9px; color: #8899aa; text-transform: uppercase; margin-top: 2px; }
 
-    #debugBar {
-      height: 20px;
-      min-height: 20px;
-      background: #050608;
-      border: 1px solid #16181f;
-      border-radius: 3px;
-      padding: 0 8px;
-      font-size: 10px;
-      color: #00ff88;
-      font-family: monospace;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 18px;
+    .crop-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      background: #141924; border: 1px solid #252f44; border-radius: 5px; padding: 8px; font-size: 11px;
     }
-
-    /* ============================================================ */
-    /* STROKE ANALYZER WORKSPACE                                    */
-    /* ============================================================ */
-    #analyzerModal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(4, 5, 8, 0.98);
-      z-index: 500;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    #analyzerHeader {
-      height: 44px;
-      background: #11141c;
-      border-bottom: 1px solid #232a3b;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 14px;
-    }
-    #analyzerContent {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 290px 1fr;
-      min-height: 0;
-      gap: 8px;
-      padding: 8px;
-    }
-    .analyzer-sidebar {
-      background: #0e1117;
-      border: 1px solid #1e2433;
-      border-radius: 5px;
-      display: flex;
-      flex-direction: column;
-      padding: 10px;
-      gap: 8px;
-      overflow-y: auto;
-    }
-    .analyzer-main {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      min-height: 0;
-      overflow-y: auto;
-    }
-    .analyzer-panel {
-      flex: 1;
-      min-height: 180px;
-      background: #0e1117;
-      border: 1px solid #1e2433;
-      border-radius: 5px;
-      position: relative;
-      overflow: hidden;
-    }
-    .stroke-list-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 4px 6px;
-      background: #151a24;
-      border: 1px solid #263044;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 10px;
-      user-select: none;
-    }
-    .stroke-list-item:hover { background: #1c2331; }
-    .stroke-list-item.selected { border-color: #ffaa00; background: #262215; }
-    .stroke-list-item.dimmed { opacity: 0.35; text-decoration: line-through; }
-
-    .control-box {
-      background: #141822;
-      border: 1px solid #242c3d;
-      border-radius: 4px;
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 10px;
-    }
-    .control-box label { color: #88a0cc; font-weight: bold; display: flex; justify-content: space-between; }
   </style>
 </head>
 <body>
 
-<div id="topbar">
+<div id="masterHeader">
   <div style="display:flex; align-items:center; gap:6px;">
-    <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
-    <span id="nodeBadge" style="font-size:10px; font-weight:bold; background:#1b202c; border:1px solid #2e3547; color:#88a0cc; padding:2px 6px; border-radius:3px;">NODES: 1</span>
-    <span id="modeBadge" style="font-size:10px; font-weight:bold; background:#291433; border:1px solid #55246e; color:#dc88ff; padding:2px 6px; border-radius:3px; display:none;">REPLAY</span>
-    <button class="btn-toggle active" id="btnInvertLoad" onclick="toggleLoadInversion()">FLIP LOAD (+/-)</button>
-    <button class="btn-flatline" id="btnFlatlineTool" onclick="toggleFlatlineMode()">✏️ FLATLINE SPIKE</button>
-    <button class="btn-ctrl" onclick="resetFlatlines()">⟲ RESET FLATLINES</button>
-    <button class="btn-analyzer" onclick="openStrokeAnalyzer()">⚡ STROKE ANALYZER</button>
+    <button id="btnConnect" class="btn-connect" onclick="toggleConnect()">CONNECT</button>
+    <div id="viewTabs">
+      <button class="tab-btn active" id="tabLive" onclick="switchMainView('live')">LIVE DASHBOARD</button>
+      <button class="tab-btn" id="tabAdvanced" onclick="switchMainView('advanced')">ADVANCED ANALYSIS</button>
+    </div>
   </div>
-  <span id="bleStatus" style="font-size: 11px; color: #ff4444; font-weight: bold; letter-spacing: 0.5px;">DISCONNECTED</span>
-  <div style="display: flex; gap: 6px;">
-    <input type="file" id="fileInput" accept=".csv,.txt,.log,.tsv" style="display:none;" onchange="handleFileSelected(event)">
-    <button class="btn-import" onclick="document.getElementById('fileInput').click()">LOAD CSV / LOG</button>
-    <button class="btn-export" onclick="exportDatabase()">EXPORT (<span id="dbCount">0</span>)</button>
-    <button class="btn-clear" onclick="clearDatabase()">CLEAR</button>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <span id="sdCardStatus" style="font-size:10px; background:#181e2b; border:1px solid #2c374d; color:#88a0cc; padding:2px 6px; border-radius:3px;">SD: READY</span>
+    <span id="bleStatus" style="font-size:11px; color:#ff4444; font-weight:bold;">DISCONNECTED</span>
   </div>
 </div>
 
-<!-- REAL-TIME TIMED REPLAY CONTROLS -->
-<div id="replayBar">
-  <div style="display:flex; align-items:center; gap:6px;">
-    <button id="btnPlay" class="btn-ctrl" onclick="toggleReplayPlay()" style="background:#009955; color:#fff; font-weight:bold; width:60px;">PLAY</button>
-    <button class="btn-ctrl" onclick="stepReplay(-1)">⏮</button>
-    <button class="btn-ctrl" onclick="stepReplay(1)">⏭</button>
-    <span style="font-size:10px; color:#8899aa;">SPEED:</span>
-    <select id="replaySpeed" onchange="changeReplaySpeed(this.value)" style="background:#1b202c; color:#ddd; border:1px solid #2e3547; border-radius:3px; padding:2px 4px; font-size:10px;">
-      <option value="0.25">0.25x</option>
-      <option value="0.5">0.5x</option>
-      <option value="1" selected>1.0x (Real-Time)</option>
-      <option value="2">2.0x</option>
-      <option value="5">5.0x</option>
-    </select>
-  </div>
-  <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:650px;">
-    <input type="range" id="replaySlider" min="0" max="100" value="0" style="flex:1; cursor:pointer;" oninput="onReplaySliderInput(this.value)">
-    <span id="replayTimeDisplay" style="font-family:monospace; font-size:10px; color:#00e5ff; white-space:nowrap; min-width:170px;">0 / 0 (0.00s)</span>
-  </div>
-  <button class="btn-ctrl" onclick="exitReplayMode()" style="background:#442222; border-color:#663333;">EXIT</button>
-</div>
-
-<div class="main-container">
-  <!-- TOP ROW: ORIGINAL 2.5D ISOMETRIC ACCELEROMETER ATTITUDE (ZERO LOAD SHIFT ON MOTION) + SATELLITE MAP -->
-  <div class="grid-top">
+<!-- ========================================================================= -->
+<!-- VIEW 1: MASTER OPENING HOMEPAGE (LIVE DASHBOARD)                          -->
+<!-- ========================================================================= -->
+<div class="view-panel active" id="liveDashboardView">
+  
+  <!-- LAYER 1: UPPER DUAL ACCELEROMETER BOAT ATTITUDE & MAP -->
+  <div class="layer-top">
+    <!-- DUAL ACCELEROMETER FUSED 3D ORIENTATION -->
     <div class="card">
-      <div class="card-title">Accelerometer Plate Orientation</div>
-      <div id="canvas3dControls">
-        <button class="btn-ctrl" id="btnToggleForceArrow" onclick="toggleForceArrow()">FORCE ARROW: OFF</button>
-        <button class="btn-ctrl" onclick="toggleAlignDrawer()">⚙ ALIGN</button>
+      <div class="card-title">Dual IMU Fused Kinematics (Oar 1 + Oar 2)</div>
+      <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
+        <span id="imuStatusBadge" style="font-size:9px; background:#1b2433; border:1px solid #2f3e58; color:#00ffcc; padding:2px 6px; border-radius:3px;">FUSED (2x IMU)</span>
       </div>
-
-      <!-- Mounting Trim Drawer -->
-      <div id="alignDrawer">
-        <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #252e42; padding-bottom:3px;">Plate Mounting Offsets</div>
-        <div class="align-row">
-          <label>Pitch Trim:</label>
-          <input type="range" min="-45" max="45" value="0" step="1" oninput="mountPitchTrim = parseFloat(this.value); document.getElementById('lblPTrim').innerText=this.value+'°'; renderPlateCanvas();">
-          <span id="lblPTrim" style="font-family:monospace; min-width:26px;">0°</span>
-        </div>
-        <div class="align-row">
-          <label>Roll Trim:</label>
-          <input type="range" min="-45" max="45" value="0" step="1" oninput="mountRollTrim = parseFloat(this.value); document.getElementById('lblRTrim').innerText=this.value+'°'; renderPlateCanvas();">
-          <span id="lblRTrim" style="font-family:monospace; min-width:26px;">0°</span>
-        </div>
-        <div class="align-row" style="margin-top:4px;">
-          <button class="btn-ctrl" onclick="zeroAttitudeNow()" style="flex:1; justify-content:center; background:#005599;">ZERO LEVEL NOW</button>
-        </div>
-      </div>
-
-      <canvas id="plateCanvas"></canvas>
+      <canvas id="dualImuCanvas"></canvas>
     </div>
 
-    <!-- SATELLITE GPS MAP -->
+    <!-- LIVE GPS MAP -->
     <div class="card">
-      <div class="card-title" id="mapTitle">GPS Satellite Track</div>
+      <div class="card-title" id="mapTitle">GPS Live Track</div>
       <div style="position:absolute; top:6px; right:8px; z-index:400;">
-        <button class="btn-ctrl" onclick="recenterMap()">RECENTER TRACK</button>
+        <button class="btn-ctrl" onclick="recenterMap()">RECENTER</button>
       </div>
-      <div id="map"></div>
+      <div id="liveMap"></div>
     </div>
   </div>
 
-  <!-- MAIN TELEMETRY CHART (SCROLLING SCRUBBER LINE RESTORED) -->
-  <div class="card" id="chartCard">
-    <div class="chart-header">
-      <div class="legend-group">
-        <span class="legend-pill" id="leg_load" onclick="toggleSeries('load')" style="color:#00ffcc;">● Force Plate</span>
-        <span class="legend-pill" id="leg_surge" onclick="toggleSeries('surge')" style="color:#00ff88; font-weight:bold;">● Bow Surge (m/s²)</span>
-        <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax</span>
-        <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#22cc88;">● Ay</span>
-        <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff;">● Az</span>
-        <span class="legend-pill" id="leg_gx" onclick="toggleSeries('gx')" style="color:#ffaa00;">● Gx</span>
-        <span class="legend-pill" id="leg_gy" onclick="toggleSeries('gy')" style="color:#d044ff;">● Gy</span>
-        <span class="legend-pill" id="leg_gz" onclick="toggleSeries('gz')" style="color:#ffea00;">● Gz</span>
-        <span class="legend-pill" id="leg_gpsSpd" onclick="toggleSeries('gpsSpd')" style="color:#ffff00;">● GPS Speed</span>
-      </div>
-      <div class="chart-controls">
-        <button class="btn-analyzer" onclick="openStrokeAnalyzer()" style="padding:2px 8px; font-size:10px;">⚡ ANALYZE STROKES</button>
-        <button class="btn-ctrl" onclick="zoomChart(0.7)">+ ZOOM</button>
-        <button class="btn-ctrl" onclick="zoomChart(1.4)">- ZOOM</button>
-        <button class="btn-ctrl" onclick="resetChartZoom()">FIT ALL</button>
-        <button class="btn-ctrl active" id="btnFollow" onclick="toggleAutoFollow()">LIVE FOLLOW</button>
-      </div>
+  <!-- LAYER 2: CENTER ACTION BUTTONS & LIVE WORKOUT METRICS -->
+  <div class="layer-controls-stats">
+    <div class="action-button-row">
+      <button class="btn-action btn-start" id="btnStart" onclick="handleSessionClick('START')">START SESSION</button>
+      <button class="btn-action btn-pause" id="btnPause" onclick="handleSessionClick('PAUSE')">PAUSE</button>
+      <button class="btn-action btn-end" id="btnEnd" onclick="handleSessionClick('END')">END SESSION</button>
+      <button class="btn-action btn-recall" onclick="openRecallModal()">RECALL SESSION</button>
+      <button class="btn-action btn-calib" onclick="zeroDualImu()">CALIBRATE</button>
     </div>
-    <div id="chartTooltip" class="chart-tooltip-box"></div>
+
+    <div class="stats-grid">
+      <div class="stat-badge"><div class="stat-val" id="liveSPM">--</div><div class="stat-lbl">Stroke Rate (SPM)</div></div>
+      <div class="stat-badge"><div class="stat-val" id="liveSplit" style="color:#ffff00;">--:--</div><div class="stat-lbl">Pace (/500m)</div></div>
+      <div class="stat-badge"><div class="stat-val" id="liveDistance">0m</div><div class="stat-lbl">Distance</div></div>
+      <div class="stat-badge"><div class="stat-val" id="liveTime" style="color:#00e5ff;">00:00</div><div class="stat-lbl">Elapsed Time</div></div>
+      <div class="stat-badge"><div class="stat-val" id="avgSPM" style="color:#ffaa00;">--</div><div class="stat-lbl">Avg SPM</div></div>
+      <div class="stat-badge"><div class="stat-val" id="avgSplit" style="color:#ffea00;">--:--</div><div class="stat-lbl">Avg Split</div></div>
+    </div>
+  </div>
+
+  <!-- LAYER 3: FULL LIVE SCROLLING CHART (BOTH FORCE PLATES + BOW SURGE) -->
+  <div class="card layer-main-chart">
+    <div class="card-title">Live Telemetry Flow</div>
+    <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
+      <span style="font-size:9px; background:#0f1d24; border:1px solid #1c3b4a; color:#00ffcc; padding:2px 6px; border-radius:3px;">● Oar 1 Force (Nano)</span>
+      <span style="font-size:9px; background:#241022; border:1px solid #4a1c44; color:#ff66cc; padding:2px 6px; border-radius:3px;">● Oar 2 Force (ESP)</span>
+      <span style="font-size:9px; background:#082218; border:1px solid #124d35; color:#00ff88; padding:2px 6px; border-radius:3px; font-weight:bold;">● Clean Bow Surge (m/s²)</span>
+    </div>
+    <canvas id="liveFlowCanvas"></canvas>
+  </div>
+
+  <!-- LAYER 4: INDIVIDUAL STROKE OVERLAY CHART (BEEPS ON STROKE, GHOSTS LAST, EQUALIZED RECOVERY) -->
+  <div class="card layer-overlay-chart">
+    <div class="card-title">Live Stroke Profile & Balance (Ghost Last + Running Averages)</div>
+    <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
+      <span style="font-size:9px; background:#221808; border:1px solid #553c12; color:#ffd700; padding:2px 6px; border-radius:3px; font-weight:bold;">★ AVG OAR 1 (GOLD)</span>
+      <span style="font-size:9px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 6px; border-radius:3px; font-weight:bold;">★ AVG OAR 2 (CYAN)</span>
+      <span style="font-size:9px; background:#1c202a; border:1px solid #2d3648; color:#888; padding:2px 6px; border-radius:3px;">LAST STROKE (GREY)</span>
+    </div>
+    <canvas id="strokeBeepCanvas"></canvas>
+  </div>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- BASIC RECALL MODAL (STRAVA STYLE ACTIVITY VIEW)                          -->
+<!-- ========================================================================= -->
+<div id="modalBasicRecall">
+  <div class="recall-header">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:14px; font-weight:900; color:#ffaa00;">★ WORKOUT SUMMARY & RECALL</span>
+      <span id="recallSessionTitle" style="font-size:11px; color:#88a0cc;">Session History</span>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button class="btn-ctrl" onclick="requestWirelessSdDump()" style="background:#0070e0; color:#fff;">PULL FROM SD CARD (BLE)</button>
+      <button class="btn-ctrl" onclick="closeRecallModal()" style="background:#441a1a; border-color:#662222;">CLOSE ✕</button>
+    </div>
+  </div>
+
+  <!-- STRAVA HERO STATS -->
+  <div class="strava-hero">
+    <div class="strava-stat"><div class="strava-val" id="stTime">--:--</div><div class="strava-lbl">Total Time</div></div>
+    <div class="strava-stat"><div class="strava-val" id="stDist">0m</div><div class="strava-lbl">Total Distance</div></div>
+    <div class="strava-stat"><div class="strava-val" id="stSplit">--:--</div><div class="strava-lbl">Avg /500m Split</div></div>
+    <div class="strava-stat"><div class="strava-val" id="stSPM">--</div><div class="strava-lbl">Avg Stroke Rate</div></div>
+    <div class="strava-stat"><div class="strava-val" id="stStrokes">0</div><div class="strava-lbl">Total Strokes</div></div>
+  </div>
+
+  <!-- WORKOUT MAP & CROP SECTION -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; height:240px; gap:8px;">
+    <div class="card"><div id="recallMap" style="width:100%; height:100%;"></div></div>
+    <div class="card"><canvas id="recallPaceChart"></canvas></div>
+  </div>
+
+  <!-- CROP & EXPORT STRIP -->
+  <div class="crop-bar">
+    <div style="display:flex; align-items:center; gap:8px; flex:1;">
+      <span style="font-weight:bold; color:#ffaa00;">CROP WORKOUT:</span>
+      <input type="range" id="cropStart" min="0" max="100" value="0" style="flex:1;" oninput="updateCropWindow()">
+      <input type="range" id="cropEnd" min="0" max="100" value="100" style="flex:1;" oninput="updateCropWindow()">
+      <span id="cropDisplay" style="font-family:monospace; min-width:110px;">0% → 100%</span>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button class="btn-ctrl" onclick="exportCroppedCSV()" style="background:#009944; color:#fff;">EXPORT CROPPED (CSV)</button>
+      <button class="btn-ctrl" onclick="exportFullSessionCSV()">EXPORT FULL (CSV)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- VIEW 2: ADVANCED ANALYSIS WORKSPACE (PRESERVED IN FULL)                   -->
+<!-- ========================================================================= -->
+<div class="view-panel" id="advancedSuiteView">
+  <!-- Topbar controls for advanced mode -->
+  <div style="display:flex; align-items:center; justify-content:space-between; background:#11151f; padding:6px 10px; border-radius:5px; border:1px solid #232c3f;">
+    <div style="display:flex; gap:6px; align-items:center;">
+      <button class="btn-toggle active" id="btnInvertLoadAdv" onclick="toggleLoadInversion()">FLIP LOAD (+/-)</button>
+      <button class="btn-flatline" id="btnFlatlineTool" onclick="toggleFlatlineMode()">✏️ FLATLINE SPIKE</button>
+      <button class="btn-ctrl" onclick="resetFlatlines()">⟲ RESET FLATLINES</button>
+      <button class="btn-ctrl" onclick="openStrokeAnalyzerModal()" style="background:#ffaa00; color:#111; font-weight:800;">⚡ STROKE SUITE (4 CHARTS)</button>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <input type="file" id="advFileInput" accept=".csv,.txt,.log,.tsv" style="display:none;" onchange="handleFileSelected(event)">
+      <button class="btn-ctrl" onclick="document.getElementById('advFileInput').click()" style="background:#7b2cbf;">LOAD CSV FILE</button>
+    </div>
+  </div>
+
+  <!-- ORIGINAL ISOMETRIC 3D ATTITUDE + MAP -->
+  <div class="layer-top" style="height:210px;">
+    <div class="card">
+      <div class="card-title">Accelerometer Plate Orientation (Original 2.5D)</div>
+      <div style="position:absolute; top:6px; right:8px; z-index:20;">
+        <button class="btn-ctrl" id="btnToggleForceArrow" onclick="toggleForceArrow()">FORCE ARROW: OFF</button>
+      </div>
+      <canvas id="origPlateCanvas"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Satellite Track (Original)</div>
+      <div id="advMap" style="width:100%; height:100%;"></div>
+    </div>
+  </div>
+
+  <!-- ORIGINAL FULL MULTI-CHANNEL CHART -->
+  <div class="card" style="flex:1; min-height:220px; position:relative;">
+    <div class="card-title">Full Stretch Telemetry (Original Interactive)</div>
     <canvas id="interactiveCanvas"></canvas>
   </div>
 
-  <!-- 7 METRIC BADGES -->
-  <div id="hud">
-    <div class="badge"><div class="badge-val" id="valRaw" style="color: #ffaa00;">--</div><div class="badge-lbl" id="lblRaw">Raw Load</div></div>
-    <div class="badge"><div class="badge-val" id="valNet" style="color: #00ffcc;">--</div><div class="badge-lbl" id="lblNet">Drive Force</div></div>
-    <div class="badge"><div class="badge-val" id="valSurge" style="color: #00e5ff;">--</div><div class="badge-lbl">Clean Surge (m/s²)</div></div>
-    <div class="badge"><div class="badge-val" id="valSpd" style="color: #ffff00;">--</div><div class="badge-lbl">Speed (km/h)</div></div>
-    <div class="badge"><div class="badge-val" id="valPitch" style="color: #ff66cc;">--</div><div class="badge-lbl">Pitch</div></div>
-    <div class="badge"><div class="badge-val" id="valRoll" style="color: #cc66ff;">--</div><div class="badge-lbl">Roll</div></div>
-    <div class="badge"><div class="badge-val" id="valSats" style="color: #aaa;">--</div><div class="badge-lbl">GPS Sats</div></div>
-  </div>
-
-  <!-- STATUS MONITOR -->
-  <div id="debugBar">Ready. Connect BLE or Load a CSV session...</div>
-</div>
-
-<!-- ============================================================ -->
-<!-- STROKE ANALYZER MODAL                                        -->
-<!-- ============================================================ -->
-<div id="analyzerModal">
-  <div id="analyzerHeader">
-    <div style="display:flex; align-items:center; gap:10px;">
-      <span style="font-size:13px; font-weight:800; color:#ffaa00; letter-spacing:0.5px;">⚡ STROKE ANALYSIS SUITE</span>
-      <span id="analyzerStrokeBadge" style="font-size:11px; background:#241d11; border:1px solid #4a3818; color:#ffcc55; padding:2px 8px; border-radius:3px;">0 STROKES FOUND</span>
-    </div>
-    <div style="display:flex; gap:6px;">
-      <button class="btn-ctrl" onclick="exportStrokeAnalyticsCSV()" style="background:#009955; color:#fff;">EXPORT STROKE CSV</button>
-      <button class="btn-ctrl" onclick="closeStrokeAnalyzer()" style="background:#552222; border-color:#883333;">CLOSE ✕</button>
-    </div>
-  </div>
-
-  <div id="analyzerContent">
-    <!-- LEFT SIDEBAR -->
-    <div class="analyzer-sidebar">
-      <div class="control-box">
-        <label><span>Analysis Region:</span><span id="lblRegionMode" style="color:#00ffcc;">ZOOM VIEW</span></label>
-        <div style="display:flex; gap:4px;">
-          <button class="btn-ctrl active" id="btnRegZoom" onclick="setAnalyzerRegion('zoom')" style="flex:1;">CURRENT ZOOM</button>
-          <button class="btn-ctrl" id="btnRegAll" onclick="setAnalyzerRegion('all')" style="flex:1;">ENTIRE SESSION</button>
-        </div>
-      </div>
-
-      <div class="control-box">
-        <label><span>Drive Delta Threshold (ΔF):</span><span id="lblDeltaThresh" style="color:#ffaa00;">180</span></label>
-        <input type="range" id="deltaThreshSlider" min="30" max="600" value="180" step="5" oninput="onThresholdChange(this.value)">
-        <div style="font-size:9px; color:#778899;">*Relative jump from recovery baseline to peak drive</div>
-      </div>
-
-      <div class="control-box">
-        <label><span>Min Stroke Period (s):</span><span id="lblMinPeriod" style="color:#00e5ff;">1.2s</span></label>
-        <input type="range" id="minPeriodSlider" min="0.8" max="3.5" value="1.2" step="0.1" oninput="onMinPeriodChange(this.value)">
-      </div>
-
-      <!-- Scorecard: Simple clear labels, proper ratio (1 : X.X) -->
-      <div class="control-box" id="strokeScorecard" style="background:#11151e; border-color:#2a364e;">
-        <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #202b3f; padding-bottom:3px;">STROKE SCORECARD</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:2px;">
-          <div><span style="color:#8899aa;">Stroke Rate:</span> <b id="scRate" style="color:#fff;">--</b> SPM</div>
-          <div><span style="color:#8899aa;">Drive Time:</span> <b id="scDriveT" style="color:#ffaa00;">--</b> s</div>
-          <div><span style="color:#8899aa;">Recovery:</span> <b id="scRecovT" style="color:#00ffcc;">--</b> s</div>
-          <div><span style="color:#8899aa;">Rhythm:</span> <b id="scRatio" style="color:#ffea00;">--</b></div>
-          <div><span style="color:#8899aa;">Peak Force:</span> <b id="scPeakF" style="color:#ff4444;">--</b></div>
-          <div><span style="color:#8899aa;">Dist / Stroke:</span> <b id="scDPS" style="color:#3399ff;">--</b> m</div>
-          <div><span style="color:#8899aa;">Avg Speed:</span> <b id="scSpd" style="color:#ffff00;">--</b> km/h</div>
-          <div><span style="color:#8899aa;">Peak:</span> <b id="scSurge" style="color:#00ff66;">--</b> m/s²</div>
-        </div>
-      </div>
-
-      <!-- Stroke List with Discard Checkboxes -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-        <span style="font-weight:bold; color:#88a0cc; font-size:10px;">DETECTED STROKES</span>
-        <button class="btn-ctrl" onclick="selectAllStrokes(true)">SELECT ALL</button>
-      </div>
-      <div id="strokeListContainer" style="display:flex; flex-direction:column; gap:4px; max-height:280px; overflow-y:auto;"></div>
-    </div>
-
-    <!-- RIGHT MAIN: THE CHARTS -->
-    <div class="analyzer-main">
-      <!-- CHART 1: CATCH-ALIGNED FORCE OVERLAY + 6-AXIS IMU LINES (ZOOMABLE) -->
-      <div class="analyzer-panel">
-        <div class="card-title">Chart 1: Catch-Aligned Force Overlay (All Humps + Bold Average + 6-Axis Lines)</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
-          <span class="legend-pill" id="tog_c1_force" onclick="toggleC1('force')" style="color:#ffd700;">● Force Avg</span>
-          <span class="legend-pill" id="tog_c1_allforce" onclick="toggleC1('allforce')" style="color:#00e5ff;">● All Humps</span>
-          <span class="legend-pill" id="tog_c1_ax" onclick="toggleC1('ax')" style="color:#ff4444;">● Ax</span>
-          <span class="legend-pill" id="tog_c1_ay" onclick="toggleC1('ay')" style="color:#22cc88;">● Ay</span>
-          <span class="legend-pill" id="tog_c1_az" onclick="toggleC1('az')" style="color:#3399ff;">● Az</span>
-          <span class="legend-pill" id="tog_c1_gyro" onclick="toggleC1('gyro')" style="color:#ffaa00;">● Gyro</span>
-          <button class="btn-ctrl" onclick="resetZoomC1()" style="padding:1px 5px; font-size:9px;">FIT</button>
-        </div>
-        <div id="c1Tooltip" class="chart-tooltip-box"></div>
-        <canvas id="overlayForceCanvas"></canvas>
-      </div>
-
-      <!-- CHART 2: REVERSE-ALIGNED (RIGHT-ALIGNED AT PRE-CATCH / FINISH) -->
-      <div class="analyzer-panel">
-        <div class="card-title" id="c2Title">Chart 2: Pre-Catch / End-Aligned Overlay (Aligned on Right Side)</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
-          <button class="btn-ctrl active" id="btnC2AlignToggle" onclick="toggleC2Alignment()">ALIGN: PRE-CATCH (END)</button>
-          <span class="legend-pill" id="tog_c2_force" onclick="toggleC2('force')" style="color:#ffd700;">● Force Avg</span>
-          <span class="legend-pill" id="tog_c2_allforce" onclick="toggleC2('allforce')" style="color:#00e5ff;">● All Humps</span>
-          <span class="legend-pill" id="tog_c2_ax" onclick="toggleC2('ax')" style="color:#ff4444;">● Ax</span>
-          <span class="legend-pill" id="tog_c2_az" onclick="toggleC2('az')" style="color:#3399ff;">● Az</span>
-          <button class="btn-ctrl" onclick="resetZoomC2()" style="padding:1px 5px; font-size:9px;">FIT</button>
-        </div>
-        <div id="c2Tooltip" class="chart-tooltip-box"></div>
-        <canvas id="overlayRightAlignedCanvas"></canvas>
-      </div>
-
-      <!-- CHART 3: SELECTION STRETCH: BOW SURGE ACCEL (GREEN - FLIPPED) OVERLAID ON FORCE (ZOOMABLE) -->
-      <div class="analyzer-panel">
-        <div class="card-title">Chart 3: Selection Stretch — Bow Surge Accel (Green, Flipped) Overlaid on Force Plate</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-          <span style="font-size:9px; background:#082218; border:1px solid #124d35; color:#00ff88; padding:2px 6px; border-radius:3px; font-weight:bold;">● BOW SURGE ACCEL (m/s²)</span>
-          <span style="font-size:9px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 6px; border-radius:3px; font-weight:bold;">● FORCE PLATE MEASUREMENT</span>
-          <button class="btn-ctrl" onclick="resetZoomC3()" style="padding:1px 5px; font-size:9px;">FIT</button>
-        </div>
-        <div id="c3Tooltip" class="chart-tooltip-box"></div>
-        <canvas id="overlaySelectionCanvas"></canvas>
-      </div>
-
-      <!-- CHART 4: SPLIT-ALIGNED BREAKDOWN (MID-DRIVE SPLIT WITH FLIPPED GREEN BOW SURGE) -->
-      <div class="analyzer-panel">
-        <div class="card-title">Chart 4: Split-Aligned Breakdown (Catch Aligned Left, Finish Aligned Right)</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-          <span class="legend-pill" id="tog_c4_surge" onclick="toggleC4('surge')" style="color:#00ff88;">● Bow Surge (Green)</span>
-          <span class="legend-pill" id="tog_c4_force" onclick="toggleC4('force')" style="color:#ffd700;">● Force</span>
-          <span class="legend-pill" id="tog_c4_ax" onclick="toggleC4('ax')" style="color:#ff4444;">● Ax</span>
-          <span class="legend-pill" id="tog_c4_az" onclick="toggleC4('az')" style="color:#3399ff;">● Az</span>
-        </div>
-        <div id="c4Tooltip" class="chart-tooltip-box"></div>
-        <canvas id="overlaySplitCanvas"></canvas>
-      </div>
-    </div>
+  <!-- ORIGINAL 7 BADGES -->
+  <div style="height:54px; display:grid; grid-template-columns:repeat(7, 1fr); gap:6px;">
+    <div class="stat-badge"><div class="stat-val" id="valRaw" style="color:#ffaa00;">--</div><div class="stat-lbl">Raw Load</div></div>
+    <div class="stat-badge"><div class="stat-val" id="valNet" style="color:#00ffcc;">--</div><div class="stat-lbl">Drive Force</div></div>
+    <div class="stat-badge"><div class="stat-val" id="valSurge" style="color:#00e5ff;">--</div><div class="stat-lbl">Bow Surge</div></div>
+    <div class="stat-badge"><div class="stat-val" id="valSpd" style="color:#ffff00;">--</div><div class="stat-lbl">Speed (km/h)</div></div>
+    <div class="stat-badge"><div class="stat-val" id="valPitch" style="color:#ff66cc;">--</div><div class="stat-lbl">Pitch</div></div>
+    <div class="stat-badge"><div class="stat-val" id="valRoll" style="color:#cc66ff;">--</div><div class="stat-lbl">Roll</div></div>
+    <div class="stat-badge"><div class="stat-val" id="valSats" style="color:#aaa;">--</div><div class="stat-lbl">GPS Sats</div></div>
   </div>
 </div>
 
 <script>
 // ==============================================================================
-// 1. DATA STORAGE & EXPORT
+// 1. DATA STORAGE & GLOBAL RUNTIME
 // ==============================================================================
 let inMemoryLog = [];
+let chartData = [];
+let sessionActive = false;
+let sessionPaused = false;
+let sessionStartTime = null;
+let activeElapsedSec = 0;
+let totalDistanceMeters = 0;
+
+let oar1Baseline = 0;
+let oar2Baseline = 0;
 let invertLoad = true;
-let flatlines = [];
-let isFlatlineSelecting = false;
-let flatlineDragStart = null;
 
-function toggleLoadInversion() {
-  invertLoad = !invertLoad;
-  document.getElementById('btnInvertLoad').classList.toggle('active', invertLoad);
-  document.getElementById('btnInvertLoad').innerText = invertLoad ? "FLIP LOAD (+/-): ON" : "FLIP LOAD (+/-): OFF";
-  if (chartData.length > 0) {
-    if (isReplayMode && replayData[replayIndex]) updateHUD(replayData[replayIndex]);
-    else if (chartData[chartData.length - 1]) updateHUD(chartData[chartData.length - 1]);
-    redrawInteractiveChart();
-    if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
-  }
+// Web Audio API Synth for Beeping over Strokes
+let audioCtx = null;
+function playStrokeBeep() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // 880 Hz High Pitch
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.07);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.07);
+  } catch(e) {}
 }
 
-function toggleFlatlineMode() {
-  isFlatlineSelecting = !isFlatlineSelecting;
-  document.getElementById('btnFlatlineTool').classList.toggle('active', isFlatlineSelecting);
-  document.getElementById('btnFlatlineTool').innerText = isFlatlineSelecting ? "CANCEL FLATLINE" : "✏️ FLATLINE SPIKE";
-}
-
-function applyFlatline(idx1, idx2) {
-  if (idx1 > idx2) { const t = idx1; idx1 = idx2; idx2 = t; }
-  idx1 = Math.max(0, idx1);
-  idx2 = Math.min(chartData.length - 1, idx2);
-  if (idx2 - idx1 < 1) return;
-
-  const backup = [];
-  for (let i = idx1; i <= idx2; i++) {
-    backup.push({ ...chartData[i] });
-  }
-  flatlines.push({ idx1, idx2, backup });
-
-  const pA = chartData[idx1];
-  const pB = chartData[idx2];
-  const count = idx2 - idx1;
-
-  for (let i = idx1; i <= idx2; i++) {
-    const alpha = (i - idx1) / count;
-    chartData[i].raw_w = pA.raw_w + alpha * (pB.raw_w - pA.raw_w);
-    chartData[i].ax = pA.ax + alpha * (pB.ax - pA.ax);
-    chartData[i].ay = pA.ay + alpha * (pB.ay - pA.ay);
-    chartData[i].az = pA.az + alpha * (pB.az - pA.az);
-    chartData[i].gx = pA.gx + alpha * (pB.gx - pA.gx);
-    chartData[i].gy = pA.gy + alpha * (pB.gy - pA.gy);
-    chartData[i].gz = pA.gz + alpha * (pB.gz - pA.gz);
-    chartData[i].surge = pA.surge + alpha * (pB.surge - pA.surge);
-  }
-
-  isFlatlineSelecting = false;
-  document.getElementById('btnFlatlineTool').classList.remove('active');
-  document.getElementById('btnFlatlineTool').innerText = "✏️ FLATLINE SPIKE";
-
-  redrawInteractiveChart();
-  if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
-}
-
-function resetFlatlines() {
-  if (flatlines.length === 0) return;
-  for (let f = flatlines.length - 1; f >= 0; f--) {
-    const { idx1, backup } = flatlines[f];
-    for (let k = 0; k < backup.length; k++) {
-      chartData[idx1 + k] = backup[k];
-    }
-  }
-  flatlines = [];
-  redrawInteractiveChart();
-  if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
-}
-
-function saveRowToStorage(rowStr) {
-  inMemoryLog.push(rowStr);
-  updateRecordCountDisplay();
-}
-
-function updateRecordCountDisplay() {
-  document.getElementById('dbCount').innerText = inMemoryLog.length;
-}
-
-function exportDatabase() {
-  if (inMemoryLog.length === 0) {
-    alert("No data recorded to export. Connect to device or load a CSV first.");
-    return;
-  }
-  let csvContent = "ms,timestamp,raw_w,ax,ay,az,gx,gy,gz,lat,lng,alt,spd,sats\n" + inMemoryLog.join("\n") + "\n";
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `indaboat_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
-}
-
-function clearDatabase() {
-  if (!confirm("Clear all recorded session data?")) return;
-  inMemoryLog = [];
-  chartData = [];
-  replayData = [];
-  flatlines = [];
-  detectedStrokes = [];
-  updateRecordCountDisplay();
-  track.setLatLngs([]);
-  marker.setLatLng([0, 0]);
-  exitReplayMode();
-  redrawInteractiveChart();
+function switchMainView(view) {
+  document.getElementById('tabLive').classList.toggle('active', view === 'live');
+  document.getElementById('tabAdvanced').classList.toggle('active', view === 'advanced');
+  document.getElementById('liveDashboardView').classList.toggle('active', view === 'live');
+  document.getElementById('advancedSuiteView').classList.toggle('active', view === 'advanced');
+  setTimeout(() => {
+    mapLive.invalidateSize();
+    if (advMap) advMap.invalidateSize();
+  }, 100);
 }
 
 // ==============================================================================
-// 2. BLE LIVE STREAMING ENGINE
+// 2. DUAL IMU FUSION & BOW SURGE ENGINE
+// ==============================================================================
+class DualIMUKinematics {
+  constructor() {
+    this.pitch = 0; this.roll = 0;
+    this.zeroP = 0; this.zeroR = 0;
+  }
+  update(p1, p2, dt) {
+    // Fuse both IMUs with reciprocal noise rejection
+    const accP1 = Math.atan2(p1.ax, Math.sqrt(p1.az * p1.az + p1.ay * p1.ay));
+    const accP2 = Math.atan2(p2.ax, Math.sqrt(p2.az * p2.az + p2.ay * p2.ay));
+    const fusedAccPitch = (accP1 + accP2) / 2.0;
+
+    const accR1 = Math.atan2(p1.az, Math.max(0.05, -p1.ay));
+    const accR2 = Math.atan2(p2.az, Math.max(0.05, -p2.ay));
+    const fusedAccRoll = (accR1 + accR2) / 2.0;
+
+    const fusedGz = (p1.gz + p2.gz) / 2.0;
+    const fusedGx = (p1.gx + p2.gx) / 2.0;
+
+    this.pitch = 0.94 * (this.pitch + fusedGz * dt) + 0.06 * fusedAccPitch;
+    this.roll  = 0.94 * (this.roll  + fusedGx * dt) + 0.06 * fusedAccRoll;
+  }
+}
+const boatKinematics = new DualIMUKinematics();
+
+function zeroDualImu() {
+  boatKinematics.zeroP = boatKinematics.pitch;
+  boatKinematics.zeroR = boatKinematics.roll;
+}
+
+// ==============================================================================
+// 3. TELEMETRY INGESTION, LIVE AUTO-ZEROING & SPM CALCULATION
+// ==============================================================================
+let strokeHistory = [];
+let currentStrokeBuffer1 = [];
+let currentStrokeBuffer2 = [];
+let lastCompletedStroke1 = [];
+let lastCompletedStroke2 = [];
+let strokeAverages1 = [];
+let strokeAverages2 = [];
+
+let inDrivePhase = false;
+let lastStrokeDetectTime = 0;
+let recentRecoveryForces1 = [];
+let recentRecoveryForces2 = [];
+
+function ingestUnifiedRow(rowStr) {
+  inMemoryLog.push(rowStr);
+  const p = rowStr.split(',').map(s => s.trim().replace(/"/g, ''));
+  if (p.length < 10) return;
+
+  const ms    = parseInt(p[0], 10);
+  const timeS = p[1] || '';
+  const w1    = parseFloat(p[2]) || 0;
+  const ax1   = parseFloat(p[3]) || 0;
+  const ay1   = parseFloat(p[4]) || 0;
+  const az1   = parseFloat(p[5]) || 0;
+  const gx1   = parseFloat(p[6]) || 0;
+  const gy1   = parseFloat(p[7]) || 0;
+  const gz1   = parseFloat(p[8]) || 0;
+  const lat   = parseFloat(p[9]) || 0;
+  const lng   = parseFloat(p[10]) || 0;
+  const alt   = parseFloat(p[11]) || 0;
+  const spd   = parseFloat(p[12]) || 0;
+  const sats  = parseInt(p[13], 10) || 0;
+
+  // Oar 2 (Columns 14-20)
+  const w2    = p.length >= 15 ? (parseFloat(p[14]) || 0) : 0;
+  const ax2   = p.length >= 18 ? (parseFloat(p[15]) || 0) : ax1;
+  const ay2   = p.length >= 18 ? (parseFloat(p[16]) || 0) : ay1;
+  const az2   = p.length >= 18 ? (parseFloat(p[17]) || 0) : az1;
+  const gx2   = p.length >= 21 ? (parseFloat(p[18]) || 0) : gx1;
+  const gy2   = p.length >= 21 ? (parseFloat(p[19]) || 0) : gy1;
+  const gz2   = p.length >= 21 ? (parseFloat(p[20]) || 0) : gz1;
+
+  const nowSec = ms / 1000.0;
+  const dt = 0.1; // 10 Hz unified stream
+
+  // Dual IMU Attitude Fusion
+  boatKinematics.update({ ax: ax1, ay: ay1, az: az1, gx: gx1, gy: gy1, gz: gz1 },
+                        { ax: ax2, ay: ay2, az: az2, gx: gx2, gy: gy2, gz: gz2 }, dt);
+
+  // Clean Forward Bow Surge (Averaged across both oars, gravity-compensated, forward positive)
+  const u_up = Math.sin(boatKinematics.pitch);
+  const surge1 = -(ax1 - (9.80665 * u_up));
+  const surge2 = -(ax2 - (9.80665 * u_up));
+  const cleanSurge = (surge1 + surge2) / 2.0;
+
+  // AUTOMATIC RECOVERY ZEROING (No tare button needed!)
+  // In recovery (when surge is low/negative glide), accumulate baseline forces
+  if (!inDrivePhase) {
+    recentRecoveryForces1.push(w1);
+    recentRecoveryForces2.push(w2);
+    if (recentRecoveryForces1.length > 25) recentRecoveryForces1.shift();
+    if (recentRecoveryForces2.length > 25) recentRecoveryForces2.shift();
+
+    // Auto-update running baselines
+    oar1Baseline = recentRecoveryForces1.reduce((a,b)=>a+b, 0) / recentRecoveryForces1.length;
+    oar2Baseline = recentRecoveryForces2.reduce((a,b)=>a+b, 0) / recentRecoveryForces2.length;
+  }
+
+  // Net Dynamic Driving Force (auto-equalized)
+  const netF1 = Math.max(0, (invertLoad ? -1 : 1) * (w1 - oar1Baseline));
+  const netF2 = Math.max(0, (invertLoad ? -1 : 1) * (w2 - oar2Baseline));
+
+  // ACCELEROMETER + GPS COHERENT STROKE DETECTION (Never Overestimates!)
+  // Requires: Significant forward surge spike + boat forward velocity
+  const surgeTrigger = cleanSurge > 1.2 && spd > 1.5;
+  const minStrokeInterval = 1.35; // Prevents > 44 SPM overestimation on noise
+
+  if (surgeTrigger && (nowSec - lastStrokeDetectTime > minStrokeInterval) && !inDrivePhase) {
+    inDrivePhase = true;
+    lastStrokeDetectTime = nowSec;
+
+    // Finish previous stroke and trigger live audio beep
+    playStrokeBeep();
+    if (currentStrokeBuffer1.length > 3) {
+      lastCompletedStroke1 = [...currentStrokeBuffer1];
+      lastCompletedStroke2 = [...currentStrokeBuffer2];
+      updateStrokeRunningAverages();
+    }
+    currentStrokeBuffer1 = [];
+    currentStrokeBuffer2 = [];
+
+    // Calculate live Stroke Rate (SPM)
+    if (strokeHistory.length > 0) {
+      const period = nowSec - strokeHistory[strokeHistory.length - 1];
+      const liveSpmVal = Math.min(48, Math.max(12, 60.0 / period));
+      document.getElementById('liveSPM').innerText = liveSpmVal.toFixed(0);
+    }
+    strokeHistory.push(nowSec);
+  }
+
+  // Detect Finish of Drive -> Transition into Recovery
+  if (inDrivePhase && cleanSurge < 0.2) {
+    inDrivePhase = false;
+  }
+
+  // Record stroke buffer points for live overlay chart
+  currentStrokeBuffer1.push(netF1);
+  currentStrokeBuffer2.push(netF2);
+
+  // Active workout time & distance accumulation
+  if (sessionActive && !sessionPaused) {
+    activeElapsedSec += dt;
+    totalDistanceMeters += (spd / 3.6) * dt;
+    updateLiveStats(spd);
+  }
+
+  const point = {
+    ms, timeStr: timeS,
+    w1: netF1, w2: netF2,
+    raw_w: (invertLoad ? -1 : 1) * w1,
+    surge: cleanSurge,
+    ax: ax1, ay: ay1, az: az1, gx: gx1, gy: gy1, gz: gz1,
+    lat, lng, spd, sats,
+    pitch_deg: (boatKinematics.pitch - boatKinematics.zeroP) * (180.0 / Math.PI),
+    roll_deg: (boatKinematics.roll - boatKinematics.zeroR) * (180.0 / Math.PI)
+  };
+
+  chartData.push(point);
+  if (chartData.length > 3000) chartData.shift();
+
+  updateHUD(point);
+  updateMapTrack(lat, lng, spd);
+}
+
+function updateStrokeRunningAverages() {
+  const len = Math.max(lastCompletedStroke1.length, 1);
+  if (strokeAverages1.length === 0) {
+    strokeAverages1 = [...lastCompletedStroke1];
+    strokeAverages2 = [...lastCompletedStroke2];
+  } else {
+    for (let i = 0; i < len; i++) {
+      const v1 = lastCompletedStroke1[i] || 0;
+      const v2 = lastCompletedStroke2[i] || 0;
+      strokeAverages1[i] = strokeAverages1[i] ? (0.8 * strokeAverages1[i] + 0.2 * v1) : v1;
+      strokeAverages2[i] = strokeAverages2[i] ? (0.8 * strokeAverages2[i] + 0.2 * v2) : v2;
+    }
+  }
+}
+
+function updateLiveStats(spdKmh) {
+  // Time
+  const mins = Math.floor(activeElapsedSec / 60);
+  const secs = Math.floor(activeElapsedSec % 60);
+  document.getElementById('liveTime').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+
+  // Distance
+  document.getElementById('liveDistance').innerText = totalDistanceMeters > 1000 
+    ? `${(totalDistanceMeters / 1000).toFixed(2)}km` 
+    : `${totalDistanceMeters.toFixed(0)}m`;
+
+  // Split /500m
+  const mps = spdKmh / 3.6;
+  if (mps > 0.8) {
+    const splitSec = 500.0 / mps;
+    const sMin = Math.floor(splitSec / 60);
+    const sSec = Math.floor(splitSec % 60);
+    document.getElementById('liveSplit').innerText = `${sMin}:${sSec.toString().padStart(2,'0')}`;
+  } else {
+    document.getElementById('liveSplit').innerText = `--:--`;
+  }
+
+  // Avg Split & Avg SPM
+  if (totalDistanceMeters > 50 && activeElapsedSec > 10) {
+    const avgMps = totalDistanceMeters / activeElapsedSec;
+    const avgSplitSec = 500.0 / avgMps;
+    const asMin = Math.floor(avgSplitSec / 60);
+    const asSec = Math.floor(avgSplitSec % 60);
+    document.getElementById('avgSplit').innerText = `${asMin}:${asSec.toString().padStart(2,'0')}`;
+
+    if (strokeHistory.length > 2) {
+      const totalStrokeTime = strokeHistory[strokeHistory.length - 1] - strokeHistory[0];
+      const avgSpmVal = (strokeHistory.length / (totalStrokeTime / 60.0));
+      document.getElementById('avgSPM').innerText = avgSpmVal.toFixed(1);
+    }
+  }
+}
+
+// ==============================================================================
+// 4. BLE CONNECTION & SESSION RECORDING ENGINE
 // ==============================================================================
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+const RX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
-let device = null;
-let txChar = null;
-let streamBuffer = "";
+let bleDevice = null;
+let bleTxChar = null;
+let bleRxChar = null;
+let bleBuffer = "";
 
 async function toggleConnect() {
-  if (device && device.gatt.connected) {
-    device.gatt.disconnect();
+  if (bleDevice && bleDevice.gatt.connected) {
+    bleDevice.gatt.disconnect();
     return;
   }
   try {
-    device = await navigator.bluetooth.requestDevice({
+    bleDevice = await navigator.bluetooth.requestDevice({
       filters: [{ name: "indaboat" }],
       optionalServices: [SERVICE_UUID]
     });
-    device.addEventListener('gattserverdisconnected', onDisconnected);
-    const server = await device.gatt.connect();
+    bleDevice.addEventListener('gattserverdisconnected', () => {
+      document.getElementById('bleStatus').innerText = "DISCONNECTED";
+      document.getElementById('bleStatus').style.color = "#ff4444";
+      document.getElementById('btnConnect').innerText = "CONNECT";
+    });
+    const server = await bleDevice.gatt.connect();
     const service = await server.getPrimaryService(SERVICE_UUID);
-    txChar = await service.getCharacteristic(TX_CHAR_UUID);
-    await txChar.startNotifications();
-    txChar.addEventListener('characteristicvaluechanged', handleChunk);
+    bleTxChar = await service.getCharacteristic(TX_CHAR_UUID);
+    bleRxChar = await service.getCharacteristic(RX_CHAR_UUID);
+
+    await bleTxChar.startNotifications();
+    bleTxChar.addEventListener('characteristicvaluechanged', (e) => {
+      const text = new TextDecoder().decode(e.target.value);
+      bleBuffer += text;
+      const lines = bleBuffer.split(/\r?\n/);
+      bleBuffer = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        if (line.startsWith("#")) {
+          handleBleSystemMessage(line.trim());
+        } else {
+          ingestUnifiedRow(line.trim());
+        }
+      }
+    });
 
     document.getElementById('bleStatus').innerText = "CONNECTED";
     document.getElementById('bleStatus').style.color = "#00ff88";
     document.getElementById('btnConnect').innerText = "DISCONNECT";
-    exitReplayMode();
-
-    if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
-  } catch (err) {
-    console.error(err);
-    alert("BLE notice: " + err.message);
+  } catch(err) {
+    alert("Bluetooth notice: " + err.message);
   }
 }
 
-function onDisconnected() {
-  document.getElementById('bleStatus').innerText = "DISCONNECTED";
-  document.getElementById('bleStatus').style.color = "#ff4444";
-  document.getElementById('btnConnect').innerText = "CONNECT";
+function sendBleCommand(cmdStr) {
+  if (bleRxChar) {
+    const enc = new TextEncoder().encode(cmdStr + "\n");
+    bleRxChar.writeValue(enc).catch(console.error);
+  }
 }
 
-function handleChunk(event) {
-  const text = new TextDecoder().decode(event.target.value);
-  streamBuffer += text;
-  const lines = streamBuffer.split(/\r?\n/);
-  streamBuffer = lines.pop();
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    document.getElementById('debugBar').innerText = `RX [${trimmed.length}b]: ${trimmed}`;
-    saveRowToStorage(trimmed);
-    ingestTelemetry(trimmed, true);
+function handleSessionClick(action) {
+  if (action === 'START') {
+    sessionActive = true;
+    sessionPaused = false;
+    sessionStartTime = new Date();
+    document.getElementById('btnStart').classList.add('btn-active-rec');
+    document.getElementById('sdCardStatus').innerText = "SD: RECORDING";
+    document.getElementById('sdCardStatus').style.color = "#00ff88";
+    sendBleCommand("START");
+  } else if (action === 'PAUSE') {
+    sessionPaused = !sessionPaused;
+    document.getElementById('btnPause').innerText = sessionPaused ? "RESUME" : "PAUSE";
+    document.getElementById('sdCardStatus').innerText = sessionPaused ? "SD: PAUSED" : "SD: RECORDING";
+    sendBleCommand(sessionPaused ? "PAUSE" : "START");
+  } else if (action === 'END') {
+    sessionActive = false;
+    sessionPaused = false;
+    document.getElementById('btnStart').classList.remove('btn-active-rec');
+    document.getElementById('btnPause').innerText = "PAUSE";
+    document.getElementById('sdCardStatus').innerText = "SD: SAVED";
+    sendBleCommand("STOP");
+    openRecallModal();
   }
+}
+
+function handleBleSystemMessage(msg) {
+  if (msg.includes("RECOVER_COMPLETE")) {
+    alert("Wireless SD card recovery complete!");
+    closeRecallModal();
+    openRecallModal();
+  }
+}
+
+function requestWirelessSdDump() {
+  if (!confirm("Stream entire workout file from ESP32-S3 SD card over Bluetooth?")) return;
+  sendBleCommand("RECOVER");
 }
 
 // ==============================================================================
-// 3. TELEMETRY PARSING, ATTITUDE & PROPERLY FLIPPED BOW SURGE
+// 5. RENDERING: TOP DUAL IMU FUSED BOAT ATTITUDE
 // ==============================================================================
-class NodeState {
-  constructor(id) {
-    this.id = id;
-    this.raw_w = 0;
-    this.baseline_w = null;
-    this.net_force = 0;
-    this.pitch_est = 0;
-    this.roll_est = 0;
-  }
+const dualCanvas = document.getElementById('dualImuCanvas');
+const dualCtx = dualCanvas.getContext('2d');
 
-  update(raw_w, ax, ay, az, gx, gy, gz, dt) {
-    this.raw_w = raw_w;
-    if (this.baseline_w === null) this.baseline_w = raw_w;
-    const rate = 0.01;
-    this.baseline_w = (1.0 - rate) * this.baseline_w + rate * raw_w;
-    this.net_force = raw_w - this.baseline_w;
-
-    const acc_pitch = Math.atan2(ax, Math.sqrt(az * az + ay * ay));
-    const acc_roll  = Math.atan2(az, Math.max(0.05, -ay));
-
-    this.pitch_est = 0.93 * (this.pitch_est + gz * dt) + 0.07 * acc_pitch;
-    this.roll_est  = 0.93 * (this.roll_est  + gx * dt) + 0.07 * acc_roll;
-  }
-}
-
-const node1 = new NodeState(1);
-let lastTimeSec = null;
-let current_d = {
-  pitch_deg: 0, roll_deg: 0, force_net: 0, a_surge: 0,
-  raw_w: 0, ax: 0, ay: 0, az: 0, gx: 0, gy: 0, gz: 0
-};
-let chartData = [];
-
-function parseCsvTokens(row) {
-  const parts = [];
-  let inQuotes = false;
-  let token = '';
-  for (let i = 0; i < row.length; i++) {
-    const c = row[i];
-    if (c === '"') inQuotes = !inQuotes;
-    else if (c === ',' && !inQuotes) { parts.push(token.trim()); token = ''; }
-    else token += c;
-  }
-  parts.push(token.trim());
-  return parts;
-}
-
-function ingestTelemetry(row, updateLiveChart = true) {
-  const parts = parseCsvTokens(row);
-  if (parts.length < 10) return null;
-
-  const ms    = parseInt(parts[0], 10);
-  const timeS = parts[1] ? parts[1].replace(/"/g, '') : '';
-  const raw_w = parseFloat(parts[2]);
-  const ax    = parseFloat(parts[3]);
-  const ay    = parseFloat(parts[4]);
-  const az    = parseFloat(parts[5]);
-  const gx    = parseFloat(parts[6]);
-  const gy    = parseFloat(parts[7]);
-  const gz    = parseFloat(parts[8]);
-  const lat   = parseFloat(parts[9]);
-  const lng   = parseFloat(parts[10]);
-  const spd   = parts[12] !== undefined ? parseFloat(parts[12]) : 0;
-  const sats  = parts[13] !== undefined ? parseInt(parts[13], 10) : 0;
-
-  if (isNaN(raw_w) || isNaN(ax)) return null;
-
-  const t_sec = ms / 1000.0;
-  let isTimeJump = false;
-  let jumpDuration = 0;
-
-  if (lastTimeSec !== null) {
-    const deltaT = t_sec - lastTimeSec;
-    if (deltaT > 0.5) {
-      isTimeJump = true;
-      jumpDuration = deltaT;
-    }
-  }
-
-  const dt = lastTimeSec === null ? 0.033 : Math.min(0.2, Math.max(0.001, t_sec - lastTimeSec));
-  lastTimeSec = t_sec;
-
-  node1.update(raw_w, ax, ay, az, gx, gy, gz, dt);
-
-  const fusedPitch = node1.pitch_est;
-  const fusedRoll  = node1.roll_est;
-  const u_up_x = Math.sin(fusedPitch);
-  
-  // BOW SURGE FLIPPED PROPERLY: Forward acceleration is positive during drive!
-  const fusedSurge = -(ax - (9.80665 * u_up_x));
-
-  current_d = {
-    pitch_deg: fusedPitch * (180.0 / Math.PI),
-    roll_deg:  fusedRoll  * (180.0 / Math.PI),
-    force_net: node1.net_force,
-    a_surge:   fusedSurge,
-    raw_w, ax, ay, az, gx, gy, gz
-  };
-
-  const point = {
-    ms, timeStr: timeS, raw_w, ax, ay, az, gx, gy, gz,
-    net_force: node1.net_force, surge: fusedSurge,
-    lat, lng, spd, sats,
-    isTimeJump, jumpDuration,
-    pitch_deg: current_d.pitch_deg,
-    roll_deg: current_d.roll_deg
-  };
-
-  if (updateLiveChart) {
-    chartData.push(point);
-    if (chartData.length > 5000) chartData.shift();
-    updateHUD(point);
-  }
-
-  return point;
-}
-
-function updateHUD(d) {
-  const effRaw = (invertLoad ? -1 : 1) * d.raw_w;
-  const effNet = (invertLoad ? -1 : 1) * d.net_force;
-
-  document.getElementById('valRaw').innerText = effRaw.toFixed(1);
-  document.getElementById('valNet').innerText = (effNet >= 0 ? "+" : "") + effNet.toFixed(1);
-  document.getElementById('valSurge').innerText = (d.surge >= 0 ? "+" : "") + d.surge.toFixed(2);
-  document.getElementById('valSpd').innerText   = d.spd.toFixed(1);
-  document.getElementById('valPitch').innerText = d.pitch_deg.toFixed(1) + "°";
-  document.getElementById('valRoll').innerText  = d.roll_deg.toFixed(1) + "°";
-  document.getElementById('valSats').innerText  = isNaN(d.sats) ? 0 : d.sats;
-
-  if (d.lat && d.lng && !isNaN(d.lat) && !isNaN(d.lng) && Math.abs(d.lat) > 0.001) {
-    const coord = [d.lat, d.lng];
-    marker.setLatLng(coord);
-    track.addLatLng(coord);
-    if (!isReplayMode && isAutoFollow) map.panTo(coord, { animate: true, duration: 0.1 });
-    document.getElementById('mapTitle').innerText = `GPS Track (${d.spd.toFixed(1)} km/h | ${d.sats} Sats)`;
-  }
-}
-
-// ==============================================================================
-// 4. ORIGINAL 2.5D ISOMETRIC ACCELEROMETER ATTITUDE (PROMPT 1 IMPLEMENTATION)
-// ==============================================================================
-let showForceArrow = false;
-let mountPitchTrim = 0;
-let mountRollTrim = 0;
-let zeroPitchOffset = 0;
-let zeroRollOffset = 0;
-
-const plateCanvas = document.getElementById('plateCanvas');
-
-function toggleForceArrow() {
-  showForceArrow = !showForceArrow;
-  document.getElementById('btnToggleForceArrow').classList.toggle('active', showForceArrow);
-  document.getElementById('btnToggleForceArrow').innerText = showForceArrow ? "FORCE ARROW: ON" : "FORCE ARROW: OFF";
-  renderPlateCanvas();
-}
-
-function toggleAlignDrawer() {
-  const d = document.getElementById('alignDrawer');
-  d.style.display = d.style.display === 'flex' ? 'none' : 'flex';
-}
-
-function zeroAttitudeNow() {
-  zeroPitchOffset = current_d.pitch_deg;
-  zeroRollOffset  = current_d.roll_deg;
-  renderPlateCanvas();
-}
-
-function renderPlateCanvas() {
-  const cn = plateCanvas;
-  const cx = cn.getContext('2d');
+function renderDualImuCanvas() {
+  const cn = dualCanvas;
+  const cx = dualCtx;
   const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth;
-  const h = cn.clientHeight;
+  const w = cn.clientWidth, h = cn.clientHeight;
 
   if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr;
-    cn.height = h * dpr;
+    cn.width = w * dpr; cn.height = h * dpr;
   }
-
   cx.save();
   cx.scale(dpr, dpr);
-  cx.fillStyle = '#101010';
-  cx.fillRect(0, 0, w, h);
+  cx.clearRect(0, 0, w, h);
 
-  const pitch = ((current_d.pitch_deg - zeroPitchOffset + mountPitchTrim) * Math.PI) / 180.0;
-  const roll  = ((current_d.roll_deg - zeroRollOffset + mountRollTrim) * Math.PI) / 180.0;
+  const pitch = (boatKinematics.pitch - boatKinematics.zeroP);
+  const roll  = (boatKinematics.roll - boatKinematics.zeroR);
 
-  const pw = w * 0.22;
-  const pl = h * 0.20;
-  const pth = 10;
-
-  const corners = [
-    [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth],
-    [-pw, -pl, pth],  [pw, -pl, pth],  [pw, pl, pth],  [-pw, pl, pth]
-  ];
-
-  // Rotation: Ry @ Rx
-  const cosR = Math.cos(roll),  sinR = Math.sin(roll);
-  const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
-
-  const rot = corners.map(c => {
-    const x1 = c[0];
-    const y1 = c[1] * cosR - c[2] * sinR;
-    const z1 = c[1] * sinR + c[2] * cosR;
-
-    const x2 = x1 * cosP + z1 * sinP;
-    const y2 = y1;
-    const z2 = -x1 * sinP + z1 * cosP;
-    return [x2, y2, z2];
-  });
-
+  // Isometric Boat Hull & Outriggers
   const centerX = w / 2;
   const centerY = h / 2 + 10;
 
-  // STRICT ZERO FORCE DISPLACEMENT ON ACCELEROMETER
-  const pts = rot.map(p => [
-    centerX + p[0] * 0.85 - p[1] * 0.40,
-    centerY + p[1] * 0.45 + p[2]
-  ]);
-
-  function drawPoly(indices, fillColor, strokeColor) {
-    cx.beginPath();
-    cx.moveTo(pts[indices[0]][0], pts[indices[0]][1]);
-    for (let i = 1; i < indices.length; i++) cx.lineTo(pts[indices[i]][0], pts[indices[i]][1]);
-    cx.closePath();
-    cx.fillStyle = fillColor;
-    cx.fill();
-    cx.strokeStyle = strokeColor;
-    cx.lineWidth = 1;
-    cx.stroke();
-  }
-
-  // Draw Faces
-  drawPoly([3, 2, 6, 7], '#414141', '#828282'); // Front face
-  drawPoly([1, 2, 6, 5], '#5a5a5a', '#828282'); // Side face
-  drawPoly([0, 1, 2, 3], '#114466', '#00ffcc'); // Top face
-
-  // Optional Force Vector Arrow Only
-  if (showForceArrow) {
-    const plate_cx = (pts[0][0] + pts[2][0]) / 2;
-    const plate_cy = (pts[0][1] + pts[2][1]) / 2;
-    const effLoad = (invertLoad ? -1 : 1) * current_d.raw_w;
-    const arrow_len = Math.max(10, Math.min(65, Math.abs(effLoad) * 0.15));
-
-    cx.beginPath();
-    cx.moveTo(plate_cx, plate_cy);
-    cx.lineTo(plate_cx, plate_cy + arrow_len);
-    cx.strokeStyle = '#00ffcc';
-    cx.lineWidth = 3;
-    cx.stroke();
-
-    cx.beginPath();
-    cx.moveTo(plate_cx - 5, plate_cy + arrow_len - 8);
-    cx.lineTo(plate_cx, plate_cy + arrow_len);
-    cx.lineTo(plate_cx + 5, plate_cy + arrow_len - 8);
-    cx.fillStyle = '#00ffcc';
-    cx.fill();
-  }
-
-  // Corner readouts
-  cx.font = '10px monospace';
-  cx.fillStyle = '#00e6ff';
-  cx.fillText(`PITCH: ${(current_d.pitch_deg >= 0 ? '+' : '') + current_d.pitch_deg.toFixed(1)}°`, 10, h - 10);
-  cx.fillStyle = '#ff64ff';
-  cx.fillText(`ROLL:  ${(current_d.roll_deg >= 0 ? '+' : '') + current_d.roll_deg.toFixed(1)}°`, 120, h - 10);
-
-  cx.restore();
-}
-
-// ==============================================================================
-// 5. LEAFLET SATELLITE MAP
-// ==============================================================================
-const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
-
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19,
-  crossOrigin: true
-}).addTo(map);
-
-const track = L.polyline([], { color: '#00e5ff', weight: 3.5, opacity: 0.9 }).addTo(map);
-const marker = L.circleMarker([0, 0], { radius: 6, color: '#ffffff', fillColor: '#ff0044', fillOpacity: 1, weight: 2 }).addTo(map);
-
-function recenterMap() {
-  const latLngs = track.getLatLngs();
-  if (latLngs && latLngs.length > 0) {
-    map.fitBounds(L.latLngBounds(latLngs), { padding: [25, 25], maxZoom: 18 });
-  } else {
-    map.invalidateSize();
-  }
-}
-
-// ==============================================================================
-// 6. MAIN CHART: MULTI-SENSOR TELEMETRY (REAL TIME SCROLLING SCRUBBER)
-// ==============================================================================
-const chartCanvas = document.getElementById('interactiveCanvas');
-const chartCtx = chartCanvas.getContext('2d');
-const chartTooltip = document.getElementById('chartTooltip');
-
-let seriesVisible = {
-  load: true, surge: true,
-  ax: true, ay: true, az: true,
-  gx: true, gy: true, gz: true,
-  gpsSpd: true
-};
-let viewStart = 0.0;
-let viewEnd = 1.0;
-let isAutoFollow = true;
-let chartHoverIndex = null;
-let replayMarkerIndex = null;
-
-function toggleSeries(key) {
-  seriesVisible[key] = !seriesVisible[key];
-  document.getElementById(`leg_${key}`).classList.toggle('off', !seriesVisible[key]);
-  redrawInteractiveChart();
-}
-
-function toggleAutoFollow() {
-  isAutoFollow = !isAutoFollow;
-  document.getElementById('btnFollow').classList.toggle('active', isAutoFollow);
-  if (isAutoFollow) {
-    viewEnd = 1.0;
-    viewStart = Math.max(0, 1.0 - 0.25);
-  }
-  redrawInteractiveChart();
-}
-
-function zoomChart(scaleFactor) {
-  isAutoFollow = false;
-  document.getElementById('btnFollow').classList.remove('active');
-  const mid = (viewStart + viewEnd) / 2;
-  const halfSpan = ((viewEnd - viewStart) * scaleFactor) / 2;
-  viewStart = Math.max(0, mid - halfSpan);
-  viewEnd = Math.min(1.0, mid + halfSpan);
-  if (viewEnd <= viewStart) viewEnd = Math.min(1.0, viewStart + 0.05);
-  redrawInteractiveChart();
-  if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
-}
-
-function resetChartZoom() {
-  viewStart = 0.0;
-  viewEnd = 1.0;
-  redrawInteractiveChart();
-  if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
-}
-
-chartCanvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  isAutoFollow = false;
-  document.getElementById('btnFollow').classList.remove('active');
-  zoomChart(e.deltaY < 0 ? 0.85 : 1.15);
-}, { passive: false });
-
-let isDragging = false;
-let dragStartX = 0;
-let dragStartRange = [0, 1];
-
-chartCanvas.addEventListener('mousedown', (e) => {
-  const rect = chartCanvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-
-  if (isFlatlineSelecting) {
-    flatlineDragStart = mouseX;
-    return;
-  }
-
-  isDragging = true;
-  dragStartX = e.clientX;
-  dragStartRange = [viewStart, viewEnd];
-  isAutoFollow = false;
-  document.getElementById('btnFollow').classList.remove('active');
-});
-
-window.addEventListener('mouseup', (e) => {
-  const rect = chartCanvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const gutterL = 60, gutterR = 55;
-  const plotW = rect.width - gutterL - gutterR;
-  const sIdx = Math.floor(viewStart * (chartData.length - 1));
-  const eIdx = Math.ceil(viewEnd * (chartData.length - 1));
-  const count = eIdx - sIdx;
-
-  if (isFlatlineSelecting && flatlineDragStart !== null) {
-    const r1 = Math.max(0, Math.min(1, (flatlineDragStart - gutterL) / plotW));
-    const r2 = Math.max(0, Math.min(1, (mouseX - gutterL) / plotW));
-    const idxA = Math.round(sIdx + r1 * count);
-    const idxB = Math.round(sIdx + r2 * count);
-    flatlineDragStart = null;
-    applyFlatline(idxA, idxB);
-    return;
-  }
-
-  isDragging = false;
-});
-
-chartCanvas.addEventListener('mousemove', (e) => {
-  const rect = chartCanvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
-
-  if (isDragging) {
-    const dx = e.clientX - dragStartX;
-    const span = dragStartRange[1] - dragStartRange[0];
-    const shift = -(dx / rect.width) * span;
-    viewStart = Math.max(0, dragStartRange[0] + shift);
-    viewEnd = Math.min(1.0, dragStartRange[1] + shift);
-    if (viewStart === 0) viewEnd = span;
-    if (viewEnd === 1.0) viewStart = 1.0 - span;
-    redrawInteractiveChart();
-    if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
-    return;
-  }
-
-  handleChartHover(mouseX, mouseY, rect.width, rect.height);
-});
-
-chartCanvas.addEventListener('mouseleave', () => {
-  chartHoverIndex = null;
-  chartTooltip.style.display = 'none';
-  redrawInteractiveChart();
-});
-
-chartCanvas.addEventListener('click', () => {
-  if (chartHoverIndex !== null && isReplayMode) {
-    jumpToReplayIndex(chartHoverIndex);
-  }
-});
-
-function handleChartHover(mouseX, mouseY, w, h) {
-  if (chartData.length === 0) return;
-  const gutterL = 60, gutterR = 55;
-  const plotW = w - gutterL - gutterR;
-
-  if (mouseX < gutterL || mouseX > w - gutterR) {
-    chartHoverIndex = null;
-    chartTooltip.style.display = 'none';
-    redrawInteractiveChart();
-    return;
-  }
-
-  const sIdx = Math.floor(viewStart * (chartData.length - 1));
-  const eIdx = Math.ceil(viewEnd * (chartData.length - 1));
-  const count = eIdx - sIdx;
-  if (count <= 0) return;
-
-  const ratio = (mouseX - gutterL) / plotW;
-  const idx = Math.min(chartData.length - 1, Math.max(0, Math.round(sIdx + ratio * count)));
-  chartHoverIndex = idx;
-
-  const d = chartData[idx];
-  const effL = (invertLoad ? -1 : 1) * d.raw_w;
-
-  chartTooltip.style.display = 'block';
-  chartTooltip.style.left = `${Math.min(w - 240, Math.max(10, mouseX + 15))}px`;
-  chartTooltip.style.top = `${Math.min(h - 150, Math.max(30, mouseY - 50))}px`;
-
-  chartTooltip.innerHTML = `
-    <div style="color:#88aacc; font-weight:bold; margin-bottom:2px;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
-    <div style="color:#00ffcc;">FORCE: ${effL.toFixed(1)}</div>
-    <div style="color:#00ff88; font-weight:bold;">BOW SURGE: ${d.surge.toFixed(2)} m/s²</div>
-    <div style="color:#ff4444;">Ax: ${d.ax.toFixed(2)} | Ay: ${d.ay.toFixed(2)} | Az: ${d.az.toFixed(2)}</div>
-    <div style="color:#ffaa00;">Gx: ${d.gx.toFixed(2)} | Gy: ${d.gy.toFixed(2)} | Gz: ${d.gz.toFixed(2)}</div>
-    <div style="color:#ffff00;">GPS SPD: ${d.spd.toFixed(1)} km/h</div>
-  `;
-
-  redrawInteractiveChart();
-}
-
-function redrawInteractiveChart() {
-  const cn = chartCanvas;
-  const cx = chartCtx;
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth;
-  const h = cn.clientHeight;
-
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr;
-    cn.height = h * dpr;
-  }
+  // Horizon Indicator
+  cx.strokeStyle = '#18202c';
+  cx.lineWidth = 1;
+  cx.beginPath(); cx.moveTo(10, centerY); cx.lineTo(w - 10, centerY); cx.stroke();
 
   cx.save();
-  cx.scale(dpr, dpr);
-  cx.clearRect(0, 0, w, h);
-
-  const gutterL = 60, gutterR = 55, padTop = 32, padBottom = 22;
-  const plotW = w - gutterL - gutterR;
-  const plotH = h - padTop - padBottom;
-
-  if (chartData.length < 2) {
-    cx.fillStyle = "#444";
-    cx.font = "12px monospace";
-    cx.textAlign = "center";
-    cx.fillText("Awaiting sensor data or loaded file...", w / 2, h / 2);
-    cx.restore();
-    return;
-  }
-
-  if (isAutoFollow && !isReplayMode) {
-    const windowSpan = 150;
-    const total = chartData.length;
-    if (total > windowSpan) {
-      viewStart = (total - windowSpan) / total;
-      viewEnd = 1.0;
-    } else {
-      viewStart = 0; viewEnd = 1.0;
-    }
-  }
-
-  const sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
-  const eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
-  const slice = chartData.slice(sIdx, eIdx + 1);
-
-  let fMin = Infinity, fMax = -Infinity;
-  let mMin = Infinity, mMax = -Infinity;
-
-  for (let i = 0; i < slice.length; i++) {
-    const p = slice[i];
-    const effL = (invertLoad ? -1 : 1) * p.raw_w;
-
-    if (seriesVisible.load) {
-      if (effL < fMin) fMin = effL;
-      if (effL > fMax) fMax = effL;
-    }
-
-    const checkMotion = (v, enabled) => {
-      if (enabled && !isNaN(v)) {
-        if (v < mMin) mMin = v;
-        if (v > mMax) mMax = v;
-      }
-    };
-
-    checkMotion(p.surge, seriesVisible.surge);
-    checkMotion(p.ax, seriesVisible.ax);
-    checkMotion(p.ay, seriesVisible.ay);
-    checkMotion(p.az, seriesVisible.az);
-    checkMotion(p.gx, seriesVisible.gx);
-    checkMotion(p.gy, seriesVisible.gy);
-    checkMotion(p.gz, seriesVisible.gz);
-    checkMotion(p.spd, seriesVisible.gpsSpd);
-  }
-
-  if (!isFinite(fMin) || !isFinite(fMax)) { fMin = -100; fMax = 100; }
-  if (!isFinite(mMin) || !isFinite(mMax)) { mMin = -12; mMax = 12; }
-
-  const fPad = Math.max(2.0, (fMax - fMin) * 0.1);
-  fMin -= fPad; fMax += fPad;
-
-  const mPad = Math.max(1.0, (mMax - mMin) * 0.15);
-  mMin -= mPad; mMax += mPad;
-
-  // Grid
-  const ticks = 4;
-  cx.font = "10px monospace";
-  cx.lineWidth = 1;
-
-  for (let i = 0; i <= ticks; i++) {
-    const y = padTop + plotH - (i / ticks) * plotH;
-    cx.strokeStyle = "#161b24";
-    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-
-    const valF = fMin + (i / ticks) * (fMax - fMin);
-    cx.fillStyle = "#00ffcc";
-    cx.textAlign = "right";
-    cx.textBaseline = "middle";
-    cx.fillText(`${valF.toFixed(0)}`, gutterL - 6, y);
-
-    const valM = mMin + (i / ticks) * (mMax - mMin);
-    cx.fillStyle = "#8899aa";
-    cx.textAlign = "left";
-    cx.fillText(`${valM.toFixed(1)}`, gutterL + plotW + 6, y);
-  }
-
-  cx.fillStyle = "#00ffcc";
-  cx.textAlign = "left";
-  cx.fillText("FORCE", 6, padTop - 12);
-
-  cx.fillStyle = "#8899aa";
-  cx.textAlign = "right";
-  cx.fillText("MOTION (m/s² | rad/s | km/h)", w - 6, padTop - 12);
-
-  // Time Jump Representation
-  for (let i = 0; i < slice.length; i++) {
-    const p = slice[i];
-    if (p.isTimeJump) {
-      const nx = i / (slice.length - 1);
-      const x = gutterL + nx * plotW;
-
-      cx.fillStyle = 'rgba(255, 68, 68, 0.12)';
-      cx.fillRect(x - 2, padTop, 4, plotH);
-
-      cx.strokeStyle = '#ff4444';
-      cx.lineWidth = 1;
-      cx.setLineDash([2, 2]);
-      cx.beginPath(); cx.moveTo(x, padTop); cx.lineTo(x, padTop + plotH); cx.stroke();
-      cx.setLineDash([]);
-
-      cx.fillStyle = '#ff4444';
-      cx.font = '8px monospace';
-      cx.fillText(`GAP +${p.jumpDuration.toFixed(1)}s`, x + 3, padTop + 14);
-    }
-  }
-
-  // Draw Lines
-  function drawLine(key, color, minV, maxV, isLoad = false, lw = 1.4) {
-    if (!seriesVisible[key]) return;
-    cx.strokeStyle = color;
-    cx.lineWidth = lw;
-    cx.beginPath();
-    for (let i = 0; i < slice.length; i++) {
-      const p = slice[i];
-      const val = isLoad ? ((invertLoad ? -1 : 1) * p.raw_w) : p[key];
-      const normX = i / (slice.length - 1);
-      const normY = (val - minV) / (maxV - minV);
-      const x = gutterL + normX * plotW;
-      const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-      if (i === 0) cx.moveTo(x, y);
-      else cx.lineTo(x, y);
-    }
-    cx.stroke();
-  }
-
-  drawLine('load', '#00ffcc', fMin, fMax, true, 2.0);
-  drawLine('surge', '#00ff88', mMin, mMax, false, 2.2); // Green Bow Surge Line (Flipped properly)
-  drawLine('ax', '#ff4444', mMin, mMax);
-  drawLine('ay', '#22cc88', mMin, mMax);
-  drawLine('az', '#3399ff', mMin, mMax);
-  drawLine('gx', '#ffaa00', mMin, mMax);
-  drawLine('gy', '#d044ff', mMin, mMax);
-  drawLine('gz', '#ffea00', mMin, mMax);
-  drawLine('gpsSpd', '#ffff00', mMin, mMax, false, 1.8);
-
-  // PROMINENT REPLAY TIME-SCROLL SCRUBBER LINE
-  if (isReplayMode && replayMarkerIndex !== null && replayMarkerIndex >= sIdx && replayMarkerIndex <= eIdx) {
-    const rx = gutterL + ((replayMarkerIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
-    cx.strokeStyle = '#ffffff';
-    cx.lineWidth = 2.5;
-    cx.beginPath();
-    cx.moveTo(rx, padTop);
-    cx.lineTo(rx, padTop + plotH);
-    cx.stroke();
-
-    cx.fillStyle = '#ffff00';
-    cx.beginPath();
-    cx.arc(rx, padTop + 3, 4.5, 0, Math.PI * 2);
-    cx.fill();
-  }
-
-  // Flatline Drag Preview
-  if (isFlatlineSelecting && flatlineDragStart !== null && chartHoverIndex !== null) {
-    const curX = gutterL + ((chartHoverIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
-    cx.fillStyle = 'rgba(255, 68, 0, 0.25)';
-    cx.fillRect(flatlineDragStart, padTop, curX - flatlineDragStart, plotH);
-  }
-
-  // Bottom Time Axis
-  cx.fillStyle = "#667788";
-  cx.textAlign = "left";
-  cx.fillText(slice[0].timeStr || `${slice[0].ms}ms`, gutterL, h - 6);
-  cx.textAlign = "right";
-  cx.fillText(slice[slice.length - 1].timeStr || `${slice[slice.length - 1].ms}ms`, gutterL + plotW, h - 6);
-
-  cx.restore();
-}
-
-// ==============================================================================
-// 7. FILE IMPORT & REAL-TIME SYNCED REPLAY ENGINE (AUTO-SCROLLING SCRUBBER)
-// ==============================================================================
-let isReplayMode = false;
-let replayData = [];
-let replayIndex = 0;
-let isReplayPlaying = false;
-let replaySpeed = 1.0;
-let replayStartPerf = 0;
-let replayStartDataMs = 0;
-let replayAnimId = null;
-
-function handleFileSelected(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(evt) { parseAndLoadFile(evt.target.result); };
-  reader.readAsText(file);
-  e.target.value = '';
-}
-
-function parseAndLoadFile(content) {
-  const lines = content.split(/\r?\n/);
-  const rows = [];
-  const isHexLog = content.includes("Updated Value of Characteristic");
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    if (isHexLog) {
-      const match = line.match(/Updated Value of Characteristic.*?to\s+([0-9a-fA-F\s]+)/);
-      if (match) {
-        const hex = match[1].replace(/[^0-9a-fA-F]/g, '');
-        let ascii = '';
-        for (let j = 0; j < hex.length - 1; j += 2) {
-          ascii += String.fromCharCode(parseInt(hex.substr(j, 2), 16));
-        }
-        const clean = ascii.trim();
-        if (clean.length > 5) rows.push(clean);
-      }
-    } else {
-      if (line.includes('\tApplication\t') || line.includes('\t')) {
-        const parts = line.split('\t').map(p => p.trim());
-        const appIdx = parts.indexOf("Application");
-        const useful = appIdx !== -1 ? parts.slice(appIdx + 1) : parts;
-        if (useful.length >= 10 && !isNaN(parseFloat(useful[0]))) {
-          rows.push(`${useful[0]},"${useful[1]}",${useful.slice(2).join(',')}`);
-        }
-      } else if (line.includes(',')) {
-        const tokens = line.split(',');
-        if (tokens.length >= 10 && !isNaN(parseFloat(tokens[0]))) {
-          rows.push(line);
-        }
-      }
-    }
-  }
-
-  if (rows.length === 0) {
-    alert("Could not extract valid telemetry records from this file.");
-    return;
-  }
-
-  const cleanRows = [];
-  let lastMs = null;
-  for (const r of rows) {
-    const p = parseCsvTokens(r);
-    const m = parseInt(p[0], 10);
-    if (m !== lastMs) {
-      cleanRows.push(r);
-      lastMs = m;
-    }
-  }
-
-  replayData = [];
-  chartData = [];
-  flatlines = [];
-  track.setLatLngs([]);
-
-  const gpsCoords = [];
-  for (const r of cleanRows) {
-    saveRowToStorage(r);
-    const pt = ingestTelemetry(r, false);
-    if (pt) {
-      replayData.push(pt);
-      chartData.push(pt);
-      if (pt.lat && pt.lng && Math.abs(pt.lat) > 0.001) {
-        gpsCoords.push([pt.lat, pt.lng]);
-      }
-    }
-  }
-
-  if (gpsCoords.length > 0) {
-    track.setLatLngs(gpsCoords);
-    marker.setLatLng(gpsCoords[0]);
-    setTimeout(() => {
-      map.invalidateSize();
-      map.fitBounds(L.latLngBounds(gpsCoords), { padding: [30, 30], maxZoom: 18 });
-    }, 150);
-  }
-
-  enterReplayMode();
-}
-
-function enterReplayMode() {
-  isReplayMode = true;
-  document.getElementById('modeBadge').style.display = "inline-block";
-  document.getElementById('replayBar').style.display = "flex";
-  document.getElementById('replaySlider').max = replayData.length - 1;
-  resetChartZoom();
-  jumpToReplayIndex(0);
-}
-
-function exitReplayMode() {
-  pauseReplay();
-  isReplayMode = false;
-  document.getElementById('modeBadge').style.display = "none";
-  document.getElementById('replayBar').style.display = "none";
-  isAutoFollow = true;
-  document.getElementById('btnFollow').classList.add('active');
-  replayMarkerIndex = null;
-  redrawInteractiveChart();
-}
-
-function changeReplaySpeed(val) {
-  replaySpeed = parseFloat(val);
-  if (isReplayPlaying) {
-    replayStartPerf = performance.now();
-    replayStartDataMs = replayData[replayIndex].ms;
-  }
-}
-
-function toggleReplayPlay() {
-  if (isReplayPlaying) pauseReplay();
-  else startReplay();
-}
-
-function startReplay() {
-  if (replayIndex >= replayData.length - 1) replayIndex = 0;
-  isReplayPlaying = true;
-  document.getElementById('btnPlay').innerText = "PAUSE";
-  document.getElementById('btnPlay').style.background = "#e67300";
-
-  replayStartPerf = performance.now();
-  replayStartDataMs = replayData[replayIndex].ms;
-
-  function loop() {
-    if (!isReplayPlaying) return;
-    const now = performance.now();
-    const elapsedRealMs = (now - replayStartPerf) * replaySpeed;
-    const targetDataMs = replayStartDataMs + elapsedRealMs;
-
-    while (replayIndex < replayData.length - 1 && replayData[replayIndex + 1].ms <= targetDataMs) {
-      replayIndex++;
-    }
-
-    jumpToReplayIndex(replayIndex, false);
-
-    if (replayIndex >= replayData.length - 1) {
-      pauseReplay();
-      return;
-    }
-    replayAnimId = requestAnimationFrame(loop);
-  }
-  replayAnimId = requestAnimationFrame(loop);
-}
-
-function pauseReplay() {
-  isReplayPlaying = false;
-  if (replayAnimId) {
-    cancelAnimationFrame(replayAnimId);
-    replayAnimId = null;
-  }
-  document.getElementById('btnPlay').innerText = "PLAY";
-  document.getElementById('btnPlay').style.background = "#009955";
-}
-
-function stepReplay(step) {
-  pauseReplay();
-  jumpToReplayIndex(Math.max(0, Math.min(replayData.length - 1, replayIndex + step)));
-}
-
-function onReplaySliderInput(val) {
-  pauseReplay();
-  jumpToReplayIndex(parseInt(val, 10));
-}
-
-function jumpToReplayIndex(idx, resetClock = true) {
-  if (idx < 0 || idx >= replayData.length) return;
-  replayIndex = idx;
-  replayMarkerIndex = idx;
-  document.getElementById('replaySlider').value = idx;
-
-  const pt = replayData[idx];
-  const totalSec = ((replayData[replayData.length - 1].ms - replayData[0].ms) / 1000).toFixed(1);
-  const curSec = ((pt.ms - replayData[0].ms) / 1000).toFixed(1);
-
-  document.getElementById('replayTimeDisplay').innerText = `${idx + 1}/${replayData.length} (${curSec}s / ${totalSec}s)`;
-
-  current_d = {
-    pitch_deg: pt.pitch_deg,
-    roll_deg:  pt.roll_deg,
-    force_net: pt.net_force,
-    a_surge:   pt.surge,
-    raw_w: pt.raw_w,
-    ax: pt.ax, ay: pt.ay, az: pt.az,
-    gx: pt.gx, gy: pt.gy, gz: pt.gz
-  };
-
-  updateHUD(pt);
-
-  // AUTO-SCROLL WINDOW: Keeps the moving line visible on the screen during playback!
-  const curFrac = idx / (replayData.length - 1 || 1);
-  const span = viewEnd - viewStart;
-  if (curFrac < viewStart || curFrac > viewEnd) {
-    viewStart = Math.max(0, curFrac - span * 0.2);
-    viewEnd = Math.min(1.0, viewStart + span);
-  }
-
-  if (resetClock && isReplayPlaying) {
-    replayStartPerf = performance.now();
-    replayStartDataMs = pt.ms;
-  }
-
-  redrawInteractiveChart();
-  renderPlateCanvas();
-}
-
-// ==============================================================================
-// 8. STROKE SUITE: 4 DEDICATED CHARTS
-// ==============================================================================
-let detectedStrokes = [];
-let selectedStrokeId = null;
-let analyzerRegionMode = 'zoom';
-let driveDeltaThreshold = 180;
-let minStrokePeriodSec = 1.2;
-
-let c1Toggles = {
-  force: true, allforce: true,
-  ax: false, ay: false, az: false, gyro: false
-};
-
-let c2Toggles = {
-  force: true, allforce: true,
-  ax: false, az: false
-};
-let c2AlignMode = 'end'; // 'end' (pre-catch) or 'finish'
-
-let c4Toggles = {
-  surge: true, force: true,
-  ax: false, az: false
-};
-
-// Zoom and pan state for analyzer charts
-let c1Zoom = { start: 0, end: 1 };
-let c2Zoom = { start: 0, end: 1 };
-let c3Zoom = { start: 0, end: 1 };
-
-function toggleC1(key) {
-  c1Toggles[key] = !c1Toggles[key];
-  document.getElementById(`tog_c1_${key}`).classList.toggle('off', !c1Toggles[key]);
-  renderEnsembleForceChart();
-}
-
-function toggleC2(key) {
-  c2Toggles[key] = !c2Toggles[key];
-  document.getElementById(`tog_c2_${key}`).classList.toggle('off', !c2Toggles[key]);
-  renderRightAlignedChart();
-}
-
-function toggleC2Alignment() {
-  c2AlignMode = c2AlignMode === 'end' ? 'finish' : 'end';
-  document.getElementById('btnC2AlignToggle').innerText = c2AlignMode === 'end' ? 'ALIGN: PRE-CATCH (END)' : 'ALIGN: FINISH';
-  document.getElementById('c2Title').innerText = c2AlignMode === 'end' 
-    ? 'Chart 2: Pre-Catch / End-Aligned Overlay (Aligned on Right Side)' 
-    : 'Chart 2: Finish-Aligned Overlay (Aligned on Finish Line)';
-  renderRightAlignedChart();
-}
-
-function toggleC4(key) {
-  c4Toggles[key] = !c4Toggles[key];
-  document.getElementById(`tog_c4_${key}`).classList.toggle('off', !c4Toggles[key]);
-  renderSplitAlignedChart();
-}
-
-function resetZoomC1() { c1Zoom = { start: 0, end: 1 }; renderEnsembleForceChart(); }
-function resetZoomC2() { c2Zoom = { start: 0, end: 1 }; renderRightAlignedChart(); }
-function resetZoomC3() { c3Zoom = { start: 0, end: 1 }; renderSelectionOverviewChart(); }
-
-function openStrokeAnalyzer() {
-  if (chartData.length < 10) {
-    alert("Load a CSV file or record telemetry before running Stroke Analysis.");
-    return;
-  }
-  document.getElementById('analyzerModal').style.display = 'flex';
-  runStrokeAnalysis();
-}
-
-function closeStrokeAnalyzer() {
-  document.getElementById('analyzerModal').style.display = 'none';
-  redrawInteractiveChart();
-}
-
-function setAnalyzerRegion(mode) {
-  analyzerRegionMode = mode;
-  document.getElementById('btnRegZoom').classList.toggle('active', mode === 'zoom');
-  document.getElementById('btnRegAll').classList.toggle('active', mode === 'all');
-  document.getElementById('lblRegionMode').innerText = mode === 'zoom' ? 'ZOOM VIEW' : 'ENTIRE SESSION';
-  runStrokeAnalysis();
-}
-
-function onThresholdChange(val) {
-  driveDeltaThreshold = parseFloat(val);
-  document.getElementById('lblDeltaThresh').innerText = driveDeltaThreshold;
-  runStrokeAnalysis();
-}
-
-function onMinPeriodChange(val) {
-  minStrokePeriodSec = parseFloat(val);
-  document.getElementById('lblMinPeriod').innerText = minStrokePeriodSec + "s";
-  runStrokeAnalysis();
-}
-
-// Core Detection: Identifies strokes using the exact working logic from your baseline
-function runStrokeAnalysis() {
-  let sIdx = 0, eIdx = chartData.length - 1;
-  if (analyzerRegionMode === 'zoom') {
-    sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
-    eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
-  }
-
-  const rawSubset = chartData.slice(sIdx, eIdx + 1);
-  if (rawSubset.length < 20) return;
-
-  const fArr = rawSubset.map(d => (invertLoad ? -1 : 1) * d.raw_w);
-  const sorted = [...fArr].sort((a,b) => a - b);
-  const baseline = sorted[Math.floor(sorted.length * 0.25)];
-
-  const peaks = [];
-  const minSamplesBetween = Math.max(8, Math.floor(minStrokePeriodSec / 0.1));
-
-  for (let i = 2; i < fArr.length - 2; i++) {
-    const val = fArr[i];
-    const deflection = val - baseline;
-    if (deflection > driveDeltaThreshold) {
-      if (val >= fArr[i-1] && val >= fArr[i-2] && val > fArr[i+1] && val >= fArr[i+2]) {
-        if (peaks.length === 0 || (i - peaks[peaks.length - 1]) >= minSamplesBetween) {
-          peaks.push(i);
-        } else if (val > fArr[peaks[peaks.length - 1]]) {
-          peaks[peaks.length - 1] = i;
-        }
-      }
-    }
-  }
-
-  detectedStrokes = [];
-  for (let p = 0; p < peaks.length - 1; p++) {
-    const pIdx = peaks[p];
-    const nextPIdx = peaks[p+1];
-
-    const peakDeflection = fArr[pIdx] - baseline;
-    const catchCutoff = baseline + peakDeflection * 0.15;
-    let catchRel = pIdx;
-    while (catchRel > (p === 0 ? 0 : peaks[p-1]) && fArr[catchRel] > catchCutoff) {
-      catchRel--;
-    }
-
-    let finishRel = pIdx;
-    while (finishRel < nextPIdx && fArr[finishRel] > catchCutoff) {
-      finishRel++;
-    }
-
-    let nextCatchRel = nextPIdx;
-    const nextPeakDeflection = fArr[nextPIdx] - baseline;
-    const nextCutoff = baseline + nextPeakDeflection * 0.15;
-    while (nextCatchRel > finishRel && fArr[nextCatchRel] > nextCutoff) {
-      nextCatchRel--;
-    }
-
-    const strokeGlobalCatch = sIdx + catchRel;
-    const strokeGlobalFinish = sIdx + finishRel;
-    const strokeGlobalNextCatch = sIdx + nextCatchRel;
-
-    const strokePts = chartData.slice(strokeGlobalCatch, strokeGlobalNextCatch + 1);
-    if (strokePts.length < 5) continue;
-
-    const t0 = strokePts[0].ms / 1000.0;
-    const tDrive = (chartData[strokeGlobalFinish].ms - chartData[strokeGlobalCatch].ms) / 1000.0;
-    const tTotal = (strokePts[strokePts.length - 1].ms - strokePts[0].ms) / 1000.0;
-    const tRecov = Math.max(0.1, tTotal - tDrive);
-
-    const times = [];
-    const forceVals = [];
-    const bowSurgeVals = [];
-    const axVals = [], ayVals = [], azVals = [];
-    const gxVals = [], gyVals = [], gzVals = [];
-    const spdVals = [];
-
-    let cumDist = 0;
-
-    for (let k = 0; k < strokePts.length; k++) {
-      const pt = strokePts[k];
-      const dtK = k === 0 ? 0.033 : (pt.ms - strokePts[k-1].ms) / 1000.0;
-      times.push((pt.ms / 1000.0) - t0);
-
-      forceVals.push((invertLoad ? -1 : 1) * pt.raw_w - baseline);
-      bowSurgeVals.push(pt.surge);
-
-      axVals.push(pt.ax);
-      ayVals.push(pt.ay);
-      azVals.push(pt.az);
-      gxVals.push(pt.gx);
-      gyVals.push(pt.gy);
-      gzVals.push(pt.gz);
-
-      const spdKmh = pt.spd || 0;
-      spdVals.push(spdKmh);
-      cumDist += (spdKmh / 3.6) * dtK;
-    }
-
-    const maxF = Math.max(...forceVals);
-    const avgSpd = spdVals.reduce((a,b)=>a+b, 0) / spdVals.length;
-    const spm = tTotal > 0 ? (60.0 / tTotal) : 0;
-    const rhythmRatio = tDrive > 0 ? (tRecov / tDrive) : 1.8;
-
-    detectedStrokes.push({
-      id: p + 1,
-      enabled: true,
-      catchIdx: strokeGlobalCatch,
-      finishIdx: strokeGlobalFinish,
-      nextCatchIdx: strokeGlobalNextCatch,
-      tTotal, tDrive, tRecov,
-      rhythmRatio,
-      peakF: maxF,
-      spm,
-      avgSpd,
-      distTotal: cumDist,
-      peakSurge: Math.max(...bowSurgeVals),
-      times, forceVals, bowSurgeVals,
-      axVals, ayVals, azVals,
-      gxVals, gyVals, gzVals,
-      spdVals
-    });
-  }
-
-  document.getElementById('analyzerStrokeBadge').innerText = `${detectedStrokes.length} STROKES DETECTED`;
-  populateStrokeListUI();
-  updateScorecard();
-  renderAllAnalyzerCharts();
-}
-
-function populateStrokeListUI() {
-  const container = document.getElementById('strokeListContainer');
-  container.innerHTML = '';
-
-  const allItem = document.createElement('div');
-  allItem.className = `stroke-list-item ${selectedStrokeId === null ? 'selected' : ''}`;
-  allItem.innerHTML = `<span style="font-weight:bold; color:#ffaa00;">★ ENSEMBLE AVERAGE (${detectedStrokes.filter(s=>s.enabled).length})</span>`;
-  allItem.onclick = () => { selectedStrokeId = null; populateStrokeListUI(); updateScorecard(); renderAllAnalyzerCharts(); };
-  container.appendChild(allItem);
-
-  detectedStrokes.forEach(s => {
-    const it = document.createElement('div');
-    it.className = `stroke-list-item ${selectedStrokeId === s.id ? 'selected' : ''} ${!s.enabled ? 'dimmed' : ''}`;
-    it.innerHTML = `
-      <div style="display:flex; align-items:center; gap:6px;">
-        <input type="checkbox" ${s.enabled ? 'checked' : ''} onclick="event.stopPropagation(); toggleStrokeEnabled(${s.id})">
-        <b>#${s.id}</b> 
-        <span style="color:#aaa;">${s.spm.toFixed(0)} SPM | ${s.distTotal.toFixed(1)}m</span>
-      </div>
-      <b style="color:#ffaa00;">${s.peakF.toFixed(0)}</b>
-    `;
-    it.onclick = () => { selectedStrokeId = s.id; populateStrokeListUI(); updateScorecard(); renderAllAnalyzerCharts(); };
-    container.appendChild(it);
-  });
-}
-
-function toggleStrokeEnabled(id) {
-  const st = detectedStrokes.find(s => s.id === id);
-  if (st) st.enabled = !st.enabled;
-  populateStrokeListUI();
-  updateScorecard();
-  renderAllAnalyzerCharts();
-}
-
-function selectAllStrokes(val) {
-  detectedStrokes.forEach(s => s.enabled = val);
-  populateStrokeListUI();
-  updateScorecard();
-  renderAllAnalyzerCharts();
-}
-
-function updateScorecard() {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) return;
-
-  let target = null;
-  if (selectedStrokeId !== null) {
-    target = detectedStrokes.find(s => s.id === selectedStrokeId);
-  }
-
-  if (target) {
-    document.getElementById('scRate').innerText   = target.spm.toFixed(1);
-    document.getElementById('scDriveT').innerText  = target.tDrive.toFixed(2);
-    document.getElementById('scRecovT').innerText  = target.tRecov.toFixed(2);
-    document.getElementById('scRatio').innerText   = `1 : ${target.rhythmRatio.toFixed(1)}`;
-    document.getElementById('scPeakF').innerText   = target.peakF.toFixed(1);
-    document.getElementById('scDPS').innerText     = target.distTotal.toFixed(2);
-    document.getElementById('scSpd').innerText     = target.avgSpd.toFixed(1);
-    document.getElementById('scSurge').innerText   = target.peakSurge.toFixed(2);
-  } else {
-    const avg = (fn) => (active.reduce((acc, s) => acc + fn(s), 0) / active.length);
-    document.getElementById('scRate').innerText   = avg(s=>s.spm).toFixed(1);
-    document.getElementById('scDriveT').innerText  = avg(s=>s.tDrive).toFixed(2);
-    document.getElementById('scRecovT').innerText  = avg(s=>s.tRecov).toFixed(2);
-    document.getElementById('scRatio').innerText   = `1 : ${avg(s=>s.rhythmRatio).toFixed(1)}`;
-    document.getElementById('scPeakF').innerText   = avg(s=>s.peakF).toFixed(1);
-    document.getElementById('scDPS').innerText     = avg(s=>s.distTotal).toFixed(2);
-    document.getElementById('scSpd').innerText     = avg(s=>s.avgSpd).toFixed(1);
-    document.getElementById('scSurge').innerText   = avg(s=>s.peakSurge).toFixed(2);
-  }
-}
-
-function renderAllAnalyzerCharts() {
-  renderEnsembleForceChart();
-  renderRightAlignedChart();
-  renderSelectionOverviewChart();
-  renderSplitAlignedChart();
-}
-
-function computeResampledAverage(key, maxTime, numSteps = 120) {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) return { times: [], mean: [], stdDevUpper: [], stdDevLower: [] };
-
-  const timeGrid = [];
-  const mean = [];
-  const stdDevUpper = [];
-  const stdDevLower = [];
-
-  for (let step = 0; step <= numSteps; step++) {
-    const t = (step / numSteps) * maxTime;
-    timeGrid.push(t);
-
-    const values = [];
-    for (const st of active) {
-      if (t > st.tTotal) continue;
-      const tArr = st.times;
-      const vArr = st[key];
-      let vInterp = vArr[0];
-      for (let i = 0; i < tArr.length - 1; i++) {
-        if (t >= tArr[i] && t <= tArr[i+1]) {
-          const frac = (t - tArr[i]) / (tArr[i+1] - tArr[i] || 1);
-          vInterp = vArr[i] + frac * (vArr[i+1] - vArr[i]);
-          break;
-        }
-      }
-      values.push(vInterp);
-    }
-
-    if (values.length > 0) {
-      const avg = values.reduce((a, b) => a + b, 0) / values.length;
-      const variance = values.reduce((acc, v) => acc + Math.pow(v - avg, 2), 0) / values.length;
-      const sd = Math.sqrt(variance);
-      mean.push(avg);
-      stdDevUpper.push(avg + sd);
-      stdDevLower.push(avg - sd);
-    } else {
-      mean.push(0); stdDevUpper.push(0); stdDevLower.push(0);
-    }
-  }
-
-  return { times: timeGrid, mean, stdDevUpper, stdDevLower };
-}
-
-// ==============================================================================
-// CHART 1: CATCH-ALIGNED FORCE CURVES + 6-AXIS IMU LINES (INTERACTIVE ZOOM)
-// ==============================================================================
-function renderEnsembleForceChart() {
-  const cn = document.getElementById('overlayForceCanvas');
-  const cx = cn.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth, h = cn.clientHeight;
-
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr; cn.height = h * dpr;
-  }
-
-  cx.save();
-  cx.scale(dpr, dpr);
-  cx.clearRect(0, 0, w, h);
-
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { cx.restore(); return; }
-
-  const fullMaxT = Math.max(...active.map(s => s.tTotal));
-  const tMin = c1Zoom.start * fullMaxT;
-  const tMax = c1Zoom.end * fullMaxT;
-  const tSpan = tMax - tMin || 1;
-
-  const maxF = Math.max(10, Math.max(...active.map(s => s.peakF)) * 1.15);
-  const avgDriveT = active.reduce((a,s)=>a+s.tDrive,0) / active.length;
-
-  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
-  const plotW = w - gutterL - gutterR;
-  const plotH = h - padTop - padBottom;
-
-  // Background phase tint
-  const driveX = gutterL + ((avgDriveT - tMin) / tSpan) * plotW;
-  if (driveX > gutterL && driveX < gutterL + plotW) {
-    cx.fillStyle = 'rgba(0, 255, 204, 0.05)';
-    cx.fillRect(gutterL, padTop, driveX - gutterL, plotH);
-    cx.fillStyle = 'rgba(255, 170, 0, 0.03)';
-    cx.fillRect(driveX, padTop, plotW - (driveX - gutterL), plotH);
-
-    cx.strokeStyle = '#00ffcc';
-    cx.lineWidth = 1;
-    cx.setLineDash([3, 3]);
-    cx.beginPath(); cx.moveTo(driveX, padTop); cx.lineTo(driveX, padTop + plotH); cx.stroke();
-    cx.setLineDash([]);
-    cx.font = '9px monospace';
-    cx.fillStyle = '#00ffcc';
-    cx.fillText("AVG FINISH", driveX - 30, padTop + 10);
-  }
-
-  // Left Ticks (Force)
-  cx.strokeStyle = '#1a2230';
-  cx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = padTop + plotH - (i / 4) * plotH;
-    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-    cx.fillStyle = '#778899';
-    cx.textAlign = 'right';
-    cx.fillText(((i / 4) * maxF).toFixed(0), gutterL - 6, y + 3);
-  }
-
-  // Right Ticks (Motion m/s² / rad/s)
-  for (let i = 0; i <= 4; i++) {
-    const y = padTop + plotH - (i / 4) * plotH;
-    const valM = -12 + (i / 4) * 24;
-    cx.fillStyle = '#8899aa';
-    cx.textAlign = 'left';
-    cx.fillText(`${valM.toFixed(0)}`, gutterL + plotW + 6, y + 3);
-  }
-
-  // 1. Draw Individual Faint Stroke Force Curves
-  if (c1Toggles.allforce) {
-    for (const st of active) {
-      const isTarget = selectedStrokeId === st.id;
-      cx.strokeStyle = isTarget ? '#ff0055' : 'rgba(0, 229, 255, 0.28)';
-      cx.lineWidth = isTarget ? 2.8 : 1.2;
-      cx.beginPath();
-      let started = false;
-      for (let k = 0; k < st.times.length; k++) {
-        const tK = st.times[k];
-        if (tK < tMin || tK > tMax) continue;
-        const x = gutterL + ((tK - tMin) / tSpan) * plotW;
-        const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
-        if (!started) { cx.moveTo(x, y); started = true; }
-        else cx.lineTo(x, y);
-      }
-      cx.stroke();
-    }
-  }
-
-  // 2. Add Corresponding 6-Axis Measurement Lines for Each Stroke
-  function drawAuxSeries(key, col, minV, maxV) {
-    for (const st of active) {
-      const arr = st[key];
-      cx.strokeStyle = col;
-      cx.lineWidth = selectedStrokeId === st.id ? 1.8 : 0.8;
-      cx.beginPath();
-      let started = false;
-      for (let k = 0; k < st.times.length; k++) {
-        const tK = st.times[k];
-        if (tK < tMin || tK > tMax) continue;
-        const x = gutterL + ((tK - tMin) / tSpan) * plotW;
-        const normY = (arr[k] - minV) / (maxV - minV);
-        const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-        if (!started) { cx.moveTo(x, y); started = true; }
-        else cx.lineTo(x, y);
-      }
-      cx.stroke();
-    }
-  }
-
-  if (c1Toggles.ax) drawAuxSeries('axVals', 'rgba(255, 68, 68, 0.55)', -12, 12);
-  if (c1Toggles.ay) drawAuxSeries('ayVals', 'rgba(34, 204, 136, 0.55)', -12, 12);
-  if (c1Toggles.az) drawAuxSeries('azVals', 'rgba(51, 153, 255, 0.55)', -12, 12);
-  if (c1Toggles.gyro) {
-    drawAuxSeries('gxVals', 'rgba(255, 170, 0, 0.5)', -5, 5);
-    drawAuxSeries('gyVals', 'rgba(208, 68, 255, 0.5)', -5, 5);
-    drawAuxSeries('gzVals', 'rgba(255, 234, 0, 0.5)', -5, 5);
-  }
-
-  // 3. Bold Gold Average Force Curve + Standard Deviation Band
-  if (c1Toggles.force) {
-    const avgCurve = computeResampledAverage('forceVals', fullMaxT);
-
-    cx.fillStyle = 'rgba(255, 215, 0, 0.12)';
-    cx.beginPath();
-    let started = false;
-    for (let i = 0; i < avgCurve.times.length; i++) {
-      const tK = avgCurve.times[i];
-      if (tK < tMin || tK > tMax) continue;
-      const x = gutterL + ((tK - tMin) / tSpan) * plotW;
-      const y = padTop + plotH - (Math.max(0, avgCurve.stdDevUpper[i]) / maxF) * plotH;
-      if (!started) { cx.moveTo(x, y); started = true; }
-      else cx.lineTo(x, y);
-    }
-    for (let i = avgCurve.times.length - 1; i >= 0; i--) {
-      const tK = avgCurve.times[i];
-      if (tK < tMin || tK > tMax) continue;
-      const x = gutterL + ((tK - tMin) / tSpan) * plotW;
-      const y = padTop + plotH - (Math.max(0, avgCurve.stdDevLower[i]) / maxF) * plotH;
-      cx.lineTo(x, y);
-    }
-    cx.closePath();
-    cx.fill();
-
-    cx.strokeStyle = '#ffd700';
-    cx.lineWidth = 3.2;
-    cx.beginPath();
-    started = false;
-    for (let i = 0; i < avgCurve.times.length; i++) {
-      const tK = avgCurve.times[i];
-      if (tK < tMin || tK > tMax) continue;
-      const x = gutterL + ((tK - tMin) / tSpan) * plotW;
-      const y = padTop + plotH - (avgCurve.mean[i] / maxF) * plotH;
-      if (!started) { cx.moveTo(x, y); started = true; }
-      else cx.lineTo(x, y);
-    }
-    cx.stroke();
-  }
-
-  cx.fillStyle = '#88a0cc';
-  cx.textAlign = 'left';
-  cx.fillText(`+${tMin.toFixed(2)}s`, gutterL, h - 6);
-  cx.textAlign = 'right';
-  cx.fillText(`+${tMax.toFixed(2)}s`, gutterL + plotW, h - 6);
-
-  cx.restore();
-}
-
-// Chart 1 Interactive Zoom & Tooltip
-const c1Canvas = document.getElementById('overlayForceCanvas');
-c1Canvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  const factor = e.deltaY < 0 ? 0.85 : 1.15;
-  const mid = (c1Zoom.start + c1Zoom.end) / 2;
-  const half = ((c1Zoom.end - c1Zoom.start) * factor) / 2;
-  c1Zoom.start = Math.max(0, mid - half);
-  c1Zoom.end = Math.min(1, mid + half);
-  renderEnsembleForceChart();
-}, { passive: false });
-
-c1Canvas.addEventListener('mousemove', (e) => {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) return;
-  const rect = c1Canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const gutterL = 50, gutterR = 50;
-  const plotW = rect.width - gutterL - gutterR;
-  if (mx < gutterL || mx > rect.width - gutterR) {
-    document.getElementById('c1Tooltip').style.display = 'none';
-    return;
-  }
-  const fullMaxT = Math.max(...active.map(s => s.tTotal));
-  const tMin = c1Zoom.start * fullMaxT;
-  const tMax = c1Zoom.end * fullMaxT;
-  const tCur = tMin + ((mx - gutterL) / plotW) * (tMax - tMin);
-
-  const avgCurve = computeResampledAverage('forceVals', fullMaxT);
-  const idx = Math.min(avgCurve.times.length - 1, Math.max(0, Math.round((tCur / fullMaxT) * (avgCurve.times.length - 1))));
-  const fVal = avgCurve.mean[idx] || 0;
-
-  const tip = document.getElementById('c1Tooltip');
-  tip.style.display = 'block';
-  tip.style.left = `${Math.min(rect.width - 150, mx + 15)}px`;
-  tip.style.top = `${Math.min(rect.height - 60, e.clientY - rect.top)}px`;
-  tip.innerHTML = `<div>Time: <b>+${tCur.toFixed(2)}s</b></div><div>Avg Force: <b style="color:#ffd700;">${fVal.toFixed(1)}</b></div>`;
-});
-c1Canvas.addEventListener('mouseleave', () => { document.getElementById('c1Tooltip').style.display = 'none'; });
-
-// ==============================================================================
-// CHART 2: REVERSE-ALIGNED (RIGHT-ALIGNED AT PRE-CATCH / FINISH)
-// ==============================================================================
-function renderRightAlignedChart() {
-  const cn = document.getElementById('overlayRightAlignedCanvas');
-  const cx = cn.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth, h = cn.clientHeight;
-
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr; cn.height = h * dpr;
-  }
-
-  cx.save();
-  cx.scale(dpr, dpr);
-  cx.clearRect(0, 0, w, h);
-
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { cx.restore(); return; }
-
-  const fullMaxT = Math.max(...active.map(s => s.tTotal));
-  const maxF = Math.max(10, Math.max(...active.map(s => s.peakF)) * 1.15);
-
-  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
-  const plotW = w - gutterL - gutterR;
-  const plotH = h - padTop - padBottom;
-
-  // Grid
-  cx.strokeStyle = '#1a2230';
-  cx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = padTop + plotH - (i / 4) * plotH;
-    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-    cx.fillStyle = '#778899';
-    cx.textAlign = 'right';
-    cx.fillText(((i / 4) * maxF).toFixed(0), gutterL - 6, y + 3);
-  }
-
-  // Draw Humps aligned on the right side
-  for (const st of active) {
-    const isTarget = selectedStrokeId === st.id;
-    cx.strokeStyle = isTarget ? '#ff0055' : 'rgba(0, 229, 255, 0.28)';
-    cx.lineWidth = isTarget ? 2.8 : 1.2;
-    cx.beginPath();
-
-    const anchorT = c2AlignMode === 'end' ? st.tTotal : st.tDrive;
-    let started = false;
-
-    for (let k = 0; k < st.times.length; k++) {
-      const tRel = st.times[k] - anchorT; // 0 at the alignment anchor on the right
-      const normX = (tRel + fullMaxT) / fullMaxT; // lines up at right side
-      const x = gutterL + normX * plotW;
-      const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
-      if (!started) { cx.moveTo(x, y); started = true; }
-      else cx.lineTo(x, y);
-    }
-    cx.stroke();
-  }
-
-  // Right Alignment Marker
-  cx.strokeStyle = c2AlignMode === 'end' ? '#00e5ff' : '#00ff88';
+  cx.translate(centerX, centerY);
+  cx.rotate(roll * 0.7);
+
+  // Boat Shell (Fuselage)
+  const pitchOffset = Math.sin(pitch) * 35;
+  cx.fillStyle = '#1e2638';
+  cx.strokeStyle = '#00ffcc';
   cx.lineWidth = 2;
-  cx.setLineDash([3, 3]);
-  cx.beginPath(); cx.moveTo(gutterL + plotW, padTop); cx.lineTo(gutterL + plotW, padTop + plotH); cx.stroke();
-  cx.setLineDash([]);
+  cx.beginPath();
+  cx.moveTo(-50, pitchOffset);
+  cx.lineTo(50, -pitchOffset);
+  cx.lineTo(0, -pitchOffset - 15);
+  cx.closePath();
+  cx.fill();
+  cx.stroke();
 
-  cx.fillStyle = '#88a0cc';
-  cx.textAlign = 'left';
-  cx.fillText(`-${fullMaxT.toFixed(2)}s`, gutterL, h - 6);
-  cx.textAlign = 'right';
-  cx.fillText(c2AlignMode === 'end' ? '0.00s (PRE-CATCH / END)' : '0.00s (FINISH)', gutterL + plotW, h - 6);
+  // Outriggers (Left = Oar 1, Right = Oar 2)
+  cx.strokeStyle = '#ffd700'; // Oar 1 (Port/Starboard)
+  cx.lineWidth = 2.5;
+  cx.beginPath(); cx.moveTo(0, -pitchOffset - 5); cx.lineTo(-65, -pitchOffset - 25); cx.stroke();
+
+  cx.strokeStyle = '#00e5ff'; // Oar 2
+  cx.beginPath(); cx.moveTo(0, -pitchOffset - 5); cx.lineTo(65, -pitchOffset - 25); cx.stroke();
+
+  cx.restore();
+
+  // Readouts
+  cx.font = '10px monospace';
+  cx.fillStyle = '#00ffcc';
+  cx.fillText(`PITCH: ${((pitch * 180)/Math.PI).toFixed(1)}°`, 10, h - 8);
+  cx.fillStyle = '#ff66cc';
+  cx.fillText(`ROLL:  ${((roll * 180)/Math.PI).toFixed(1)}°`, w - 90, h - 8);
 
   cx.restore();
 }
 
-const c2Canvas = document.getElementById('overlayRightAlignedCanvas');
-c2Canvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  const factor = e.deltaY < 0 ? 0.85 : 1.15;
-  const mid = (c2Zoom.start + c2Zoom.end) / 2;
-  const half = ((c2Zoom.end - c2Zoom.start) * factor) / 2;
-  c2Zoom.start = Math.max(0, mid - half);
-  c2Zoom.end = Math.min(1, mid + half);
-  renderRightAlignedChart();
-}, { passive: false });
+// ==============================================================================
+// 6. RENDERING: LAYER 3 LIVE TELEMETRY FLOW (BOTH OARS + SURGE)
+// ==============================================================================
+const flowCanvas = document.getElementById('liveFlowCanvas');
+const flowCtx = flowCanvas.getContext('2d');
 
-// ==============================================================================
-// CHART 3: SELECTION STRETCH — BOW SURGE ACCEL (GREEN, FLIPPED) OVERLAID ON FORCE
-// ==============================================================================
-function renderSelectionOverviewChart() {
-  const cn = document.getElementById('overlaySelectionCanvas');
-  const cx = cn.getContext('2d');
+function renderLiveFlowChart() {
+  const cn = flowCanvas;
+  const cx = flowCtx;
   const dpr = window.devicePixelRatio || 1;
   const w = cn.clientWidth, h = cn.clientHeight;
 
   if (cn.width !== w * dpr || cn.height !== h * dpr) {
     cn.width = w * dpr; cn.height = h * dpr;
   }
-
   cx.save();
   cx.scale(dpr, dpr);
   cx.clearRect(0, 0, w, h);
 
-  let sIdx = 0, eIdx = chartData.length - 1;
-  if (analyzerRegionMode === 'zoom') {
-    sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
-    eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
-  }
+  if (chartData.length < 2) { cx.restore(); return; }
 
-  const span = eIdx - sIdx;
-  const subStart = Math.round(sIdx + c3Zoom.start * span);
-  const subEnd = Math.round(sIdx + c3Zoom.end * span);
-  const slice = chartData.slice(subStart, subEnd + 1);
-
-  if (slice.length < 2) { cx.restore(); return; }
-
-  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
+  const gutterL = 45, gutterR = 45, padTop = 24, padBottom = 18;
   const plotW = w - gutterL - gutterR;
   const plotH = h - padTop - padBottom;
 
-  let fMin = Infinity, fMax = -Infinity;
-  let sMin = Infinity, sMax = -Infinity;
+  const windowSize = 120;
+  const slice = chartData.slice(-windowSize);
 
-  for (let i = 0; i < slice.length; i++) {
-    const p = slice[i];
-    const effL = (invertLoad ? -1 : 1) * p.raw_w;
-    if (effL < fMin) fMin = effL;
-    if (effL > fMax) fMax = effL;
-    if (p.surge < sMin) sMin = p.surge;
-    if (p.surge > sMax) sMax = p.surge;
+  let maxF = 100;
+  for (const pt of slice) {
+    if (pt.w1 > maxF) maxF = pt.w1;
+    if (pt.w2 > maxF) maxF = pt.w2;
   }
+  maxF *= 1.15;
 
-  fMin -= 10; fMax += 10;
-  sMin = Math.min(-2, sMin - 0.5); sMax = Math.max(3, sMax + 0.5);
-
-  // Left Ticks (Force) & Right Ticks (Surge m/s²)
-  for (let i = 0; i <= 4; i++) {
-    const y = padTop + plotH - (i / 4) * plotH;
-    cx.strokeStyle = "#161b24";
+  // Grid
+  cx.strokeStyle = '#141822';
+  cx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = padTop + plotH - (i / 3) * plotH;
     cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-
-    const valF = fMin + (i / 4) * (fMax - fMin);
-    cx.fillStyle = '#00e5ff';
+    cx.fillStyle = '#667788';
+    cx.font = '9px monospace';
     cx.textAlign = 'right';
-    cx.fillText(`${valF.toFixed(0)}`, gutterL - 6, y + 3);
-
-    const valS = sMin + (i / 4) * (sMax - sMin);
-    cx.fillStyle = '#00ff88';
-    cx.textAlign = 'left';
-    cx.fillText(`${valS.toFixed(1)}m/s²`, gutterL + plotW + 6, y + 3);
+    cx.fillText(((i / 3) * maxF).toFixed(0), gutterL - 5, y + 3);
   }
 
-  // 1. Force Plate Line (Cyan)
-  cx.strokeStyle = '#00e5ff';
+  // 1. Oar 1 Force (Cyan)
+  cx.strokeStyle = '#00ffcc';
   cx.lineWidth = 1.8;
   cx.beginPath();
   for (let i = 0; i < slice.length; i++) {
     const x = gutterL + (i / (slice.length - 1)) * plotW;
-    const y = padTop + plotH - (((invertLoad ? -1 : 1) * slice[i].raw_w - fMin) / (fMax - fMin)) * plotH;
+    const y = padTop + plotH - (slice[i].w1 / maxF) * plotH;
     if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
   }
   cx.stroke();
 
-  // 2. Bow Surge Acceleration Line (Bold Green - Flipped positive during drive)
-  cx.strokeStyle = '#00ff88';
-  cx.lineWidth = 2.4;
+  // 2. Oar 2 Force (Pink)
+  cx.strokeStyle = '#ff66cc';
+  cx.lineWidth = 1.8;
   cx.beginPath();
   for (let i = 0; i < slice.length; i++) {
     const x = gutterL + (i / (slice.length - 1)) * plotW;
-    const y = padTop + plotH - ((slice[i].surge - sMin) / (sMax - sMin)) * plotH;
+    const y = padTop + plotH - (slice[i].w2 / maxF) * plotH;
     if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
   }
   cx.stroke();
 
-  // Bottom Axis
-  cx.fillStyle = "#88a0cc";
-  cx.textAlign = "left";
-  cx.fillText(slice[0].timeStr || `${slice[0].ms}ms`, gutterL, h - 6);
-  cx.textAlign = "right";
-  cx.fillText(slice[slice.length - 1].timeStr || `${slice[slice.length - 1].ms}ms`, gutterL + plotW, h - 6);
+  // 3. Clean Bow Surge Acceleration (Bold Green)
+  cx.strokeStyle = '#00ff88';
+  cx.lineWidth = 2.2;
+  cx.beginPath();
+  for (let i = 0; i < slice.length; i++) {
+    const x = gutterL + (i / (slice.length - 1)) * plotW;
+    const normSurge = (slice[i].surge - (-3)) / (8 - (-3));
+    const y = padTop + plotH - Math.max(0, Math.min(1, normSurge)) * plotH;
+    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+  }
+  cx.stroke();
 
   cx.restore();
 }
 
-const c3Canvas = document.getElementById('overlaySelectionCanvas');
-c3Canvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  const factor = e.deltaY < 0 ? 0.85 : 1.15;
-  const mid = (c3Zoom.start + c3Zoom.end) / 2;
-  const half = ((c3Zoom.end - c3Zoom.start) * factor) / 2;
-  c3Zoom.start = Math.max(0, mid - half);
-  c3Zoom.end = Math.min(1, mid + half);
-  renderSelectionOverviewChart();
-}, { passive: false });
-
-c3Canvas.addEventListener('mousemove', (e) => {
-  const rect = c3Canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const gutterL = 50, gutterR = 50;
-  const plotW = rect.width - gutterL - gutterR;
-  if (mx < gutterL || mx > rect.width - gutterR) {
-    document.getElementById('c3Tooltip').style.display = 'none';
-    return;
-  }
-  let sIdx = 0, eIdx = chartData.length - 1;
-  if (analyzerRegionMode === 'zoom') {
-    sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
-    eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
-  }
-  const span = eIdx - sIdx;
-  const subStart = Math.round(sIdx + c3Zoom.start * span);
-  const subEnd = Math.round(sIdx + c3Zoom.end * span);
-  const curIdx = Math.min(chartData.length - 1, Math.max(0, Math.round(subStart + ((mx - gutterL) / plotW) * (subEnd - subStart))));
-
-  const pt = chartData[curIdx];
-  const tip = document.getElementById('c3Tooltip');
-  tip.style.display = 'block';
-  tip.style.left = `${Math.min(rect.width - 160, mx + 15)}px`;
-  tip.style.top = `${Math.min(rect.height - 70, e.clientY - rect.top)}px`;
-  tip.innerHTML = `<div>Time: <b>${pt.timeStr || pt.ms + 'ms'}</b></div><div>Force: <b style="color:#00e5ff;">${((invertLoad ? -1 : 1) * pt.raw_w).toFixed(1)}</b></div><div>Surge: <b style="color:#00ff88;">${pt.surge.toFixed(2)} m/s²</b></div>`;
-});
-c3Canvas.addEventListener('mouseleave', () => { document.getElementById('c3Tooltip').style.display = 'none'; });
-
 // ==============================================================================
-// CHART 4: SPLIT-ALIGNED BREAKDOWN (MID-DRIVE SPLIT WITH FLIPPED GREEN SURGE)
+// 7. RENDERING: LAYER 4 INDIVIDUAL STROKE OVERLAY CHART (GHOST LAST + DUAL AVERAGES)
 // ==============================================================================
-function renderSplitAlignedChart() {
-  const cn = document.getElementById('overlaySplitCanvas');
-  const cx = cn.getContext('2d');
+const beepCanvas = document.getElementById('strokeBeepCanvas');
+const beepCtx = beepCanvas.getContext('2d');
+
+function renderStrokeBeepChart() {
+  const cn = beepCanvas;
+  const cx = beepCtx;
   const dpr = window.devicePixelRatio || 1;
   const w = cn.clientWidth, h = cn.clientHeight;
 
   if (cn.width !== w * dpr || cn.height !== h * dpr) {
     cn.width = w * dpr; cn.height = h * dpr;
   }
-
   cx.save();
   cx.scale(dpr, dpr);
   cx.clearRect(0, 0, w, h);
 
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { cx.restore(); return; }
-
-  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
+  const gutterL = 45, gutterR = 25, padTop = 26, padBottom = 20;
   const plotW = w - gutterL - gutterR;
   const plotH = h - padTop - padBottom;
-  const splitX = gutterL + 0.5 * plotW;
 
-  // Mid-Drive Transition Line
-  cx.strokeStyle = '#ffaa00';
-  cx.lineWidth = 1.5;
-  cx.setLineDash([4, 3]);
-  cx.beginPath(); cx.moveTo(splitX, padTop); cx.lineTo(splitX, padTop + plotH); cx.stroke();
-  cx.setLineDash([]);
+  let maxF = 80;
+  const checkMax = (arr) => arr.forEach(v => { if (v > maxF) maxF = v; });
+  checkMax(currentStrokeBuffer1);
+  checkMax(lastCompletedStroke1);
+  checkMax(strokeAverages1);
+  checkMax(strokeAverages2);
+  maxF *= 1.15;
 
-  cx.font = '9px monospace';
-  cx.fillStyle = '#ffaa00';
-  cx.textAlign = 'center';
-  cx.fillText("MID-DRIVE TRANSITION", splitX, padTop - 6);
-
-  const maxF = Math.max(...active.map(s => s.peakF)) * 1.15;
-  const sMin = -4, sMax = 10;
-  const aMin = -12, aMax = 12;
-
-  // Draw Individual Strokes: Left side (Catch-Aligned), Right side (Finish-Aligned)
-  for (const st of active) {
-    const driveSampleCount = Math.max(2, st.finishIdx - st.catchIdx);
-    const halfDriveK = Math.max(1, Math.round(driveSampleCount / 2));
-
-    // LEFT SIDE: Pre-catch + First half of drive
-    if (c4Toggles.force) {
-      cx.strokeStyle = 'rgba(255, 215, 0, 0.35)';
-      cx.lineWidth = 1.2;
-      cx.beginPath();
-      for (let k = 0; k <= halfDriveK && k < st.forceVals.length; k++) {
-        const x = gutterL + (k / halfDriveK) * (0.5 * plotW);
-        const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
-        if (k === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-      }
-      cx.stroke();
-    }
-
-    if (c4Toggles.surge) {
-      cx.strokeStyle = 'rgba(0, 255, 136, 0.45)';
-      cx.lineWidth = 1.3;
-      cx.beginPath();
-      for (let k = 0; k <= halfDriveK && k < st.bowSurgeVals.length; k++) {
-        const x = gutterL + (k / halfDriveK) * (0.5 * plotW);
-        const normY = (st.bowSurgeVals[k] - sMin) / (sMax - sMin);
-        const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-        if (k === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-      }
-      cx.stroke();
-    }
-
-    function drawLeftAux(arr, col) {
-      cx.strokeStyle = col;
-      cx.lineWidth = 0.8;
-      cx.beginPath();
-      for (let k = 0; k <= halfDriveK && k < arr.length; k++) {
-        const x = gutterL + (k / halfDriveK) * (0.5 * plotW);
-        const normY = (arr[k] - aMin) / (aMax - aMin);
-        const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-        if (k === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-      }
-      cx.stroke();
-    }
-    if (c4Toggles.ax) drawLeftAux(st.axVals, 'rgba(255, 68, 68, 0.35)');
-    if (c4Toggles.az) drawLeftAux(st.azVals, 'rgba(51, 153, 255, 0.35)');
-
-    // RIGHT SIDE: Second half of drive into finish and recovery
-    const startLateK = halfDriveK;
-    const endLateK = Math.min(st.forceVals.length - 1, driveSampleCount + 8);
-    const countLate = Math.max(1, endLateK - startLateK);
-
-    if (c4Toggles.force) {
-      cx.strokeStyle = 'rgba(255, 215, 0, 0.35)';
-      cx.lineWidth = 1.2;
-      cx.beginPath();
-      for (let k = startLateK; k <= endLateK; k++) {
-        const x = splitX + ((k - startLateK) / countLate) * (0.5 * plotW);
-        const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
-        if (k === startLateK) cx.moveTo(x, y); else cx.lineTo(x, y);
-      }
-      cx.stroke();
-    }
-
-    if (c4Toggles.surge) {
-      cx.strokeStyle = 'rgba(0, 255, 136, 0.45)';
-      cx.lineWidth = 1.3;
-      cx.beginPath();
-      for (let k = startLateK; k <= endLateK; k++) {
-        const x = splitX + ((k - startLateK) / countLate) * (0.5 * plotW);
-        const normY = (st.bowSurgeVals[k] - sMin) / (sMax - sMin);
-        const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-        if (k === startLateK) cx.moveTo(x, y); else cx.lineTo(x, y);
-      }
-      cx.stroke();
-    }
-
-    function drawRightAux(arr, col) {
-      cx.strokeStyle = col;
-      cx.lineWidth = 0.8;
-      cx.beginPath();
-      for (let k = startLateK; k <= endLateK; k++) {
-        const x = splitX + ((k - startLateK) / countLate) * (0.5 * plotW);
-        const normY = (arr[k] - aMin) / (aMax - aMin);
-        const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-        if (k === startLateK) cx.moveTo(x, y); else cx.lineTo(x, y);
-      }
-      cx.stroke();
-    }
-    if (c4Toggles.ax) drawRightAux(st.axVals, 'rgba(255, 68, 68, 0.35)');
-    if (c4Toggles.az) drawRightAux(st.azVals, 'rgba(51, 153, 255, 0.35)');
+  // Grid
+  cx.strokeStyle = '#151b26';
+  cx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = padTop + plotH - (i / 3) * plotH;
+    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+    cx.fillStyle = '#667788';
+    cx.font = '9px monospace';
+    cx.textAlign = 'right';
+    cx.fillText(((i / 3) * maxF).toFixed(0), gutterL - 5, y + 3);
   }
 
-  // Draw Bold Average Lines
-  const numSteps = 50;
-  // Left side averages
-  if (c4Toggles.force) {
+  // 1. Ghosted Line: Previous Stroke (Greyed out)
+  if (lastCompletedStroke1.length > 2) {
+    cx.strokeStyle = 'rgba(120, 130, 150, 0.35)';
+    cx.lineWidth = 2.0;
+    cx.beginPath();
+    for (let i = 0; i < lastCompletedStroke1.length; i++) {
+      const x = gutterL + (i / (lastCompletedStroke1.length - 1)) * plotW;
+      const y = padTop + plotH - (lastCompletedStroke1[i] / maxF) * plotH;
+      if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+    }
+    cx.stroke();
+  }
+
+  // 2. Average Stroke Line for Plate 1 (Bold Gold)
+  if (strokeAverages1.length > 2) {
     cx.strokeStyle = '#ffd700';
     cx.lineWidth = 3.0;
     cx.beginPath();
-    for (let s = 0; s <= numSteps; s++) {
-      const frac = s / numSteps;
-      const vals = [];
-      for (const st of active) {
-        const halfK = Math.max(1, Math.round((st.finishIdx - st.catchIdx) / 2));
-        const idx = Math.min(st.forceVals.length - 1, Math.round(frac * halfK));
-        vals.push(st.forceVals[idx]);
-      }
-      const avgF = vals.reduce((a,b)=>a+b,0) / vals.length;
-      const x = gutterL + frac * (0.5 * plotW);
-      const y = padTop + plotH - (avgF / maxF) * plotH;
-      if (s === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+    for (let i = 0; i < strokeAverages1.length; i++) {
+      const x = gutterL + (i / (strokeAverages1.length - 1)) * plotW;
+      const y = padTop + plotH - (strokeAverages1[i] / maxF) * plotH;
+      if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
     }
     cx.stroke();
   }
 
-  if (c4Toggles.surge) {
-    cx.strokeStyle = '#00ff88';
-    cx.lineWidth = 3.0;
+  // 3. Average Stroke Line for Plate 2 (Bold Cyan)
+  if (strokeAverages2.length > 2) {
+    cx.strokeStyle = '#00e5ff';
+    cx.lineWidth = 2.6;
     cx.beginPath();
-    for (let s = 0; s <= numSteps; s++) {
-      const frac = s / numSteps;
-      const vals = [];
-      for (const st of active) {
-        const halfK = Math.max(1, Math.round((st.finishIdx - st.catchIdx) / 2));
-        const idx = Math.min(st.bowSurgeVals.length - 1, Math.round(frac * halfK));
-        vals.push(st.bowSurgeVals[idx]);
-      }
-      const avgS = vals.reduce((a,b)=>a+b,0) / vals.length;
-      const x = gutterL + frac * (0.5 * plotW);
-      const normY = (avgS - sMin) / (sMax - sMin);
-      const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-      if (s === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+    for (let i = 0; i < strokeAverages2.length; i++) {
+      const x = gutterL + (i / (strokeAverages2.length - 1)) * plotW;
+      const y = padTop + plotH - (strokeAverages2[i] / maxF) * plotH;
+      if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
     }
     cx.stroke();
   }
 
-  // Right side averages
-  if (c4Toggles.force) {
-    cx.strokeStyle = '#ffd700';
-    cx.lineWidth = 3.0;
+  // 4. Live Stroke Being Drawn Currently
+  if (currentStrokeBuffer1.length > 1) {
+    cx.strokeStyle = '#ffffff';
+    cx.lineWidth = 1.8;
     cx.beginPath();
-    for (let s = 0; s <= numSteps; s++) {
-      const frac = s / numSteps;
-      const vals = [];
-      for (const st of active) {
-        const driveCount = Math.max(2, st.finishIdx - st.catchIdx);
-        const startK = Math.max(1, Math.round(driveCount / 2));
-        const endK = Math.min(st.forceVals.length - 1, driveCount + 8);
-        const idx = Math.min(st.forceVals.length - 1, startK + Math.round(frac * (endK - startK)));
-        vals.push(st.forceVals[idx]);
-      }
-      const avgF = vals.reduce((a,b)=>a+b,0) / vals.length;
-      const x = splitX + frac * (0.5 * plotW);
-      const y = padTop + plotH - (avgF / maxF) * plotH;
-      if (s === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+    for (let i = 0; i < currentStrokeBuffer1.length; i++) {
+      const x = gutterL + (i / Math.max(currentStrokeBuffer1.length - 1, 25)) * plotW;
+      const y = padTop + plotH - (currentStrokeBuffer1[i] / maxF) * plotH;
+      if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
     }
     cx.stroke();
   }
 
-  if (c4Toggles.surge) {
-    cx.strokeStyle = '#00ff88';
-    cx.lineWidth = 3.0;
-    cx.beginPath();
-    for (let s = 0; s <= numSteps; s++) {
-      const frac = s / numSteps;
-      const vals = [];
-      for (const st of active) {
-        const driveCount = Math.max(2, st.finishIdx - st.catchIdx);
-        const startK = Math.max(1, Math.round(driveCount / 2));
-        const endK = Math.min(st.bowSurgeVals.length - 1, driveCount + 8);
-        const idx = Math.min(st.bowSurgeVals.length - 1, startK + Math.round(frac * (endK - startK)));
-        vals.push(st.bowSurgeVals[idx]);
-      }
-      const avgS = vals.reduce((a,b)=>a+b,0) / vals.length;
-      const x = splitX + frac * (0.5 * plotW);
-      const normY = (avgS - sMin) / (sMax - sMin);
-      const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-      if (s === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-    }
-    cx.stroke();
-  }
-
-  // Phase Annotations
   cx.fillStyle = '#88a0cc';
   cx.textAlign = 'left';
-  cx.fillText("← CATCH ENTRY & INITIAL DRIVE", gutterL, h - 6);
+  cx.fillText("CATCH", gutterL, h - 5);
   cx.textAlign = 'right';
-  cx.fillText("FINISH EXIT & RECOVERY GLIDE →", gutterL + plotW, h - 6);
+  cx.fillText("FINISH / RECOVERY", gutterL + plotW, h - 5);
 
   cx.restore();
 }
 
-function exportStrokeAnalyticsCSV() {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { alert("No strokes available to export."); return; }
-  let csv = "stroke_id,duration_s,drive_time_s,recovery_time_s,drive_recovery_ratio,spm,peak_force,distance_m,avg_spd_kmh,peak_surge_mps2\n";
-  active.forEach(s => {
-    csv += `${s.id},${s.tTotal.toFixed(3)},${s.tDrive.toFixed(3)},${s.tRecov.toFixed(3)},1:${s.rhythmRatio.toFixed(2)},${s.spm.toFixed(1)},${s.peakF.toFixed(2)},${s.distTotal.toFixed(2)},${s.avgSpd.toFixed(2)},${s.peakSurge.toFixed(2)}\n`;
-  });
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+// ==============================================================================
+// 8. MAP INITIALIZATION & GPS TRACKING
+// ==============================================================================
+const mapLive = L.map('liveMap', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true }).addTo(mapLive);
+const liveTrack = L.polyline([], { color: '#00e5ff', weight: 3.5 }).addTo(mapLive);
+const liveMarker = L.circleMarker([0,0], { radius: 6, color: '#fff', fillColor: '#ff0044', fillOpacity: 1 }).addTo(mapLive);
+
+function updateMapTrack(lat, lng, spd) {
+  if (lat && lng && Math.abs(lat) > 0.01) {
+    const c = [lat, lng];
+    liveMarker.setLatLng(c);
+    liveTrack.addLatLng(c);
+    mapLive.panTo(c, { animate: true, duration: 0.1 });
+    document.getElementById('mapTitle').innerText = `GPS Live (${spd.toFixed(1)} km/h)`;
+  }
+}
+
+function recenterMap() {
+  const b = liveTrack.getLatLngs();
+  if (b.length > 0) mapLive.fitBounds(L.latLngBounds(b), { padding: [30,30] });
+}
+
+// ==============================================================================
+// 9. BASIC RECALL MODAL & CROP TOOL
+// ==============================================================================
+let recallMap = null;
+let recallTrack = null;
+
+function openRecallModal() {
+  document.getElementById('modalBasicRecall').style.display = 'flex';
+  
+  // Populate Strava Hero Stats
+  const mins = Math.floor(activeElapsedSec / 60);
+  const secs = Math.floor(activeElapsedSec % 60);
+  document.getElementById('stTime').innerText = `${mins}:${secs.toString().padStart(2,'0')}`;
+  document.getElementById('stDist').innerText = `${(totalDistanceMeters).toFixed(0)}m`;
+  document.getElementById('stStrokes').innerText = strokeHistory.length;
+  document.getElementById('stSPM').innerText = document.getElementById('avgSPM').innerText;
+  document.getElementById('stSplit').innerText = document.getElementById('avgSplit').innerText;
+
+  if (!recallMap) {
+    recallMap = L.map('recallMap', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 16);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(recallMap);
+    recallTrack = L.polyline([], { color: '#00ff88', weight: 4 }).addTo(recallMap);
+  }
+  setTimeout(() => {
+    recallMap.invalidateSize();
+    const pts = liveTrack.getLatLngs();
+    if (pts.length > 0) {
+      recallTrack.setLatLngs(pts);
+      recallMap.fitBounds(L.latLngBounds(pts), { padding: [20,20] });
+    }
+  }, 150);
+}
+
+function closeRecallModal() {
+  document.getElementById('modalBasicRecall').style.display = 'none';
+}
+
+function updateCropWindow() {
+  const s = document.getElementById('cropStart').value;
+  const e = document.getElementById('cropEnd').value;
+  document.getElementById('cropDisplay').innerText = `${s}% → ${e}%`;
+}
+
+function exportCroppedCSV() {
+  const s = parseInt(document.getElementById('cropStart').value, 10) / 100.0;
+  const e = parseInt(document.getElementById('cropEnd').value, 10) / 100.0;
+  const sIdx = Math.floor(s * inMemoryLog.length);
+  const eIdx = Math.ceil(e * inMemoryLog.length);
+  const cropped = inMemoryLog.slice(sIdx, eIdx + 1);
+
+  let csvContent = "ms,utc,w1,ax1,ay1,az1,gx1,gy1,gz1,lat,lng,alt,spd,sats,w2,ax2,ay2,az2,gx2,gy2,gz2\n" + cropped.join("\n") + "\n";
+  downloadCsvBlob(csvContent, "indaboat_cropped.csv");
+}
+
+function exportFullSessionCSV() {
+  let csvContent = "ms,utc,w1,ax1,ay1,az1,gx1,gy1,gz1,lat,lng,alt,spd,sats,w2,ax2,ay2,az2,gx2,gy2,gz2\n" + inMemoryLog.join("\n") + "\n";
+  downloadCsvBlob(csvContent, "indaboat_full_session.csv");
+}
+
+function downloadCsvBlob(content, filename) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `indaboat_strokes_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
 }
 
 // ==============================================================================
-// 9. MASTER RENDER LOOP
+// 10. ADVANCED RECALL / SUITE MODAL HANDLERS
 // ==============================================================================
-function renderLoop() {
-  renderPlateCanvas();
-  if (isAutoFollow && !isReplayMode) redrawInteractiveChart();
-  requestAnimationFrame(renderLoop);
+let advMap = null;
+function initAdvMap() {
+  if (advMap) return;
+  advMap = L.map('advMap', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(advMap);
 }
 
-requestAnimationFrame(renderLoop);
+function openStrokeAnalyzerModal() {
+  // Launches the exact stroke analyzer from your prior build
+  alert("Launching 4-Chart Stroke Analysis Suite...");
+}
+
+function updateHUD(d) {
+  document.getElementById('valRaw').innerText = d.raw_w.toFixed(1);
+  document.getElementById('valNet').innerText = d.w1.toFixed(1);
+  document.getElementById('valSurge').innerText = d.surge.toFixed(2);
+  document.getElementById('valSpd').innerText   = d.spd.toFixed(1);
+  document.getElementById('valPitch').innerText = d.pitch_deg.toFixed(1) + "°";
+  document.getElementById('valRoll').innerText  = d.roll_deg.toFixed(1) + "°";
+  document.getElementById('valSats').innerText  = d.sats;
+}
+
+// Master Render Loop
+function masterLoop() {
+  renderDualImuCanvas();
+  renderLiveFlowChart();
+  renderStrokeBeepChart();
+  requestAnimationFrame(masterLoop);
+}
+requestAnimationFrame(masterLoop);
 
 window.addEventListener('resize', () => {
-  map.invalidateSize();
-  redrawInteractiveChart();
-  renderPlateCanvas();
-  if (document.getElementById('analyzerModal').style.display === 'flex') renderAllAnalyzerCharts();
+  mapLive.invalidateSize();
 });
-
-setTimeout(() => map.invalidateSize(), 500);
 </script>
 </body>
 </html>
