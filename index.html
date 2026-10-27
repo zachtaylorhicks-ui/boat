@@ -58,16 +58,16 @@
       border: 1px solid transparent;
       color: #fff;
       font-weight: 800;
-      padding: 6px 12px;
+      padding: 6px 11px;
       border-radius: 4px;
       font-size: 11px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 5px;
       transition: filter 0.15s ease, background 0.15s ease;
-      letter-spacing: 0.4px;
+      letter-spacing: 0.3px;
     }
     button:active { filter: brightness(1.3); }
     button:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -81,6 +81,12 @@
     .btn-ctrl:hover { background: #202838; color: #fff; }
     .btn-ctrl.active { background: #0070e0; border-color: #00bbff; color: #fff; }
 
+    .btn-flip { background: #2a1836; border: 1px solid #5a2e75; color: #d9a8ff; font-weight: 900; }
+    .btn-flip.active { background: #7b1fa2; border-color: #ba68c8; color: #fff; }
+
+    .btn-mode { background: #1b261b; border: 1px solid #2e4a2e; color: #a8ffa8; font-weight: 900; }
+    .btn-mode.raw { background: #d97706; border-color: #f59e0b; color: #000; }
+
     /* Master Top Header */
     #masterHeader {
       height: 44px;
@@ -92,6 +98,7 @@
       background: #080a0f;
       border-bottom: 1px solid var(--border-dark);
       z-index: 1000;
+      gap: 8px;
     }
 
     .view-tabs { display: flex; gap: 6px; }
@@ -167,7 +174,7 @@
     canvas { width: 100%; height: 100%; display: block; }
 
     /* ==========================================================================
-       2. VIEW 1: MOBILE-FIRST LIVE HOMEPAGE LAYOUT
+       2. VIEW 1: LIVE HOMEPAGE LAYOUT
        ========================================================================== */
     #liveHomepageView { padding: 6px; gap: 6px; }
 
@@ -196,7 +203,7 @@
     }
     .btn-action {
       flex: 1;
-      min-width: 90px;
+      min-width: 85px;
       height: 38px;
       justify-content: center;
       font-size: 11px;
@@ -212,7 +219,7 @@
 
     .stats-grid-primary {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
       gap: 6px;
       margin-top: 4px;
     }
@@ -232,6 +239,7 @@
       color: var(--accent-cyan);
       font-family: var(--font-mono);
       line-height: 1.1;
+      white-space: nowrap;
     }
     .stat-lbl {
       font-size: 8px;
@@ -242,8 +250,8 @@
     }
 
     .layer-flow-chart {
-      height: 195px;
-      min-height: 170px;
+      height: 205px;
+      min-height: 180px;
       position: relative;
     }
 
@@ -268,6 +276,7 @@
       border: 1px solid #1a2232;
       border-radius: 5px;
       padding: 0 8px;
+      gap: 6px;
     }
     #replayBar {
       height: 38px;
@@ -344,11 +353,10 @@
     }
 
     #hud {
-      height: 56px;
-      min-height: 56px;
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
       gap: 6px;
+      min-height: 56px;
     }
     .badge {
       background: #090c13;
@@ -358,9 +366,9 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 2px 4px;
+      padding: 4px;
     }
-    .badge-val { font-size: 16px; font-weight: 900; color: var(--accent-cyan); line-height: 1.1; font-family: var(--font-mono); }
+    .badge-val { font-size: 15px; font-weight: 900; color: var(--accent-cyan); line-height: 1.1; font-family: var(--font-mono); white-space: nowrap; }
     .badge-lbl { font-size: 9px; color: #76869a; text-transform: uppercase; margin-top: 2px; font-weight: 700; }
 
     #debugBar {
@@ -395,7 +403,7 @@
     }
     .strava-hero {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
       gap: 8px;
       background: #0a0d15;
       border: 1px solid #182233;
@@ -403,7 +411,7 @@
       padding: 12px;
     }
     .strava-stat { display: flex; flex-direction: column; }
-    .strava-val { font-size: 26px; font-weight: 900; color: var(--accent-cyan); font-family: var(--font-mono); }
+    .strava-val { font-size: 24px; font-weight: 900; color: var(--accent-cyan); font-family: var(--font-mono); }
     .strava-lbl { font-size: 9px; color: #8fa0b5; text-transform: uppercase; margin-top: 2px; font-weight: 700; }
 
     .crop-bar {
@@ -493,23 +501,26 @@
       .layer-individual-overlays { grid-template-columns: 1fr; height: 380px; }
       .grid-top { grid-template-columns: 1fr; height: 380px; }
       #analyzerContent { grid-template-columns: 1fr; }
-      .stats-grid-primary { grid-template-columns: repeat(3, 1fr); }
-      .strava-hero { grid-template-columns: repeat(3, 1fr); }
     }
   </style>
 </head>
 <body>
 
-  <!-- MASTER TOP BAR -->
+  <!-- MASTER TOP HEADER (ALWAYS VISIBLE WITH UNIVERSAL CONTROLS) -->
   <header id="masterHeader">
-    <div style="display:flex; align-items:center; gap:8px;">
+    <div style="display:flex; align-items:center; gap:6px;">
       <button id="btnConnect" class="btn-connect" onclick="toggleConnect()">CONNECT BLE</button>
+      <input type="file" id="masterFileInput" accept=".csv,.txt,.log" style="display:none;" onchange="handleFileSelected(event)" />
+      <button class="btn-ctrl" onclick="document.getElementById('masterFileInput').click()" style="background:#5e2499; color:#fff;">LOAD CSV / LOG</button>
+      <button class="btn-flip" id="btnFlipP1_Top" onclick="toggleFlipP1()">FLIP P1 (+/-)</button>
+      <button class="btn-flip" id="btnFlipP2_Top" onclick="toggleFlipP2()">FLIP P2 (+/-)</button>
+      <button class="btn-mode" id="btnForceMode_Top" onclick="toggleForceDisplayMode()">MODE: NET (TARED)</button>
       <div class="view-tabs">
         <button class="tab-btn active" id="tabLive" onclick="switchView('live')">LIVE DASHBOARD</button>
         <button class="tab-btn" id="tabAdvanced" onclick="switchView('advanced')">ADVANCED SUITE</button>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:8px;">
+    <div style="display:flex; align-items:center; gap:6px;">
       <span class="badge-chip">MEM: <b id="lblMemCount" style="color:#00ffcc;">0</b> PTS</span>
       <span class="badge-chip">
         <span class="status-dot green" id="sdDot"></span>
@@ -528,10 +539,10 @@
     <!-- LAYER 1: DUAL 3D MECHANICAL FORCE PLATES & SATELLITE GPS -->
     <section class="layer-top-grid">
       <div class="card">
-        <div class="card-title">Dual Mechanical Force Plates & Force Vectors</div>
+        <div class="card-title">Dual Mechanical Force Plates & 3D Vectors</div>
         <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
           <span style="font-size:9px; background:#121824; border:1px solid #1f2b40; color:#00ffcc; padding:2px 6px; border-radius:3px; font-weight:bold;">
-            6-DOF QUATERNION STABILIZED
+            6-DOF GRAVITY ALIGNED
           </span>
         </div>
         <canvas id="dualPlatesCanvas"></canvas>
@@ -553,7 +564,7 @@
         <button class="btn-action btn-pause" id="btnPause" onclick="handleSessionAction('PAUSE')">PAUSE SESSION</button>
         <button class="btn-action btn-end" id="btnEnd" onclick="handleSessionAction('END')">END SESSION</button>
         <button class="btn-action btn-recall-main" onclick="openBasicRecallModal()">RECALL SESSION</button>
-        <button class="btn-action btn-calib" onclick="zeroKinematicsNow()">CALIBRATE</button>
+        <button class="btn-action btn-calib" onclick="zeroKinematicsNow()">CALIBRATE LEVEL</button>
       </div>
 
       <div class="stats-grid-primary">
@@ -566,13 +577,13 @@
       </div>
     </section>
 
-    <!-- LAYER 3: LIVE TELEMETRY FLOW STRIP CHART (DUAL Y-AXIS) -->
+    <!-- LAYER 3: LIVE TELEMETRY FLOW STRIP CHART (INDEPENDENT DUAL Y-AXES) -->
     <section class="card layer-flow-chart">
-      <div class="card-title">Live Telemetry Flow (Plates Left Axis & Clean Surge Right Axis)</div>
+      <div class="card-title">Live Telemetry Flow (Bipolar Force Left Axis | Surge Right Axis)</div>
       <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-        <span style="font-size:9px; background:#0a191f; border:1px solid #133340; color:#00ffcc; padding:2px 6px; border-radius:3px;">● Plate 1 (kg)</span>
-        <span style="font-size:9px; background:#210b1a; border:1px solid #421634; color:#ff55aa; padding:2px 6px; border-radius:3px;">● Plate 2 (kg)</span>
-        <span style="font-size:9px; background:#071c12; border:1px solid #0f3d26; color:#00ff88; padding:2px 6px; border-radius:3px; font-weight:bold;">● Clean Surge (m/s²)</span>
+        <span style="font-size:9px; background:#0a191f; border:1px solid #133340; color:#00ffcc; padding:2px 6px; border-radius:3px; font-weight:bold;">● Plate 1 (kg)</span>
+        <span style="font-size:9px; background:#210b1a; border:1px solid #421634; color:#ff55aa; padding:2px 6px; border-radius:3px; font-weight:bold;">● Plate 2 (kg)</span>
+        <button class="btn-ctrl active" id="btnToggleLiveSurge" onclick="toggleLiveSurgeLine()" style="padding:1px 6px; font-size:9px;">SURGE LINE: ON</button>
       </div>
       <canvas id="liveFlowCanvas"></canvas>
     </section>
@@ -606,14 +617,14 @@
   <main class="view-container" id="advancedSuiteView">
     <div id="topbarAdv">
       <div style="display:flex; align-items:center; gap:6px;">
-        <button class="btn-ctrl" onclick="toggleLoadInversion()">FLIP LOAD (+/-)</button>
+        <button class="btn-flip" id="btnFlipP1_Adv" onclick="toggleFlipP1()">FLIP P1 (+/-)</button>
+        <button class="btn-flip" id="btnFlipP2_Adv" onclick="toggleFlipP2()">FLIP P2 (+/-)</button>
+        <button class="btn-mode" id="btnForceMode_Adv" onclick="toggleForceDisplayMode()">MODE: NET (TARED)</button>
         <button class="btn-ctrl" id="btnFlatline" onclick="toggleFlatlineMode()">✏️ FLATLINE SPIKE</button>
         <button class="btn-ctrl" onclick="resetFlatlines()">⟲ RESET FLATLINES</button>
         <button class="btn-ctrl" style="background:#ffaa00; color:#000; font-weight:bold;" onclick="openStrokeAnalyzer()">⚡ STROKE ANALYZER (4 CHARTS)</button>
       </div>
       <div style="display:flex; gap:6px;">
-        <input type="file" id="advFileInput" accept=".csv,.txt,.log" style="display:none;" onchange="handleFileSelected(event)" />
-        <button class="btn-ctrl" onclick="document.getElementById('advFileInput').click()" style="background:#7b2cbf;">LOAD CSV</button>
         <button class="btn-ctrl" onclick="exportDatabase()" style="background:#009955;">EXPORT (<span id="dbCountAdv">0</span>)</button>
         <button class="btn-ctrl" onclick="clearDatabase()" style="background:#3a3f4b;">CLEAR</button>
       </div>
@@ -655,11 +666,12 @@
       </div>
     </div>
 
-    <!-- MAIN INTERACTIVE TELEMETRY CHART -->
+    <!-- MAIN INTERACTIVE TELEMETRY CHART (DUAL LOAD CELLS INTEGRATED) -->
     <div class="card" id="chartCard">
       <div class="chart-header">
         <div class="legend-group">
-          <span class="legend-pill" id="leg_load" onclick="toggleSeries('load')" style="color:#00ffcc;">● Force Plate</span>
+          <span class="legend-pill" id="leg_load1" onclick="toggleSeries('w1')" style="color:#00ffcc;">● Plate 1 Force</span>
+          <span class="legend-pill" id="leg_load2" onclick="toggleSeries('w2')" style="color:#ff55aa;">● Plate 2 Force</span>
           <span class="legend-pill" id="leg_surge" onclick="toggleSeries('surge')" style="color:#00ff88; font-weight:bold;">● Bow Surge (m/s²)</span>
           <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax</span>
           <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#22cc88;">● Ay</span>
@@ -680,11 +692,11 @@
       <canvas id="interactiveCanvas"></canvas>
     </div>
 
-    <!-- 7 METRIC BADGES -->
+    <!-- 7 RESPONSIVE METRIC BADGES -->
     <div id="hud">
-      <div class="badge"><div class="badge-val" id="valRaw" style="color: #ffaa00;">--</div><div class="badge-lbl">Raw Load</div></div>
-      <div class="badge"><div class="badge-val" id="valNet" style="color: #00ffcc;">--</div><div class="badge-lbl">Drive Force</div></div>
-      <div class="badge"><div class="badge-val" id="valSurge" style="color: #00e5ff;">--</div><div class="badge-lbl">Clean Surge</div></div>
+      <div class="badge"><div class="badge-val" id="valRaw1" style="color: #00ffcc;">--</div><div class="badge-lbl">P1 Force (kg)</div></div>
+      <div class="badge"><div class="badge-val" id="valRaw2" style="color: #ff55aa;">--</div><div class="badge-lbl">P2 Force (kg)</div></div>
+      <div class="badge"><div class="badge-val" id="valSurge" style="color: #00ff88;">--</div><div class="badge-lbl">Clean Surge</div></div>
       <div class="badge"><div class="badge-val" id="valSpd" style="color: #ffff00;">--</div><div class="badge-lbl">Speed (km/h)</div></div>
       <div class="badge"><div class="badge-val" id="valPitch" style="color: #ff66cc;">--</div><div class="badge-lbl">Pitch</div></div>
       <div class="badge"><div class="badge-val" id="valRoll" style="color: #cc66ff;">--</div><div class="badge-lbl">Roll</div></div>
@@ -813,10 +825,10 @@
     "use strict";
 
     // ==========================================================================
-    // 1. DATA RING BUFFER & INDEXEDDB BATCH MANAGER
+    // 1. DATA RING BUFFER, STATE STORAGE & CONFIGURATION
     // ==========================================================================
     class TelemetryRingBuffer {
-      constructor(capacity = 5000) {
+      constructor(capacity = 6000) {
         this.capacity = capacity;
         this.buffer = new Array(capacity);
         this.writePtr = 0;
@@ -845,8 +857,8 @@
         return res;
       }
       sliceTail(n) {
-        const count = Math.min(this.count, n);
-        return this.slice(this.count - count, this.count);
+        const c = Math.min(this.count, n);
+        return this.slice(this.count - c, this.count);
       }
       clear() {
         this.buffer = new Array(this.capacity);
@@ -855,13 +867,18 @@
       }
     }
 
-    const chartRing = new TelemetryRingBuffer(5000);
+    const chartRing = new TelemetryRingBuffer(6000);
     let inMemoryLog = [];
     let pendingDbBatch = [];
-    let flatlines = [];
+    let flatlinesBackup = [];
     let isFlatlineSelecting = false;
     let flatlineDragStart = null;
-    let invertLoad = false;
+
+    // Independent Inversion & Force Display Controls
+    let invertP1 = false;
+    let invertP2 = false;
+    let forceDisplayMode = "NET"; // "RAW" or "NET"
+    let showLiveSurgeLine = true;
 
     // Session Workout Recording State
     let sessionActive = false;
@@ -890,24 +907,18 @@
       inMemoryLog.push(rowStr);
       pendingDbBatch.push(rowStr);
       document.getElementById('lblMemCount').innerText = inMemoryLog.length;
-
-      // Commit to IndexedDB in batches of 50 to prevent I/O thread lock
-      if (pendingDbBatch.length >= 50) {
-        flushDbBatch();
-      }
+      if (pendingDbBatch.length >= 50) flushDbBatch();
     }
 
     function flushDbBatch() {
       if (!db || pendingDbBatch.length === 0) return;
       const tx = db.transaction([STORE_NAME], "readwrite");
       const store = tx.objectStore(STORE_NAME);
-      for (let i = 0; i < pendingDbBatch.length; i++) {
-        store.add(pendingDbBatch[i]);
-      }
+      for (let i = 0; i < pendingDbBatch.length; i++) store.add(pendingDbBatch[i]);
       pendingDbBatch = [];
       updateDBCount();
     }
-    setInterval(flushDbBatch, 2000); // Periodic flush
+    setInterval(flushDbBatch, 2000);
 
     function updateDBCount() {
       if (!db) return;
@@ -930,7 +941,7 @@
       inMemoryLog = [];
       pendingDbBatch = [];
       chartRing.clear();
-      flatlines = [];
+      flatlinesBackup = [];
       detectedStrokes = [];
       if (db) {
         const tx = db.transaction([STORE_NAME], "readwrite");
@@ -943,12 +954,52 @@
       redrawInteractiveChart();
     }
 
+    // Toggle Handlers
+    function toggleFlipP1() {
+      invertP1 = !invertP1;
+      const act = invertP1;
+      document.getElementById('btnFlipP1_Top').classList.toggle('active', act);
+      document.getElementById('btnFlipP1_Adv').classList.toggle('active', act);
+      redrawAllActiveVisualizers();
+    }
+
+    function toggleFlipP2() {
+      invertP2 = !invertP2;
+      const act = invertP2;
+      document.getElementById('btnFlipP2_Top').classList.toggle('active', act);
+      document.getElementById('btnFlipP2_Adv').classList.toggle('active', act);
+      redrawAllActiveVisualizers();
+    }
+
+    function toggleForceDisplayMode() {
+      forceDisplayMode = forceDisplayMode === "NET" ? "RAW" : "NET";
+      const isRaw = forceDisplayMode === "RAW";
+      const txt = isRaw ? "MODE: RAW FORCE" : "MODE: NET (TARED)";
+      document.getElementById('btnForceMode_Top').innerText = txt;
+      document.getElementById('btnForceMode_Adv').innerText = txt;
+      document.getElementById('btnForceMode_Top').classList.toggle('raw', isRaw);
+      document.getElementById('btnForceMode_Adv').classList.toggle('raw', isRaw);
+      redrawAllActiveVisualizers();
+    }
+
+    function toggleLiveSurgeLine() {
+      showLiveSurgeLine = !showLiveSurgeLine;
+      const btn = document.getElementById('btnToggleLiveSurge');
+      btn.classList.toggle('active', showLiveSurgeLine);
+      btn.innerText = showLiveSurgeLine ? "SURGE LINE: ON" : "SURGE LINE: OFF";
+      renderLiveFlowChart();
+    }
+
     // Web Audio Synthesizer: 880 Hz Crystal Tone
     let audioCtx = null;
+    function unlockAudioContext() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
     function playStrokeBeep() {
       try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
+        unlockAudioContext();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
@@ -962,7 +1013,6 @@
       } catch(e) {}
     }
 
-    // View Navigation
     function switchView(target) {
       document.getElementById('tabLive').classList.toggle('active', target === 'live');
       document.getElementById('tabAdvanced').classList.toggle('active', target === 'advanced');
@@ -972,12 +1022,14 @@
       setTimeout(() => {
         if (target === 'live') {
           mapLive.invalidateSize();
+          renderDualPlates3DCanvas();
+          renderLiveFlowChart();
         } else {
           map.invalidateSize();
           redrawInteractiveChart();
           renderPlateCanvas();
         }
-      }, 100);
+      }, 80);
     }
 
     function switchToAdvancedFromRecall() {
@@ -986,25 +1038,41 @@
     }
 
     // ==========================================================================
-    // 2. 6-DOF QUATERNION & TRUE LINEAR ACCELERATION KINEMATICS
+    // 2. 6-DOF QUATERNION KINEMATICS & LEVEL ALIGNMENT MATRICES
     // ==========================================================================
     class QuaternionKinematics {
       constructor() {
         this.q = [1, 0, 0, 0]; // [qw, qx, qy, qz]
+        this.q_align = [1, 0, 0, 0]; // Orientation alignment offset
         this.pitch = 0;
         this.roll = 0;
         this.yaw = 0;
         this.linAcc = [0, 0, 0];
       }
 
+      // Quaternion Multiplication: a (x) b
+      quatMult(a, b) {
+        return [
+          a[0]*b[0] - a[1]*b[1] - a[2]*b[2] - a[3]*b[3],
+          a[0]*b[1] + a[1]*b[0] + a[2]*b[3] - a[3]*b[2],
+          a[0]*b[2] - a[1]*b[3] + a[2]*b[0] + a[3]*b[1],
+          a[0]*b[3] + a[1]*b[2] - a[2]*b[1] + a[3]*b[0]
+        ];
+      }
+
       update(ax, ay, az, gx, gy, gz, dt) {
-        // Normalize accelerometer vector
+        // Gyroscope Unit Guard: Auto-detect deg/s vs rad/s
+        if (Math.abs(gx) > 15 || Math.abs(gy) > 15 || Math.abs(gz) > 15) {
+          gx *= (Math.PI / 180.0);
+          gy *= (Math.PI / 180.0);
+          gz *= (Math.PI / 180.0);
+        }
+
         let normA = Math.hypot(ax, ay, az);
         if (normA > 0.001) {
           ax /= normA; ay /= normA; az /= normA;
         }
 
-        // Madgwick 6-DOF gradient descent step
         let qw = this.q[0], qx = this.q[1], qy = this.q[2], qz = this.q[3];
         const f1 = 2 * (qx * qz - qw * qy) - ax;
         const f2 = 2 * (qw * qx + qy * qz) - ay;
@@ -1024,7 +1092,6 @@
           s0 /= normS; s1 /= normS; s2 /= normS; s3 /= normS;
         }
 
-        // Gyroscope quaternion derivative
         const beta = 0.08;
         const qDotOmega0 = 0.5 * (-qx * gx - qy * gy - qz * gz);
         const qDotOmega1 = 0.5 * ( qw * gx + qy * gz - qz * gy);
@@ -1039,56 +1106,65 @@
         let normQ = Math.hypot(qw, qx, qy, qz);
         this.q = [qw / normQ, qx / normQ, qy / normQ, qz / normQ];
 
-        // Euler Angles (Tethered to gravity - no runaway spinning)
-        this.roll  = Math.atan2(2 * (qw * qx + qy * qz), 1 - 2 * (qx * qx + qy * qy));
-        this.pitch = Math.asin(Math.max(-1, Math.min(1, 2 * (qw * qy - qz * qx))));
-        this.yaw   = 0.985 * (this.yaw + gz * dt); // Leaky yaw avoids DC bias runaway
+        // Apply Level Alignment Quaternion
+        const q_eff = this.quatMult(this.q_align, this.q);
+        const eqw = q_eff[0], eqx = q_eff[1], eqy = q_eff[2], eqz = q_eff[3];
 
-        // Extract Direction Cosine Matrix (DCM)
+        this.roll  = Math.atan2(2 * (eqw * eqx + eqy * eqz), 1 - 2 * (eqx * eqx + eqy * eqy));
+        this.pitch = Math.asin(Math.max(-1, Math.min(1, 2 * (eqw * eqy - eqz * eqx))));
+        this.yaw   = 0.985 * (this.yaw + gz * dt);
+
+        // Direction Cosine Matrix (DCM) of Aligned Frame
         const R = [
-          [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qw * qz), 2 * (qx * qz + qw * qy)],
-          [2 * (qx * qy + qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qw * qx)],
-          [2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx * qx + qy * qy)]
+          [1 - 2*(eqy*eqy + eqz*eqz), 2*(eqx*eqy - eqw*eqz),     2*(eqx*eqz + eqw*eqy)],
+          [2*(eqx*eqy + eqw*eqz),     1 - 2*(eqx*eqx + eqz*eqz), 2*(eqy*eqz - eqw*eqx)],
+          [2*(eqx*eqz - eqw*eqy),     2*(eqy*eqz + eqw*eqx),     1 - 2*(eqx*eqx + eqy*eqy)]
         ];
 
-        // Gravity Vector Isolation in Body Frame: a_linear = a_measured - R^T * [0, 0, g]
+        // Body Frame Gravity Isolation
         const gx_body = R[2][0] * 9.80665;
         const gy_body = R[2][1] * 9.80665;
         const gz_body = R[2][2] * 9.80665;
 
         this.linAcc = [
-          ax * (normA || 9.8) - gx_body,
-          ay * (normA || 9.8) - gy_body,
-          az * (normA || 9.8) - gz_body
+          ax * (normA || 9.80665) - gx_body,
+          ay * (normA || 9.80665) - gy_body,
+          az * (normA || 9.80665) - gz_body
         ];
       }
 
-      getDCM() {
-        const qw = this.q[0], qx = this.q[1], qy = this.q[2], qz = this.q[3];
+      calibrateLevelNow() {
+        // Compute inverse of current quaternion: q_align = q_current^(-1)
+        this.q_align = [this.q[0], -this.q[1], -this.q[2], -this.q[3]];
+        this.yaw = 0;
+      }
+
+      getAlignedDCM() {
+        const q_eff = this.quatMult(this.q_align, this.q);
+        const qw = q_eff[0], qx = q_eff[1], qy = q_eff[2], qz = q_eff[3];
         return [
-          [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qw * qz), 2 * (qx * qz + qw * qy)],
-          [2 * (qx * qy + qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qw * qx)],
-          [2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx * qx + qy * qy)]
+          [1 - 2*(qy*qy + qz*qz), 2*(qx*qy - qw*qz),     2*(qx*qz + qw*qy)],
+          [2*(qx*qy + qw*qz),     1 - 2*(qx*qx + qz*qz), 2*(qy*qz - qw*qx)],
+          [2*(qx*qz - qw*qy),     2*(qy*qz + qw*qx),     1 - 2*(qx*qx + qy*qy)]
         ];
       }
     }
 
     const imuP1 = new QuaternionKinematics();
     const imuP2 = new QuaternionKinematics();
-    let zeroPitchOffset = 0, zeroRollOffset = 0;
 
     function zeroKinematicsNow() {
-      zeroPitchOffset = (imuP1.pitch + imuP2.pitch) / 2.0;
-      zeroRollOffset  = (imuP1.roll  + imuP2.roll)  / 2.0;
+      imuP1.calibrateLevelNow();
+      imuP2.calibrateLevelNow();
+      redrawAllActiveVisualizers();
     }
 
     // ==========================================================================
-    // 3. ZERO-TARE AUTOMATIC EQUALIZATION & MULTI-SENSOR SPM ENGINE
+    // 3. TELEMETRY INGESTION, CALIBRATED ZEROING & COHERENT SPM
     // ==========================================================================
     let oar1Baseline = 0, oar2Baseline = 0;
     let recoverySamples1 = [], recoverySamples2 = [];
     let isCurrentlyInDrive = false;
-    let polarityP1 = 1, polarityP2 = 1;
 
     let strokeDetectionHistory = [];
     let lastValidStrokeTimestamp = 0;
@@ -1148,14 +1224,14 @@
       const dt = lastPacketTimestampMs === null ? 0.05 : Math.max(0.01, Math.min(0.25, (ms - lastPacketTimestampMs) / 1000.0));
       lastPacketTimestampMs = ms;
 
-      // 1. Solve 6-DOF Quaternion Orientations
+      // 1. Solve Aligned 6-DOF Quaternions
       imuP1.update(ax1, ay1, az1, gx1, gy1, gz1, dt);
       imuP2.update(ax2, ay2, az2, gx2, gy2, gz2, dt);
 
       // Clean Bow Surge (Earth-Gravity Isolated Hull Vector)
       const cleanSurge = -((imuP1.linAcc[0] + imuP2.linAcc[0]) / 2.0);
 
-      // 2. AUTOMATIC EQUALIZATION & AUTO-POLARITY
+      // 2. Continuous Recovery Baseline Estimation
       if (!isCurrentlyInDrive) {
         recoverySamples1.push(w1);
         recoverySamples2.push(w2);
@@ -1168,23 +1244,23 @@
         oar2Baseline = s2[Math.floor(s2.length * 0.4)] || 0;
       }
 
-      const rawDelta1 = w1 - oar1Baseline;
-      const rawDelta2 = w2 - oar2Baseline;
+      // Compute Values with Full Bipolar Fidelity (No Negative Truncation)
+      const signP1 = invertP1 ? -1 : 1;
+      const signP2 = invertP2 ? -1 : 1;
 
-      // Auto-detect reversed sensor mounting
-      if (cleanSurge > 1.2) {
-        if (rawDelta1 < -2.0) polarityP1 = -1; else if (rawDelta1 > 2.0) polarityP1 = 1;
-        if (rawDelta2 < -2.0) polarityP2 = -1; else if (rawDelta2 > 2.0) polarityP2 = 1;
-      }
+      const rawP1 = signP1 * w1;
+      const rawP2 = signP2 * w2;
+      const netP1 = signP1 * (w1 - oar1Baseline);
+      const netP2 = signP2 * (w2 - oar2Baseline);
 
-      const inv = invertLoad ? -1 : 1;
-      const netF1 = inv * polarityP1 * rawDelta1;
-      const netF2 = inv * polarityP2 * rawDelta2;
+      // Selected Force Stream (RAW vs NET)
+      const activeF1 = forceDisplayMode === "RAW" ? rawP1 : netP1;
+      const activeF2 = forceDisplayMode === "RAW" ? rawP2 : netP2;
 
-      // 3. COHERENT LIVE SPM ENGINE (Surge Jerk + GPS Velocity + 1.20s Refractory Lockout)
-      const surgeJerk = cleanSurge > 1.15;
+      // 3. Coherent Multi-Sensor SPM Detection
+      const surgeJerk = cleanSurge > 1.10;
       const gpsMoving = spd > 1.0;
-      const refractoryLockout = 1.20; // Up to 50 SPM support
+      const refractoryLockout = 1.15; // Up to 52 SPM support
 
       if (surgeJerk && gpsMoving && (t_sec - lastValidStrokeTimestamp > refractoryLockout) && !isCurrentlyInDrive) {
         isCurrentlyInDrive = true;
@@ -1203,7 +1279,7 @@
         if (strokeDetectionHistory.length > 0) {
           const deltaT = t_sec - strokeDetectionHistory[strokeDetectionHistory.length - 1];
           const rawSpm = 60.0 / deltaT;
-          const clampedSpm = Math.min(52, Math.max(12, rawSpm));
+          const clampedSpm = Math.min(54, Math.max(12, rawSpm));
           document.getElementById('liveSPM').innerText = clampedSpm.toFixed(0);
         }
         strokeDetectionHistory.push(t_sec);
@@ -1213,8 +1289,8 @@
         isCurrentlyInDrive = false;
       }
 
-      currentStrokeP1.push(netF1);
-      currentStrokeP2.push(netF2);
+      currentStrokeP1.push(activeF1);
+      currentStrokeP2.push(activeF2);
 
       if (sessionActive && !sessionPaused) {
         activeElapsedSec += dt;
@@ -1222,14 +1298,14 @@
         updateLiveWorkoutStats(spd);
       }
 
-      const fusedP = ((imuP1.pitch + imuP2.pitch) / 2.0) - zeroPitchOffset;
-      const fusedR = ((imuP1.roll  + imuP2.roll)  / 2.0) - zeroRollOffset;
+      const fusedP = (imuP1.pitch + imuP2.pitch) / 2.0;
+      const fusedR = (imuP1.roll  + imuP2.roll)  / 2.0;
 
       const point = {
         ms, timeStr: timeS,
-        raw_w: w1,
-        net_force: netF1,
-        w1: netF1, w2: netF2,
+        raw_w1: rawP1, raw_w2: rawP2,
+        net_w1: netP1, net_w2: netP2,
+        w1: activeF1,  w2: activeF2,
         surge: cleanSurge,
         ax: ax1, ay: ay1, az: az1, gx: gx1, gy: gy1, gz: gz1,
         lat, lng, spd, sats,
@@ -1246,20 +1322,38 @@
       return point;
     }
 
+    // Phase-Normalized Resampling (100 Points - Eliminates Average Tail Decay)
     function updateNormalizedStrokeAverages() {
       const len1 = ghostLastStrokeP1.length;
-      if (len1 < 2) return;
+      if (len1 < 3) return;
 
-      if (runningAverageStrokeP1.length === 0) {
-        runningAverageStrokeP1 = [...ghostLastStrokeP1];
-        runningAverageStrokeP2 = [...ghostLastStrokeP2];
+      const N = 100;
+      const resampP1 = new Float32Array(N);
+      const resampP2 = new Float32Array(N);
+
+      for (let i = 0; i < N; i++) {
+        const frac = i / (N - 1);
+        const idx1 = frac * (len1 - 1);
+        const i0 = Math.floor(idx1), i1 = Math.min(len1 - 1, i0 + 1);
+        const a = idx1 - i0;
+        resampP1[i] = (1 - a) * ghostLastStrokeP1[i0] + a * ghostLastStrokeP1[i1];
+
+        const len2 = ghostLastStrokeP2.length;
+        if (len2 > 2) {
+          const idx2 = frac * (len2 - 1);
+          const j0 = Math.floor(idx2), j1 = Math.min(len2 - 1, j0 + 1);
+          const b = idx2 - j0;
+          resampP2[i] = (1 - b) * ghostLastStrokeP2[j0] + b * ghostLastStrokeP2[j1];
+        }
+      }
+
+      if (runningAverageStrokeP1.length !== N) {
+        runningAverageStrokeP1 = Array.from(resampP1);
+        runningAverageStrokeP2 = Array.from(resampP2);
       } else {
-        const targetLen = Math.max(len1, runningAverageStrokeP1.length);
-        for (let i = 0; i < targetLen; i++) {
-          const v1 = ghostLastStrokeP1[i] || 0;
-          const v2 = ghostLastStrokeP2[i] || 0;
-          runningAverageStrokeP1[i] = runningAverageStrokeP1[i] !== undefined ? (0.8 * runningAverageStrokeP1[i] + 0.2 * v1) : v1;
-          runningAverageStrokeP2[i] = runningAverageStrokeP2[i] !== undefined ? (0.8 * runningAverageStrokeP2[i] + 0.2 * v2) : v2;
+        for (let i = 0; i < N; i++) {
+          runningAverageStrokeP1[i] = 0.8 * runningAverageStrokeP1[i] + 0.2 * resampP1[i];
+          runningAverageStrokeP2[i] = 0.8 * runningAverageStrokeP2[i] + 0.2 * resampP2[i];
         }
       }
     }
@@ -1299,8 +1393,8 @@
     }
 
     function updateHUD(d) {
-      document.getElementById('valRaw').innerText = d.raw_w.toFixed(1);
-      document.getElementById('valNet').innerText = (d.w1 >= 0 ? "+" : "") + d.w1.toFixed(1);
+      document.getElementById('valRaw1').innerText = (d.w1 >= 0 ? "+" : "") + d.w1.toFixed(1);
+      document.getElementById('valRaw2').innerText = (d.w2 >= 0 ? "+" : "") + d.w2.toFixed(1);
       document.getElementById('valSurge').innerText = (d.surge >= 0 ? "+" : "") + d.surge.toFixed(2);
       document.getElementById('valSpd').innerText   = d.spd.toFixed(1);
       document.getElementById('valPitch').innerText = d.pitch_deg.toFixed(1) + "°";
@@ -1329,6 +1423,7 @@
     let streamBuffer = "";
 
     async function toggleConnect() {
+      unlockAudioContext();
       if (device && device.gatt.connected) {
         device.gatt.disconnect();
         return;
@@ -1355,7 +1450,7 @@
 
         if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
       } catch (err) {
-        alert("Bluetooth Connection notice: " + err.message);
+        alert("Bluetooth connection notice: " + err.message);
       }
     }
 
@@ -1394,6 +1489,7 @@
     }
 
     function handleSessionAction(action) {
+      unlockAudioContext();
       if (action === 'START') {
         sessionActive = true;
         sessionPaused = false;
@@ -1433,12 +1529,11 @@
     }
 
     // ==========================================================================
-    // 5. DUAL 3D MECHANICAL PLATES & SURFACE NORMAL FORCE VECTORS
+    // 5. DUAL 3D MECHANICAL PLATES (DEPTH-SORTED & BACKFACE-CULLED)
     // ==========================================================================
     const dualPlatesCanvas = document.getElementById('dualPlatesCanvas');
     const dualPlatesCtx = dualPlatesCanvas.getContext('2d');
 
-    // Cached Canvas Dimensions (ResizeObserver Layout Thrash Elimination)
     let dualCanvasW = 300, dualCanvasH = 200;
     new ResizeObserver(entries => {
       for (const entry of entries) {
@@ -1462,7 +1557,6 @@
 
       const fov = 200, dist = 220;
 
-      // 3D Object Space to Camera Screen Space Transform
       function projectPoint3D(R, x, y, z, cx_pt, cy_pt) {
         const rx = R[0][0] * x + R[0][1] * y + R[0][2] * z;
         const ry = R[1][0] * x + R[1][1] * y + R[1][2] * z;
@@ -1471,7 +1565,7 @@
         return [cx_pt + rx * scale, cy_pt - ry * scale, rz];
       }
 
-      // Dividers & Ground Plane
+      // Draw Horizon & Ground Line
       cx.strokeStyle = '#121822'; cx.lineWidth = 1;
       cx.beginPath();
       cx.moveTo(10, h / 2 + 10); cx.lineTo(w / 2 - 15, h / 2 + 10);
@@ -1481,29 +1575,37 @@
       cx.strokeStyle = '#182232';
       cx.beginPath(); cx.moveTo(w / 2, 20); cx.lineTo(w / 2, h - 20); cx.stroke();
 
-      // Solid Plate Dimensions (3D Box)
       const pw = 30, pl = 40, pth = 6;
       const boxVerts = [
-        [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth], // Top Face
-        [-pw, -pl,  pth], [pw, -pl,  pth], [pw, pl,  pth], [-pw, pl,  pth]  // Bottom Face
+        [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth], // Top
+        [-pw, -pl,  pth], [pw, -pl,  pth], [pw, pl,  pth], [-pw, pl,  pth]  // Bottom
       ];
 
       function renderSingleMechanicalPlate(imu, forceVal, cx_pt, cy_pt, isP1) {
-        const R = imu.getDCM();
+        const R = imu.getAlignedDCM();
         const projVerts = boxVerts.map(v => projectPoint3D(R, v[0], v[1], v[2], cx_pt, cy_pt));
 
-        const faces = [
-          { indices: [0, 1, 2, 3], norm: [R[0][2], R[1][2], R[2][2]], color: isP1 ? '#b59218' : '#00a3cc' }, // Top Plate
-          { indices: [4, 5, 6, 7], norm: [-R[0][2], -R[1][2], -R[2][2]], color: '#10151f' },                   // Bottom
-          { indices: [0, 1, 5, 4], norm: [-R[0][1], -R[1][1], -R[2][1]], color: '#1a2230' },                   // Front
-          { indices: [1, 2, 6, 5], norm: [R[0][0], R[1][0], R[2][0]], color: '#151b26' },                     // Right
-          { indices: [2, 3, 7, 6], norm: [R[0][1], R[1][1], R[2][1]], color: '#1a2230' },                     // Back
-          { indices: [3, 0, 4, 7], norm: [-R[0][0], -R[1][0], -R[2][0]], color: '#151b26' }                    // Left
+        const rawFaces = [
+          { indices: [0, 1, 2, 3], norm: [R[0][2], R[1][2], R[2][2]], color: isP1 ? '#b59218' : '#00a3cc' },
+          { indices: [4, 5, 6, 7], norm: [-R[0][2], -R[1][2], -R[2][2]], color: '#10151f' },
+          { indices: [0, 1, 5, 4], norm: [-R[0][1], -R[1][1], -R[2][1]], color: '#1a2230' },
+          { indices: [1, 2, 6, 5], norm: [R[0][0], R[1][0], R[2][0]], color: '#151b26' },
+          { indices: [2, 3, 7, 6], norm: [R[0][1], R[1][1], R[2][1]], color: '#1a2230' },
+          { indices: [3, 0, 4, 7], norm: [-R[0][0], -R[1][0], -R[2][0]], color: '#151b26' }
         ];
 
-        // Backface Culling & Normal Lighting
-        for (const face of faces) {
-          if (face.norm[2] < 0) continue; // Face pointing away from camera
+        // Depth Sorting (Centroid Z) & Backface Culling
+        const visibleFaces = [];
+        for (const face of rawFaces) {
+          if (face.norm[2] < 0) continue; // Backface culling
+          let zSum = 0;
+          for (const idx of face.indices) zSum += projVerts[idx][2];
+          face.depthZ = zSum / face.indices.length;
+          visibleFaces.push(face);
+        }
+        visibleFaces.sort((a, b) => b.depthZ - a.depthZ); // Painter's Algorithm
+
+        for (const face of visibleFaces) {
           cx.beginPath();
           cx.moveTo(projVerts[face.indices[0]][0], projVerts[face.indices[0]][1]);
           for (let i = 1; i < face.indices.length; i++) {
@@ -1514,7 +1616,7 @@
           cx.strokeStyle = isP1 ? '#ffd700' : '#00e5ff'; cx.lineWidth = 1; cx.stroke();
         }
 
-        // 3D SURFACE-NORMAL FORCE VECTOR ARROW (Anchor mathematically bound to plate top)
+        // 3D Surface-Normal Force Vector Arrow
         if (Math.abs(forceVal) > 0.5) {
           const arrowLen = Math.min(85, Math.abs(forceVal) * 1.4);
           const base3D = projectPoint3D(R, 0, 0, -pth, cx_pt, cy_pt);
@@ -1527,25 +1629,24 @@
           cx.lineTo(tip3D[0], tip3D[1]);
           cx.stroke();
 
-          // True 3D Arrowhead
           cx.fillStyle = isP1 ? '#ffd700' : '#00e5ff';
           cx.beginPath();
           cx.arc(tip3D[0], tip3D[1], 4.5, 0, Math.PI * 2);
           cx.fill();
         }
 
-        // Labels
         cx.font = '10px monospace';
         cx.fillStyle = isP1 ? '#ffd700' : '#00e5ff';
         cx.fillText(isP1 ? "PLATE 1 (PORT)" : "PLATE 2 (STARBOARD)", cx_pt - 45, cy_pt - 65);
         cx.fillStyle = '#889bb4';
         cx.fillText(`P:${((imu.pitch * 180)/Math.PI).toFixed(0)}° R:${((imu.roll * 180)/Math.PI).toFixed(0)}°`, cx_pt - 30, cy_pt + 70);
         cx.fillStyle = isP1 ? '#ffd700' : '#00e5ff';
-        cx.fillText(`${forceVal.toFixed(1)} kg`, cx_pt - 18, cy_pt + 84);
+        cx.fillText(`${(forceVal >= 0 ? '+' : '') + forceVal.toFixed(1)} kg`, cx_pt - 22, cy_pt + 84);
       }
 
-      const p1F = chartRing.get(chartRing.length - 1)?.w1 || 0;
-      const p2F = chartRing.get(chartRing.length - 1)?.w2 || 0;
+      const latest = chartRing.get(chartRing.length - 1);
+      const p1F = latest ? latest.w1 : 0;
+      const p2F = latest ? latest.w2 : 0;
 
       renderSingleMechanicalPlate(imuP1, p1F, w * 0.25, h / 2, true);
       renderSingleMechanicalPlate(imuP2, p2F, w * 0.75, h / 2, false);
@@ -1582,12 +1683,12 @@
     }
 
     // ==========================================================================
-    // 7. LIVE FLOW STRIP CHART (INDEPENDENT DUAL Y-AXES: NO CEILING CLIPPING)
+    // 7. LIVE FLOW STRIP CHART (INDEPENDENT DUAL Y-AXES & IDLE STATE)
     // ==========================================================================
     const liveFlowCanvas = document.getElementById('liveFlowCanvas');
     const liveFlowCtx = liveFlowCanvas.getContext('2d');
 
-    let flowCanvasW = 600, flowCanvasH = 195;
+    let flowCanvasW = 600, flowCanvasH = 205;
     new ResizeObserver(entries => {
       for (const entry of entries) {
         flowCanvasW = entry.contentRect.width;
@@ -1606,49 +1707,75 @@
       }
       cx.save(); cx.scale(dpr, dpr); cx.clearRect(0, 0, w, h);
 
-      if (chartRing.length < 2) { cx.restore(); return; }
-
       const gutterL = 48, gutterR = 50, padTop = 26, padBottom = 20;
       const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
-      const slice = chartRing.sliceTail(160);
 
-      // 1. Force Bounds (Left Axis: kg)
-      let maxF = 40;
-      for (const pt of slice) {
-        if (pt.w1 > maxF) maxF = pt.w1;
-        if (pt.w2 > maxF) maxF = pt.w2;
+      // Handle Idle Canvas State Gracefully (Draw Guides Even When Empty)
+      if (chartRing.length < 2) {
+        cx.strokeStyle = '#161b24'; cx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+          const y = padTop + (i / 4) * plotH;
+          cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+        }
+        cx.fillStyle = '#445566'; cx.font = '11px monospace'; cx.textAlign = 'center';
+        cx.fillText("Awaiting Live Telemetry or Loaded File...", gutterL + plotW / 2, padTop + plotH / 2);
+        cx.restore();
+        return;
       }
-      maxF *= 1.15;
 
-      // 2. Surge Bounds (Right Axis: m/s²) - Pinned Symmetric Zero Centerline
+      const slice = chartRing.sliceTail(180);
+
+      // 1. Force Bounds (Bipolar Left Axis: kg)
+      let minF = -5, maxF = 40;
+      for (const pt of slice) {
+        if (pt.w1 < minF) minF = pt.w1; if (pt.w1 > maxF) maxF = pt.w1;
+        if (pt.w2 < minF) minF = pt.w2; if (pt.w2 > maxF) maxF = pt.w2;
+      }
+      minF -= Math.max(3, (maxF - minF) * 0.1);
+      maxF += Math.max(5, (maxF - minF) * 0.15);
+
+      // 2. Surge Bounds (Symmetric Right Axis: m/s²)
       let maxS = 3.0;
       for (const pt of slice) {
         if (Math.abs(pt.surge) > maxS) maxS = Math.abs(pt.surge);
       }
-      maxS *= 1.20;
+      maxS *= 1.25;
       const minS = -maxS;
 
-      // Draw Grid & Labels
+      // Grid Lines & Labels
       cx.strokeStyle = '#121722'; cx.lineWidth = 1;
-      for (let i = 0; i <= 3; i++) {
-        const y = padTop + plotH - (i / 3) * plotH;
+      for (let i = 0; i <= 4; i++) {
+        const y = padTop + plotH - (i / 4) * plotH;
         cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
 
+        const fVal = minF + (i / 4) * (maxF - minF);
         cx.fillStyle = '#667788'; cx.font = '9px monospace'; cx.textAlign = 'right';
-        cx.fillText(((i / 3) * maxF).toFixed(0), gutterL - 5, y + 3);
+        cx.fillText((fVal >= 0 ? '+' : '') + fVal.toFixed(0), gutterL - 5, y + 3);
 
-        cx.fillStyle = '#00ff88'; cx.textAlign = 'left';
-        const sVal = minS + (i / 3) * (maxS - minS);
-        cx.fillText((sVal >= 0 ? '+' : '') + sVal.toFixed(1), gutterL + plotW + 6, y + 3);
+        if (showLiveSurgeLine) {
+          const sVal = minS + (i / 4) * (maxS - minS);
+          cx.fillStyle = '#00ff88'; cx.textAlign = 'left';
+          cx.fillText((sVal >= 0 ? '+' : '') + sVal.toFixed(1), gutterL + plotW + 6, y + 3);
+        }
       }
 
-      // Explicit Zero Line for Surge
-      const zeroY = padTop + plotH / 2;
-      cx.strokeStyle = '#1c2820'; cx.lineWidth = 1.2; cx.setLineDash([3, 3]);
-      cx.beginPath(); cx.moveTo(gutterL, zeroY); cx.lineTo(gutterL + plotW, zeroY); cx.stroke();
-      cx.setLineDash([]);
+      // Zero Baseline for Force
+      const zeroForceNorm = (0.0 - minF) / (maxF - minF);
+      const zeroForceY = padTop + plotH - zeroForceNorm * plotH;
+      if (zeroForceY >= padTop && zeroForceY <= padTop + plotH) {
+        cx.strokeStyle = '#263345'; cx.lineWidth = 1.2;
+        cx.beginPath(); cx.moveTo(gutterL, zeroForceY); cx.lineTo(gutterL + plotW, zeroForceY); cx.stroke();
+      }
 
-      // Scoped Plot Area Clip
+      // Zero Centerline for Surge
+      if (showLiveSurgeLine) {
+        const zeroSurgeY = padTop + plotH / 2;
+        cx.strokeStyle = '#1b3322'; cx.lineWidth = 1.2; cx.setLineDash([3, 3]);
+        cx.beginPath(); cx.moveTo(gutterL, zeroSurgeY); cx.lineTo(gutterL + plotW, zeroSurgeY); cx.stroke();
+        cx.setLineDash([]);
+      }
+
+      // Clip plot area
       cx.save();
       cx.beginPath(); cx.rect(gutterL, padTop, plotW, plotH); cx.clip();
 
@@ -1656,7 +1783,7 @@
       cx.strokeStyle = '#00ffcc'; cx.lineWidth = 2.0; cx.beginPath();
       for (let i = 0; i < slice.length; i++) {
         const x = gutterL + (i / (slice.length - 1)) * plotW;
-        const y = padTop + plotH - Math.max(0, slice[i].w1 / maxF) * plotH;
+        const y = padTop + plotH - ((slice[i].w1 - minF) / (maxF - minF)) * plotH;
         if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
       }
       cx.stroke();
@@ -1665,22 +1792,23 @@
       cx.strokeStyle = '#ff55aa'; cx.lineWidth = 2.0; cx.beginPath();
       for (let i = 0; i < slice.length; i++) {
         const x = gutterL + (i / (slice.length - 1)) * plotW;
-        const y = padTop + plotH - Math.max(0, slice[i].w2 / maxF) * plotH;
+        const y = padTop + plotH - ((slice[i].w2 - minF) / (maxF - minF)) * plotH;
         if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
       }
       cx.stroke();
 
-      // Clean Bow Surge (Continuous Physical Wave - NEVER CLIPPED)
-      cx.strokeStyle = '#00ff88'; cx.lineWidth = 2.2; cx.beginPath();
-      for (let i = 0; i < slice.length; i++) {
-        const x = gutterL + (i / (slice.length - 1)) * plotW;
-        const normS = (slice[i].surge - minS) / (maxS - minS);
-        const y = padTop + plotH - normS * plotH;
-        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      // Clean Bow Surge (Green Wave - Never Clipped)
+      if (showLiveSurgeLine) {
+        cx.strokeStyle = '#00ff88'; cx.lineWidth = 2.2; cx.beginPath();
+        for (let i = 0; i < slice.length; i++) {
+          const x = gutterL + (i / (slice.length - 1)) * plotW;
+          const y = padTop + plotH - ((slice[i].surge - minS) / (maxS - minS)) * plotH;
+          if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+        }
+        cx.stroke();
       }
-      cx.stroke();
 
-      cx.restore(); // Restore clip
+      cx.restore();
       cx.restore();
     }
 
@@ -1700,17 +1828,26 @@
       const gutterL = 40, gutterR = 25, padTop = 26, padBottom = 20;
       const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
 
-      let maxF = 40;
-      const checkM = (arr) => arr.forEach(v => { if (v > maxF) maxF = v; });
+      let minF = -5, maxF = 40;
+      const checkM = (arr) => arr.forEach(v => { if (v < minF) minF = v; if (v > maxF) maxF = v; });
       checkM(currentStroke); checkM(ghostStroke); checkM(primaryAvg); checkM(secondaryAvg);
-      maxF *= 1.15;
+      minF -= Math.max(3, (maxF - minF) * 0.1);
+      maxF += Math.max(5, (maxF - minF) * 0.15);
 
       cx.strokeStyle = '#121722'; cx.lineWidth = 1;
       for (let i = 0; i <= 3; i++) {
         const y = padTop + plotH - (i / 3) * plotH;
         cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+        const fVal = minF + (i / 3) * (maxF - minF);
         cx.fillStyle = '#667788'; cx.font = '9px monospace'; cx.textAlign = 'right';
-        cx.fillText(((i / 3) * maxF).toFixed(0), gutterL - 5, y + 3);
+        cx.fillText((fVal >= 0 ? '+' : '') + fVal.toFixed(0), gutterL - 5, y + 3);
+      }
+
+      // Zero Force Line
+      const zeroY = padTop + plotH - ((0.0 - minF) / (maxF - minF)) * plotH;
+      if (zeroY >= padTop && zeroY <= padTop + plotH) {
+        cx.strokeStyle = '#263345'; cx.lineWidth = 1;
+        cx.beginPath(); cx.moveTo(gutterL, zeroY); cx.lineTo(gutterL + plotW, zeroY); cx.stroke();
       }
 
       cx.save();
@@ -1721,31 +1858,31 @@
         cx.strokeStyle = 'rgba(130, 145, 170, 0.40)'; cx.lineWidth = 2.0; cx.beginPath();
         for (let i = 0; i < ghostStroke.length; i++) {
           const x = gutterL + (i / (ghostStroke.length - 1)) * plotW;
-          const y = padTop + plotH - (ghostStroke[i] / maxF) * plotH;
+          const y = padTop + plotH - ((ghostStroke[i] - minF) / (maxF - minF)) * plotH;
           if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
         }
         cx.stroke();
       }
 
-      // Plate 1 Moving Average (Gold)
+      // Plate 1 Resampled Moving Average (Gold)
       if (runningAverageStrokeP1.length > 2) {
         cx.strokeStyle = isPlate1 ? '#ffd700' : 'rgba(255, 215, 0, 0.45)';
         cx.lineWidth = isPlate1 ? 3.0 : 1.5; cx.beginPath();
         for (let i = 0; i < runningAverageStrokeP1.length; i++) {
           const x = gutterL + (i / (runningAverageStrokeP1.length - 1)) * plotW;
-          const y = padTop + plotH - (runningAverageStrokeP1[i] / maxF) * plotH;
+          const y = padTop + plotH - ((runningAverageStrokeP1[i] - minF) / (maxF - minF)) * plotH;
           if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
         }
         cx.stroke();
       }
 
-      // Plate 2 Moving Average (Cyan)
+      // Plate 2 Resampled Moving Average (Cyan)
       if (runningAverageStrokeP2.length > 2) {
         cx.strokeStyle = !isPlate1 ? '#00e5ff' : 'rgba(0, 229, 255, 0.45)';
         cx.lineWidth = !isPlate1 ? 3.0 : 1.5; cx.beginPath();
         for (let i = 0; i < runningAverageStrokeP2.length; i++) {
           const x = gutterL + (i / (runningAverageStrokeP2.length - 1)) * plotW;
-          const y = padTop + plotH - (runningAverageStrokeP2[i] / maxF) * plotH;
+          const y = padTop + plotH - ((runningAverageStrokeP2[i] - minF) / (maxF - minF)) * plotH;
           if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
         }
         cx.stroke();
@@ -1756,7 +1893,7 @@
         cx.strokeStyle = '#ffffff'; cx.lineWidth = 2.2; cx.beginPath();
         for (let i = 0; i < currentStroke.length; i++) {
           const x = gutterL + (i / Math.max(currentStroke.length - 1, 30)) * plotW;
-          const y = padTop + plotH - (currentStroke[i] / maxF) * plotH;
+          const y = padTop + plotH - ((currentStroke[i] - minF) / (maxF - minF)) * plotH;
           if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
         }
         cx.stroke();
@@ -1787,8 +1924,8 @@
       document.getElementById('stSPM').innerText = document.getElementById('avgSPM').innerText;
       document.getElementById('stSplit').innerText = document.getElementById('avgSplit').innerText;
 
-      const s1 = runningAverageStrokeP1.reduce((a,b)=>a+b, 0);
-      const s2 = runningAverageStrokeP2.reduce((a,b)=>a+b, 0);
+      const s1 = runningAverageStrokeP1.reduce((a,b)=>a+Math.abs(b), 0);
+      const s2 = runningAverageStrokeP2.reduce((a,b)=>a+Math.abs(b), 0);
       const tot = s1 + s2 || 1;
       const b1 = Math.round((s1 / tot) * 100);
       document.getElementById('stBalance').innerText = `${b1} / ${100 - b1}`;
@@ -1806,7 +1943,7 @@
           recallMap.fitBounds(L.latLngBounds(pts), { padding: [20,20] });
         }
         renderRecallOverview();
-      }, 150);
+      }, 120);
     }
 
     function closeBasicRecallModal() {
@@ -1885,13 +2022,8 @@
     }
 
     // ==========================================================================
-    // 10. ADVANCED ANALYSIS SUITE & 4-CHART ENGINE
+    // 10. ADVANCED ANALYSIS SUITE & NON-DESTRUCTIVE FLATLINE EDITOR
     // ==========================================================================
-    function toggleLoadInversion() {
-      invertLoad = !invertLoad;
-      redrawInteractiveChart();
-    }
-
     function toggleFlatlineMode() {
       isFlatlineSelecting = !isFlatlineSelecting;
       document.getElementById('btnFlatline').classList.toggle('active', isFlatlineSelecting);
@@ -1903,24 +2035,47 @@
       idx2 = Math.min(chartRing.length - 1, idx2);
       if (idx2 - idx1 < 1) return;
 
+      const sliceBackup = [];
+      for (let i = idx1; i <= idx2; i++) {
+        const pt = chartRing.get(i);
+        sliceBackup.push({ idx: i, raw_w1: pt.raw_w1, raw_w2: pt.raw_w2, surge: pt.surge });
+      }
+      flatlinesBackup.push(sliceBackup);
+
       const pA = chartRing.get(idx1);
       const pB = chartRing.get(idx2);
       const count = idx2 - idx1;
 
       for (let i = idx1; i <= idx2; i++) {
         const pt = chartRing.get(i);
-        const alpha = (i - idx1) / count;
-        pt.raw_w = pA.raw_w + alpha * (pB.raw_w - pA.raw_w);
-        pt.surge = pA.surge + alpha * (pB.surge - pA.surge);
+        const a = (i - idx1) / count;
+        pt.raw_w1 = pA.raw_w1 + a * (pB.raw_w1 - pA.raw_w1);
+        pt.raw_w2 = pA.raw_w2 + a * (pB.raw_w2 - pA.raw_w2);
+        pt.surge  = pA.surge  + a * (pB.surge  - pA.surge);
+        pt.w1 = forceDisplayMode === "RAW" ? pt.raw_w1 : pt.net_w1;
+        pt.w2 = forceDisplayMode === "RAW" ? pt.raw_w2 : pt.net_w2;
       }
 
       isFlatlineSelecting = false;
       document.getElementById('btnFlatline').classList.remove('active');
-      redrawInteractiveChart();
+      redrawAllActiveVisualizers();
     }
 
     function resetFlatlines() {
-      redrawInteractiveChart();
+      while (flatlinesBackup.length > 0) {
+        const slice = flatlinesBackup.pop();
+        for (const item of slice) {
+          const pt = chartRing.get(item.idx);
+          if (pt) {
+            pt.raw_w1 = item.raw_w1;
+            pt.raw_w2 = item.raw_w2;
+            pt.surge  = item.surge;
+            pt.w1 = forceDisplayMode === "RAW" ? pt.raw_w1 : pt.net_w1;
+            pt.w2 = forceDisplayMode === "RAW" ? pt.raw_w2 : pt.net_w2;
+          }
+        }
+      }
+      redrawAllActiveVisualizers();
     }
 
     // 2.5D Plate Renderer (Original)
@@ -1936,8 +2091,9 @@
       }
       cx.save(); cx.scale(dpr, dpr); cx.fillStyle = '#101010'; cx.fillRect(0, 0, w, h);
 
-      const curP = chartRing.get(chartRing.length - 1)?.pitch_deg || 0;
-      const curR = chartRing.get(chartRing.length - 1)?.roll_deg || 0;
+      const latest = chartRing.get(chartRing.length - 1);
+      const curP = latest ? latest.pitch_deg : 0;
+      const curR = latest ? latest.roll_deg : 0;
       const pitch = (curP * Math.PI) / 180.0;
       const roll  = (curR * Math.PI) / 180.0;
 
@@ -1991,12 +2147,12 @@
       if (pts.length > 0) map.fitBounds(L.latLngBounds(pts), { padding: [25, 25] });
     }
 
-    // Interactive Telemetry Chart
+    // Interactive Telemetry Chart (Plate 1 & Plate 2 Integrated)
     const chartCanvas = document.getElementById('interactiveCanvas');
     const chartCtx = chartCanvas.getContext('2d');
     const chartTooltip = document.getElementById('chartTooltip');
 
-    let seriesVisible = { load: true, surge: true, ax: true, ay: true, az: true, gx: true, gy: true, gz: true, gpsSpd: true };
+    let seriesVisible = { w1: true, w2: true, surge: true, ax: true, ay: true, az: true, gx: true, gy: true, gz: true, gpsSpd: true };
     let viewStart = 0.0, viewEnd = 1.0;
     let isAutoFollow = true;
     let chartHoverIndex = null;
@@ -2004,7 +2160,9 @@
 
     function toggleSeries(key) {
       seriesVisible[key] = !seriesVisible[key];
-      document.getElementById(`leg_${key}`).classList.toggle('off', !seriesVisible[key]);
+      const pillMap = { w1: 'leg_load1', w2: 'leg_load2', surge: 'leg_surge', ax: 'leg_ax', ay: 'leg_ay', az: 'leg_az', gx: 'leg_gx', gy: 'leg_gy', gz: 'leg_gz', gpsSpd: 'leg_gpsSpd' };
+      const el = document.getElementById(pillMap[key]);
+      if (el) el.classList.toggle('off', !seriesVisible[key]);
       redrawInteractiveChart();
     }
 
@@ -2095,12 +2253,13 @@
       const d = chartRing.get(idx);
       if (!d) return;
       chartTooltip.style.display = 'block';
-      chartTooltip.style.left = `${Math.min(w - 240, Math.max(10, mouseX + 15))}px`;
-      chartTooltip.style.top = `${Math.min(h - 150, Math.max(30, mouseY - 50))}px`;
+      chartTooltip.style.left = `${Math.min(w - 250, Math.max(10, mouseX + 15))}px`;
+      chartTooltip.style.top = `${Math.min(h - 160, Math.max(30, mouseY - 50))}px`;
       chartTooltip.innerHTML = `
         <div style="color:#88aacc; font-weight:bold;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
-        <div style="color:#00ffcc;">FORCE: ${d.raw_w.toFixed(1)}</div>
-        <div style="color:#00ff88; font-weight:bold;">SURGE: ${d.surge.toFixed(2)} m/s²</div>
+        <div style="color:#00ffcc;">P1 FORCE: ${(d.w1 >= 0 ? '+' : '') + d.w1.toFixed(1)} kg</div>
+        <div style="color:#ff55aa;">P2 FORCE: ${(d.w2 >= 0 ? '+' : '') + d.w2.toFixed(1)} kg</div>
+        <div style="color:#00ff88; font-weight:bold;">BOW SURGE: ${(d.surge >= 0 ? '+' : '') + d.surge.toFixed(2)} m/s²</div>
         <div style="color:#ff4444;">Ax: ${d.ax.toFixed(2)} | Ay: ${d.ay.toFixed(2)} | Az: ${d.az.toFixed(2)}</div>
         <div style="color:#ffff00;">GPS SPD: ${d.spd.toFixed(1)} km/h</div>
       `;
@@ -2121,7 +2280,17 @@
       const gutterL = 60, gutterR = 55, padTop = 32, padBottom = 22;
       const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
 
-      if (chartRing.length < 2) { cx.restore(); return; }
+      if (chartRing.length < 2) {
+        cx.strokeStyle = '#161b24'; cx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+          const y = padTop + (i / 4) * plotH;
+          cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+        }
+        cx.fillStyle = '#445566'; cx.font = '11px monospace'; cx.textAlign = 'center';
+        cx.fillText("Awaiting Data or Replay Scrub...", gutterL + plotW / 2, padTop + plotH / 2);
+        cx.restore();
+        return;
+      }
 
       if (isAutoFollow && !isReplayMode) {
         const windowSpan = 150;
@@ -2134,23 +2303,19 @@
       const eIdx = Math.min(chartRing.length - 1, Math.ceil(viewEnd * (chartRing.length - 1)));
       const slice = chartRing.slice(sIdx, eIdx + 1);
 
-      let fMin = Infinity, fMax = -Infinity;
-      let mMin = Infinity, mMax = -Infinity;
+      let fMin = -5, fMax = 40;
+      let mMin = -10, mMax = 10;
 
       for (let i = 0; i < slice.length; i++) {
         const p = slice[i];
-        if (seriesVisible.load) {
-          if (p.raw_w < fMin) fMin = p.raw_w;
-          if (p.raw_w > fMax) fMax = p.raw_w;
-        }
+        if (seriesVisible.w1) { if (p.w1 < fMin) fMin = p.w1; if (p.w1 > fMax) fMax = p.w1; }
+        if (seriesVisible.w2) { if (p.w2 < fMin) fMin = p.w2; if (p.w2 > fMax) fMax = p.w2; }
         const chk = (v, en) => { if (en && !isNaN(v)) { if (v < mMin) mMin = v; if (v > mMax) mMax = v; }};
         chk(p.surge, seriesVisible.surge); chk(p.ax, seriesVisible.ax); chk(p.ay, seriesVisible.ay);
         chk(p.az, seriesVisible.az); chk(p.gx, seriesVisible.gx); chk(p.gy, seriesVisible.gy);
         chk(p.gz, seriesVisible.gz); chk(p.spd, seriesVisible.gpsSpd);
       }
 
-      if (!isFinite(fMin) || !isFinite(fMax)) { fMin = -100; fMax = 100; }
-      if (!isFinite(mMin) || !isFinite(mMax)) { mMin = -12; mMax = 12; }
       fMin -= Math.max(2, (fMax - fMin) * 0.1); fMax += Math.max(2, (fMax - fMin) * 0.1);
       mMin -= Math.max(1, (mMax - mMin) * 0.15); mMax += Math.max(1, (mMax - mMin) * 0.15);
 
@@ -2158,31 +2323,45 @@
       for (let i = 0; i <= 4; i++) {
         const y = padTop + plotH - (i / 4) * plotH;
         cx.strokeStyle = "#161b24"; cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-        cx.fillStyle = "#00ffcc"; cx.textAlign = "right"; cx.fillText((fMin + (i / 4) * (fMax - fMin)).toFixed(0), gutterL - 6, y + 3);
-        cx.fillStyle = "#8899aa"; cx.textAlign = "left"; cx.fillText((mMin + (i / 4) * (mMax - mMin)).toFixed(1), gutterL + plotW + 6, y + 3);
+        const fVal = fMin + (i / 4) * (fMax - fMin);
+        cx.fillStyle = "#00ffcc"; cx.textAlign = "right"; cx.fillText((fVal >= 0 ? '+' : '') + fVal.toFixed(0), gutterL - 6, y + 3);
+
+        const mVal = mMin + (i / 4) * (mMax - mMin);
+        cx.fillStyle = "#8899aa"; cx.textAlign = "left"; cx.fillText((mVal >= 0 ? '+' : '') + mVal.toFixed(1), gutterL + plotW + 6, y + 3);
       }
 
-      function drawSeriesLine(key, color, minV, maxV, isRaw = false, lw = 1.4) {
+      // Zero Baseline for Force
+      const zeroFY = padTop + plotH - ((0.0 - fMin) / (fMax - fMin)) * plotH;
+      if (zeroFY >= padTop && zeroFY <= padTop + plotH) {
+        cx.strokeStyle = "#253447"; cx.lineWidth = 1.2;
+        cx.beginPath(); cx.moveTo(gutterL, zeroFY); cx.lineTo(gutterL + plotW, zeroFY); cx.stroke();
+      }
+
+      cx.save();
+      cx.beginPath(); cx.rect(gutterL, padTop, plotW, plotH); cx.clip();
+
+      function drawSeriesLine(key, color, minV, maxV, lw = 1.4) {
         if (!seriesVisible[key]) return;
         cx.strokeStyle = color; cx.lineWidth = lw; cx.beginPath();
         for (let i = 0; i < slice.length; i++) {
-          const val = isRaw ? slice[i].raw_w : slice[i][key];
+          const val = slice[i][key];
           const x = gutterL + (i / (slice.length - 1)) * plotW;
-          const y = padTop + plotH - Math.max(0, Math.min(1, (val - minV) / (maxV - minV))) * plotH;
+          const y = padTop + plotH - ((val - minV) / (maxV - minV)) * plotH;
           if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
         }
         cx.stroke();
       }
 
-      drawSeriesLine('load', '#00ffcc', fMin, fMax, true, 2.0);
-      drawSeriesLine('surge', '#00ff88', mMin, mMax, false, 2.2);
+      drawSeriesLine('w1', '#00ffcc', fMin, fMax, 2.0);
+      drawSeriesLine('w2', '#ff55aa', fMin, fMax, 2.0);
+      drawSeriesLine('surge', '#00ff88', mMin, mMax, 2.2);
       drawSeriesLine('ax', '#ff4444', mMin, mMax);
       drawSeriesLine('ay', '#22cc88', mMin, mMax);
       drawSeriesLine('az', '#3399ff', mMin, mMax);
       drawSeriesLine('gx', '#ffaa00', mMin, mMax);
       drawSeriesLine('gy', '#d044ff', mMin, mMax);
       drawSeriesLine('gz', '#ffea00', mMin, mMax);
-      drawSeriesLine('gpsSpd', '#ffff00', mMin, mMax, false, 1.8);
+      drawSeriesLine('gpsSpd', '#ffff00', mMin, mMax, 1.8);
 
       if (isReplayMode && replayMarkerIndex !== null && replayMarkerIndex >= sIdx && replayMarkerIndex <= eIdx) {
         const rx = gutterL + ((replayMarkerIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
@@ -2190,15 +2369,17 @@
       }
 
       cx.restore();
+      cx.restore();
     }
 
     // ==========================================================================
-    // 11. TIMED REPLAY ENGINE & FILE LOADER
+    // 11. REPLAY ENGINE & UNIVERSAL FILE LOADER
     // ==========================================================================
     let isReplayMode = false, replayData = [], replayIndex = 0;
     let isReplayPlaying = false, replaySpeed = 1.0, replayStartPerf = 0, replayStartDataMs = 0, replayAnimId = null;
 
     function handleFileSelected(e) {
+      unlockAudioContext();
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
@@ -2212,7 +2393,7 @@
       const rows = lines.filter(l => l.trim().includes(',') && !isNaN(parseFloat(l.split(',')[0])));
       if (rows.length === 0) { alert("Could not extract valid telemetry rows."); return; }
 
-      replayData = []; chartRing.clear(); flatlines = []; track.setLatLngs([]);
+      replayData = []; chartRing.clear(); flatlinesBackup = []; track.setLatLngs([]);
       const gpsCoords = [];
       for (const r of rows) {
         queueRowForStorage(r);
@@ -2224,7 +2405,7 @@
       }
       if (gpsCoords.length > 0) {
         track.setLatLngs(gpsCoords); marker.setLatLng(gpsCoords[0]);
-        setTimeout(() => { map.fitBounds(L.latLngBounds(gpsCoords), { padding: [30,30] }); }, 150);
+        setTimeout(() => { map.fitBounds(L.latLngBounds(gpsCoords), { padding: [30,30] }); }, 120);
       }
       enterReplayMode();
     }
@@ -2241,7 +2422,8 @@
       pauseReplay(); isReplayMode = false;
       document.getElementById('replayBar').style.display = "none";
       isAutoFollow = true; document.getElementById('btnFollow').classList.add('active');
-      replayMarkerIndex = null; redrawInteractiveChart();
+      replayMarkerIndex = null;
+      redrawAllActiveVisualizers();
     }
 
     function changeReplaySpeed(val) {
@@ -2297,8 +2479,18 @@
       if (resetClock && isReplayPlaying) {
         replayStartPerf = performance.now(); replayStartDataMs = pt.ms;
       }
-      redrawInteractiveChart();
+
+      // Synchronously Pipe Scrubbed Frames to ALL Visualizers
+      redrawAllActiveVisualizers();
+    }
+
+    function redrawAllActiveVisualizers() {
+      renderDualPlates3DCanvas();
+      renderLiveFlowChart();
+      renderIndividualStrokeCanvas(cnP1, currentStrokeP1, ghostLastStrokeP1, runningAverageStrokeP1, runningAverageStrokeP2, true);
+      renderIndividualStrokeCanvas(cnP2, currentStrokeP2, ghostLastStrokeP2, runningAverageStrokeP2, runningAverageStrokeP1, false);
       renderPlateCanvas();
+      redrawInteractiveChart();
     }
 
     // ==========================================================================
@@ -2341,7 +2533,7 @@
       const rawSubset = chartRing.slice(sIdx, eIdx + 1);
       if (rawSubset.length < 20) return;
 
-      const fArr = rawSubset.map(d => d.raw_w);
+      const fArr = rawSubset.map(d => d.w1);
       const sorted = [...fArr].sort((a,b) => a - b);
       const baseline = sorted[Math.floor(sorted.length * 0.25)];
 
@@ -2387,13 +2579,13 @@
           catchIdx: sIdx + cRel, finishIdx: sIdx + fRel,
           tTotal, tDrive, tRecov: Math.max(0.1, tTotal - tDrive),
           rhythmRatio: tDrive > 0 ? ((tTotal - tDrive) / tDrive) : 1.8,
-          peakF: Math.max(...stPts.map(d => d.raw_w - baseline)),
+          peakF: Math.max(...stPts.map(d => d.w1 - baseline)),
           spm: tTotal > 0 ? (60.0 / tTotal) : 0,
           avgSpd: stPts.reduce((a,b)=>a+(b.spd||0),0) / stPts.length,
           distTotal: (stPts.reduce((a,b)=>a+(b.spd||0),0) / stPts.length / 3.6) * tTotal,
           peakSurge: Math.max(...stPts.map(d => d.surge)),
           times: stPts.map(d => (d.ms / 1000.0) - t0),
-          forceVals: stPts.map(d => d.raw_w - baseline),
+          forceVals: stPts.map(d => d.w1 - baseline),
           surgeVals: stPts.map(d => d.surge)
         });
       }
@@ -2462,7 +2654,6 @@
       const gutterL = 40, gutterR = 30, padTop = 24, padBottom = 20;
       const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
 
-      // Resample to 100 points for statistical mean & variance envelope
       const N_PTS = 100;
       const gridMeans = new Float32Array(N_PTS);
       const gridVars  = new Float32Array(N_PTS);
@@ -2474,8 +2665,8 @@
           const tTarget = frac * st.tTotal;
           for (let k = 0; k < st.times.length - 1; k++) {
             if (tTarget >= st.times[k] && tTarget <= st.times[k+1]) {
-              const alpha = (tTarget - st.times[k]) / (st.times[k+1] - st.times[k] || 1);
-              sum += st.forceVals[k] + alpha * (st.forceVals[k+1] - st.forceVals[k]);
+              const a = (tTarget - st.times[k]) / (st.times[k+1] - st.times[k] || 1);
+              sum += st.forceVals[k] + a * (st.forceVals[k+1] - st.forceVals[k]);
               count++;
               break;
             }
@@ -2491,8 +2682,8 @@
           const tTarget = frac * st.tTotal;
           for (let k = 0; k < st.times.length - 1; k++) {
             if (tTarget >= st.times[k] && tTarget <= st.times[k+1]) {
-              const alpha = (tTarget - st.times[k]) / (st.times[k+1] - st.times[k] || 1);
-              const val = st.forceVals[k] + alpha * (st.forceVals[k+1] - st.forceVals[k]);
+              const a = (tTarget - st.times[k]) / (st.times[k+1] - st.times[k] || 1);
+              const val = st.forceVals[k] + a * (st.forceVals[k+1] - st.forceVals[k]);
               sumSq += Math.pow(val - gridMeans[step], 2);
               count++;
               break;
@@ -2502,7 +2693,7 @@
         gridVars[step] = count > 1 ? Math.sqrt(sumSq / (count - 1)) : 0;
       }
 
-      // Draw +-1 Sigma Confidence Envelope
+      // Shaded +-1 Sigma Variance Band
       cx.fillStyle = 'rgba(0, 255, 204, 0.12)';
       cx.beginPath();
       for (let i = 0; i < N_PTS; i++) {
@@ -2517,7 +2708,7 @@
       }
       cx.closePath(); cx.fill();
 
-      // Draw Individual Stroke Lines
+      // All Strokes
       for (const st of active) {
         cx.strokeStyle = selectedStrokeId === st.id ? '#ff0055' : 'rgba(0, 229, 255, 0.22)';
         cx.lineWidth = selectedStrokeId === st.id ? 2.5 : 1.0; cx.beginPath();
@@ -2529,7 +2720,7 @@
         cx.stroke();
       }
 
-      // Draw Bold Ensemble Mean Curve
+      // Bold Ensemble Mean
       cx.strokeStyle = '#ffd700'; cx.lineWidth = 3.0; cx.beginPath();
       for (let i = 0; i < N_PTS; i++) {
         const x = gutterL + (i / (N_PTS - 1)) * plotW;
@@ -2590,7 +2781,7 @@
       cx.strokeStyle = '#00e5ff'; cx.lineWidth = 1.8; cx.beginPath();
       for (let i = 0; i < slice.length; i++) {
         const x = gutterL + (i / (slice.length - 1)) * plotW;
-        const y = padTop + plotH - (slice[i].raw_w / 150) * plotH;
+        const y = padTop + plotH - (slice[i].w1 / 150) * plotH;
         if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
       }
       cx.stroke();
@@ -2657,13 +2848,12 @@
     }
 
     // ==========================================================================
-    // 13. MASTER REQUESTANIMATIONFRAME LOOP (VISIBILITY GATED)
+    // 13. MASTER ANIMATION LOOP
     // ==========================================================================
     const cnP1 = document.getElementById('strokeCanvasP1');
     const cnP2 = document.getElementById('strokeCanvasP2');
 
     function masterRenderLoop() {
-      // Gate rendering behind visibility to eliminate background layout thrashing
       if (document.getElementById('liveHomepageView').classList.contains('active')) {
         renderDualPlates3DCanvas();
         renderLiveFlowChart();
@@ -2673,7 +2863,6 @@
         renderPlateCanvas();
         if (isAutoFollow && !isReplayMode) redrawInteractiveChart();
       }
-
       requestAnimationFrame(masterRenderLoop);
     }
     requestAnimationFrame(masterRenderLoop);
