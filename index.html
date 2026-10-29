@@ -107,7 +107,7 @@
     /* ROW 1: 3D BOXES + MAP */
     .grid-top {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
       height: 270px;
       min-height: 270px;
       gap: 8px;
@@ -261,6 +261,15 @@
         <button class="btn-ctrl" onclick="reset3DCamera(2)">RESET CAM</button>
       </div>
       <canvas id="plateCanvas2"></canvas>
+    </div>
+
+    <!-- 3D BOX 3: BOAT HULL 3D KINEMATICS & LINEAR ACCEL -->
+    <div class="card">
+      <div class="card-title">BOAT HULL 3D KINEMATICS & LINEAR ACCEL</div>
+      <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
+        <button class="btn-ctrl" onclick="reset3DCamera(3)">RESET CAM</button>
+      </div>
+      <canvas id="plateCanvas3"></canvas>
     </div>
 
     <!-- GPS SATELLITE TRACK -->
@@ -702,6 +711,7 @@ class OarKinematics {
 
 const oar1 = new OarKinematics(1);
 const oar2 = new OarKinematics(2);
+const boat = new OarKinematics(3);
 
 let flipLoad1 = true;
 let flipLoad2 = true;
@@ -803,8 +813,17 @@ function ingestTelemetryLine(line) {
     o2_gz = parseFloat(parts[20]) || 0;
   }
 
+  // BOAT HULL Telemetry (From Central Hub MPU)
+  let boat_ax = 0, boat_ay = 0, boat_az = 9.80665;
+  if (parts.length >= 24) {
+    boat_ax = parseFloat(parts[21]) || 0;
+    boat_ay = parseFloat(parts[22]) || 0;
+    boat_az = parseFloat(parts[23]) || 9.80665;
+  }
+
   oar1.update(o1_w, o1_ax, o1_ay, o1_az, o1_gx, o1_gy, o1_gz, dt);
   oar2.update(o2_w, o2_ax, o2_ay, o2_az, o2_gx, o2_gy, o2_gz, dt);
+  boat.update(0, boat_ax, boat_ay, boat_az, 0, 0, 0, dt);
 
   const effForce1 = (flipLoad1 ? -1 : 1) * (o1_w - oar1.tareOffset);
   const effForce2 = (flipLoad2 ? -1 : 1) * (o2_w - oar2.tareOffset);
@@ -819,9 +838,11 @@ function ingestTelemetryLine(line) {
     ms, timeStr,
     o1_w, o1_ax, o1_ay, o1_az, o1_gx, o1_gy, o1_gz,
     o2_w, o2_ax, o2_ay, o2_az, o2_gx, o2_gy, o2_gz,
+    boat_ax, boat_ay, boat_az,
     effForce1, effForce2,
     o1_surge: oar1.planar_surge,
     o2_surge: oar2.planar_surge,
+    boat_surge: boat.planar_surge,
     lat, lng, spd, sats
   };
 
@@ -842,14 +863,16 @@ function ingestTelemetryLine(line) {
 // ==============================================================================
 let camYaw1 = -0.4, camPitch1 = 0.45;
 let camYaw2 = -0.4, camPitch2 = 0.45;
-let isOrbiting1 = false, isOrbiting2 = false;
-let startX1 = 0, startY1 = 0, startX2 = 0, startY2 = 0;
+let camYaw3 = -0.4, camPitch3 = 0.45;
+let isOrbiting1 = false, isOrbiting2 = false, isOrbiting3 = false;
+let startX1 = 0, startY1 = 0, startX2 = 0, startY2 = 0, startX3 = 0, startY3 = 0;
 
 const plateCn1 = document.getElementById('plateCanvas1');
 const plateCn2 = document.getElementById('plateCanvas2');
+const plateCn3 = document.getElementById('plateCanvas3');
 
 plateCn1.addEventListener('mousedown', (e) => { isOrbiting1 = true; startX1 = e.clientX; startY1 = e.clientY; });
-window.addEventListener('mouseup', () => { isOrbiting1 = false; isOrbiting2 = false; });
+window.addEventListener('mouseup', () => { isOrbiting1 = false; isOrbiting2 = false; isOrbiting3 = false; });
 plateCn1.addEventListener('mousemove', (e) => {
   if (!isOrbiting1) return;
   camYaw1 += (e.clientX - startX1) * 0.01;
@@ -867,13 +890,23 @@ plateCn2.addEventListener('mousemove', (e) => {
   renderPlateCanvas(2);
 });
 
+plateCn3.addEventListener('mousedown', (e) => { isOrbiting3 = true; startX3 = e.clientX; startY3 = e.clientY; });
+plateCn3.addEventListener('mousemove', (e) => {
+  if (!isOrbiting3) return;
+  camYaw3 += (e.clientX - startX3) * 0.01;
+  camPitch3 = Math.max(-1.2, Math.min(1.2, camPitch3 + (e.clientY - startY3) * 0.01));
+  startX3 = e.clientX; startY3 = e.clientY;
+  renderPlateCanvas(3);
+});
+
 function reset3DCamera(oarNum) {
   if (oarNum === 1) { camYaw1 = -0.4; camPitch1 = 0.45; renderPlateCanvas(1); }
-  else { camYaw2 = -0.4; camPitch2 = 0.45; renderPlateCanvas(2); }
+  else if (oarNum === 2) { camYaw2 = -0.4; camPitch2 = 0.45; renderPlateCanvas(2); }
+  else { camYaw3 = -0.4; camPitch3 = 0.45; renderPlateCanvas(3); }
 }
 
 function renderPlateCanvas(oarNum) {
-  const cn = oarNum === 1 ? plateCn1 : plateCn2;
+  const cn = oarNum === 1 ? plateCn1 : (oarNum === 2 ? plateCn2 : plateCn3);
   const cx = cn.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const w = cn.clientWidth;
@@ -889,9 +922,9 @@ function renderPlateCanvas(oarNum) {
   cx.fillStyle = '#0f1116';
   cx.fillRect(0, 0, w, h);
 
-  const oar = oarNum === 1 ? oar1 : oar2;
-  const camY = oarNum === 1 ? camYaw1 : camYaw2;
-  const camP = oarNum === 1 ? camPitch1 : camPitch2;
+  const oar = oarNum === 1 ? oar1 : (oarNum === 2 ? oar2 : boat);
+  const camY = oarNum === 1 ? camYaw1 : (oarNum === 2 ? camYaw2 : camYaw3);
+  const camP = oarNum === 1 ? camPitch1 : (oarNum === 2 ? camPitch2 : camPitch3);
 
   const pitchRad = oar.pitch;
   const rollRad  = oar.roll;
@@ -952,7 +985,10 @@ function renderPlateCanvas(oarNum) {
 
   drawPoly([3, 2, 6, 7], '#1d222c', '#333b4d');
   drawPoly([1, 2, 6, 5], '#252c38', '#424c61');
-  drawPoly([0, 1, 2, 3], oarNum === 1 ? '#0e3a53' : '#4a3812', oarNum === 1 ? '#00e5ff' : '#ffaa00');
+  
+  const faceFill = oarNum === 1 ? '#0e3a53' : (oarNum === 2 ? '#4a3812' : '#2d1445');
+  const faceStroke = oarNum === 1 ? '#00e5ff' : (oarNum === 2 ? '#ffaa00' : '#cc44ff');
+  drawPoly([0, 1, 2, 3], faceFill, faceStroke);
 
   const chipW = 16, chipL = 20, chipH = 4;
   const chipZ = -pth - 3;
@@ -967,7 +1003,7 @@ function renderPlateCanvas(oarNum) {
   cx.closePath();
   cx.fillStyle = '#1c1f26';
   cx.fill();
-  cx.strokeStyle = oarNum === 1 ? '#00ffcc' : '#ffcc00';
+  cx.strokeStyle = oarNum === 1 ? '#00ffcc' : (oarNum === 2 ? '#ffcc00' : '#ff44ff');
   cx.stroke();
 
   const center2D = project([0, 0, chipZ - chipH]);
@@ -1571,6 +1607,7 @@ function redrawAllCharts() {
 function masterLoop() {
   renderPlateCanvas(1);
   renderPlateCanvas(2);
+  renderPlateCanvas(3);
   redrawAllCharts();
   requestAnimationFrame(masterLoop);
 }
@@ -1582,6 +1619,7 @@ window.addEventListener('resize', () => {
   redrawAllCharts();
   renderPlateCanvas(1);
   renderPlateCanvas(2);
+  renderPlateCanvas(3);
 });
 
 setTimeout(() => map.invalidateSize(), 500);
