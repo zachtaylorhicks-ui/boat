@@ -3,59 +3,87 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>indaboat Dual-Telemetry Live HUD & 6-DOF Kinematic Analyzer</title>
+  <title>indaboat Dual-Telemetry Live Kinematic HUD</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #08090b; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-    
-    #topbar { height: 42px; min-height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; background: #111317; border-bottom: 1px solid #232731; z-index: 100; }
-    button { background: #0070e0; border: none; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; user-select: none; }
+    body {
+      background: #08090b;
+      color: #eee;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      overflow-x: hidden;
+      overflow-y: auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TOPBAR */
+    #topbar {
+      height: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      background: #111317;
+      border-bottom: 1px solid #232731;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .topbar-left, .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    button {
+      background: #0070e0;
+      border: none;
+      color: #fff;
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      user-select: none;
+    }
     button:active { filter: brightness(1.2); }
     .btn-export { background: #009955; }
     .btn-import { background: #7b2cbf; }
     .btn-clear { background: #3a3f4b; }
-    .btn-analyzer { background: #ffaa00; color: #111; font-weight: 800; border: 1px solid #ffbb22; }
-    .btn-analyzer:hover { background: #ffbb22; }
     .btn-toggle { background: #262c3a; border: 1px solid #3c465d; font-size: 10px; padding: 4px 8px; }
     .btn-toggle.active { background: #0088cc; border-color: #33bbff; color: #fff; }
-    .btn-ctrl { background: #1e232e; border: 1px solid #323b4e; padding: 3px 8px; font-size: 10px; border-radius: 3px; }
+    .btn-ctrl { background: #1e232e; border: 1px solid #323b4e; padding: 3px 8px; font-size: 10px; border-radius: 3px; color: #ddd; }
     .btn-ctrl:hover { background: #2a3243; }
-    .btn-ctrl.active { background: #0070e0; border-color: #0099ff; }
+    .btn-ctrl.active { background: #0070e0; border-color: #0099ff; color: #fff; }
+    .btn-tare { background: #c25e00; border: 1px solid #ff7700; color: #fff; font-weight: bold; }
+    .btn-tare:hover { background: #e06d00; }
 
-    #replayBar {
-      height: 38px;
-      min-height: 38px;
-      background: #12151d;
-      border-bottom: 1px solid #262c3b;
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 10px;
-      gap: 10px;
-      font-size: 11px;
-    }
+    #bleStatus { font-size: 11px; font-weight: bold; letter-spacing: 0.5px; color: #ff4444; }
 
-    .main-container {
-      flex: 1;
+    /* WORKSPACE CONTAINER */
+    .dashboard-container {
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 42px);
-      min-height: 0;
-      padding: 6px;
-      gap: 6px;
+      gap: 8px;
+      padding: 8px;
+      flex: 1;
     }
 
-    .grid-top {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      height: 270px;
-      min-height: 220px;
-      gap: 6px;
+    .card {
+      background: #0f1116;
+      border: 1px solid #1f232c;
+      border-radius: 5px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
-
-    .card { background: #0f1116; border: 1px solid #1f232c; border-radius: 5px; position: relative; overflow: hidden; display: flex; flex-direction: column; }
     .card-title {
       position: absolute;
       top: 6px;
@@ -66,47 +94,35 @@
       color: #aaa;
       z-index: 10;
       font-weight: 700;
-      background: rgba(15,17,22,0.85);
+      background: rgba(15,17,22,0.88);
       padding: 2px 6px;
       border-radius: 3px;
       pointer-events: none;
     }
 
-    #canvas3dControls {
-      position: absolute;
-      top: 6px;
-      right: 8px;
-      z-index: 20;
-      display: flex;
-      gap: 4px;
-      align-items: center;
+    /* ROW 1: 3D BOXES + MAP */
+    .grid-top {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      height: 270px;
+      min-height: 270px;
+      gap: 8px;
     }
-
-    #alignDrawer {
-      position: absolute;
-      top: 32px;
-      right: 8px;
-      z-index: 30;
-      background: rgba(14, 17, 24, 0.95);
-      border: 1px solid #2e374b;
-      border-radius: 4px;
-      padding: 8px;
-      display: none;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 10px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.7);
-    }
-    .align-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .align-row label { color: #88a0cc; }
-
     #map { width: 100%; height: 100%; }
     canvas { width: 100%; height: 100%; display: block; }
 
-    /* Interactive Chart Card */
-    #chartCard {
-      flex: 1;
-      min-height: 180px;
+    /* ROW 2: FOUR CORRESPONDING STRIP CHARTS */
+    .grid-strips {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 150px 150px;
+      gap: 8px;
+    }
+
+    /* ROW 3 & 4: INTERACTIVE CHARTS */
+    .interactive-card {
+      height: 250px;
+      min-height: 250px;
       position: relative;
     }
     .chart-header {
@@ -135,6 +151,7 @@
       border-radius: 4px;
       border: 1px solid #232731;
       flex-wrap: wrap;
+      max-width: 70%;
     }
     .legend-pill {
       font-size: 9px;
@@ -150,11 +167,11 @@
       border: 1px solid #2a3140;
     }
     .legend-pill.off {
-      opacity: 0.3;
+      opacity: 0.28;
       filter: grayscale(1);
     }
 
-    #chartTooltip {
+    .chart-tooltip {
       position: absolute;
       display: none;
       background: rgba(10, 12, 16, 0.96);
@@ -171,210 +188,65 @@
       line-height: 1.35;
     }
 
-    #hud {
-      height: 62px;
-      min-height: 62px;
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 6px;
-    }
-    .badge {
-      background: #0f1116;
-      border: 1px solid #1f232c;
-      border-radius: 5px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2px 4px;
-    }
-    .badge-val { font-size: 16px; font-weight: 800; color: #00ffcc; line-height: 1.1; }
-    .badge-lbl { font-size: 9px; color: #777; text-transform: uppercase; margin-top: 2px; font-weight: 600; }
-
+    /* BOTTOM RAW BLE PACKET MONITOR */
     #debugBar {
-      height: 20px;
-      min-height: 20px;
+      height: 24px;
+      min-height: 24px;
       background: #050608;
       border: 1px solid #16181f;
       border-radius: 3px;
-      padding: 0 8px;
+      padding: 2px 8px;
       font-size: 10px;
       color: #00ff88;
       font-family: monospace;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      line-height: 18px;
+      line-height: 20px;
     }
-
-    /* ============================================================ */
-    /* STROKE ANALYZER MODAL & WORKSPACE STYLES                     */
-    /* ============================================================ */
-    #analyzerModal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(4, 5, 8, 0.97);
-      z-index: 500;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    #analyzerHeader {
-      height: 48px;
-      background: #11141c;
-      border-bottom: 1px solid #232a3b;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-    }
-    #analyzerContent {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 320px 1fr;
-      min-height: 0;
-      gap: 8px;
-      padding: 8px;
-    }
-    .analyzer-sidebar {
-      background: #0e1117;
-      border: 1px solid #1e2433;
-      border-radius: 5px;
-      display: flex;
-      flex-direction: column;
-      padding: 10px;
-      gap: 10px;
-      overflow-y: auto;
-    }
-    .analyzer-main {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      min-height: 0;
-    }
-    .analyzer-panel {
-      flex: 1;
-      background: #0e1117;
-      border: 1px solid #1e2433;
-      border-radius: 5px;
-      position: relative;
-      overflow: hidden;
-      min-height: 140px;
-    }
-    .stroke-list-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 4px 6px;
-      background: #151a24;
-      border: 1px solid #263044;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 10px;
-      user-select: none;
-    }
-    .stroke-list-item:hover { background: #1c2331; }
-    .stroke-list-item.selected { border-color: #ffaa00; background: #262215; }
-    .stroke-list-item.dimmed { opacity: 0.35; }
-
-    .control-box {
-      background: #141822;
-      border: 1px solid #242c3d;
-      border-radius: 4px;
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 10px;
-    }
-    .control-box label { color: #88a0cc; font-weight: bold; display: flex; justify-content: space-between; }
   </style>
 </head>
 <body>
 
 <div id="topbar">
-  <div style="display:flex; align-items:center; gap:6px;">
-    <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
-    <span id="nodeBadge" style="font-size:10px; font-weight:bold; background:#1b202c; border:1px solid #2e3547; color:#88a0cc; padding:2px 6px; border-radius:3px;">NODES: 1</span>
-    <span id="modeBadge" style="font-size:10px; font-weight:bold; background:#291433; border:1px solid #55246e; color:#dc88ff; padding:2px 6px; border-radius:3px; display:none;">REPLAY</span>
-    <button class="btn-toggle active" id="btnInvertLoad" onclick="toggleLoadInversion()">FLIP LOAD (+/-)</button>
-    <button class="btn-analyzer" onclick="openStrokeAnalyzer()">⚡ STROKE ANALYZER</button>
+  <div class="topbar-left">
+    <button id="btnConnect" onclick="toggleConnect()">CONNECT BLE</button>
+    <span id="bleStatus">DISCONNECTED</span>
+    <span id="pktHealth" style="font-size:10px; color:#88a0cc; background:#181c24; border:1px solid #2a3140; padding:2px 6px; border-radius:3px;">RATE: 0 Hz</span>
+    <button class="btn-toggle active" id="btnFlipOar1Top" onclick="toggleFlipLoad(1)">FLIP OAR 1 (+/-)</button>
+    <button class="btn-toggle active" id="btnFlipOar2Top" onclick="toggleFlipLoad(2)">FLIP OAR 2 (+/-)</button>
+    <button class="btn-tare" onclick="liveTareAll()">TARE LOAD CELLS (0.00)</button>
   </div>
-  <span id="bleStatus" style="font-size: 11px; color: #ff4444; font-weight: bold; letter-spacing: 0.5px;">DISCONNECTED</span>
-  <div style="display: flex; gap: 6px;">
+  <div class="topbar-right">
     <input type="file" id="fileInput" accept=".csv,.txt,.log,.tsv" style="display:none;" onchange="handleFileSelected(event)">
     <button class="btn-import" onclick="document.getElementById('fileInput').click()">LOAD CSV / LOG</button>
-    <button class="btn-export" onclick="exportDatabase()">EXPORT (<span id="dbCount">0</span>)</button>
+    <button class="btn-export" onclick="exportDatabase()">EXPORT CSV (<span id="dbCount">0</span>)</button>
     <button class="btn-clear" onclick="clearDatabase()">CLEAR</button>
   </div>
 </div>
 
-<!-- REAL-TIME TIMED REPLAY CONTROLS -->
-<div id="replayBar">
-  <div style="display:flex; align-items:center; gap:6px;">
-    <button id="btnPlay" class="btn-ctrl" onclick="toggleReplayPlay()" style="background:#009955; color:#fff; font-weight:bold; width:60px;">PLAY</button>
-    <button class="btn-ctrl" onclick="stepReplay(-1)">⏮</button>
-    <button class="btn-ctrl" onclick="stepReplay(1)">⏭</button>
-    <span style="font-size:10px; color:#8899aa;">SPEED:</span>
-    <select id="replaySpeed" onchange="changeReplaySpeed(this.value)" style="background:#1b202c; color:#ddd; border:1px solid #2e3547; border-radius:3px; padding:2px 4px; font-size:10px;">
-      <option value="0.25">0.25x</option>
-      <option value="0.5">0.5x</option>
-      <option value="1" selected>1.0x (Real-Time)</option>
-      <option value="2">2.0x</option>
-      <option value="5">5.0x</option>
-    </select>
-  </div>
-  <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:650px;">
-    <input type="range" id="replaySlider" min="0" max="100" value="0" style="flex:1; cursor:pointer;" oninput="onReplaySliderInput(this.value)">
-    <span id="replayTimeDisplay" style="font-family:monospace; font-size:10px; color:#00e5ff; white-space:nowrap; min-width:170px;">0 / 0 (0.00s)</span>
-  </div>
-  <button class="btn-ctrl" onclick="exitReplayMode()" style="background:#442222; border-color:#663333;">EXIT</button>
-</div>
-
-<div class="main-container">
-  <!-- TOP ROW: 3D ORIENTATION + SATELLITE MAP -->
+<div class="dashboard-container">
+  <!-- ROW 1: 3D ANIMATION BOXES & SATELLITE GPS MAP -->
   <div class="grid-top">
-    <!-- 3D ATTITUDE + 6-DOF ARROWS & TWIST SYMBOLS ON ACCELEROMETER -->
+    <!-- 3D BOX 1: OAR 1 (PORT / NANO) ATTITUDE & LINEAR ACCELERATION -->
     <div class="card">
-      <div class="card-title">3D Attitude & 6-DOF Motion Kinematics</div>
-      <div id="canvas3dControls">
-        <button class="btn-ctrl" id="btnToggleForceArrow" onclick="toggleForceArrow()">FORCE ARROW: OFF</button>
-        <button class="btn-ctrl active" id="btnToggle6Dof" onclick="toggle6DofSymbols()">6-DOF: ON</button>
-        <button class="btn-ctrl" onclick="toggleAlignDrawer()">⚙ ALIGN</button>
-        <button class="btn-ctrl" onclick="reset3DCamera()">RESET VIEW</button>
+      <div class="card-title">OAR 1 (PORT) 3D KINEMATICS & LINEAR ACCEL</div>
+      <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
+        <button class="btn-ctrl" onclick="reset3DCamera(1)">RESET CAM</button>
       </div>
-
-      <!-- Alignment & Mounting Offset Drawer -->
-      <div id="alignDrawer">
-        <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #252e42; padding-bottom:3px;">Relative Plate Mounting</div>
-        <div class="align-row">
-          <label>Mount Yaw:</label>
-          <select id="mountYawSel" onchange="mountYawDeg = parseFloat(this.value)" style="background:#181d26; color:#fff; border:1px solid #333; font-size:10px;">
-            <option value="0" selected>0° (Default)</option>
-            <option value="90">90° CW</option>
-            <option value="180">180°</option>
-            <option value="270">270° CCW</option>
-          </select>
-        </div>
-        <div class="align-row">
-          <label>Pitch Trim:</label>
-          <input type="range" min="-45" max="45" value="0" step="1" oninput="mountPitchTrim = parseFloat(this.value); document.getElementById('lblPTrim').innerText=this.value+'°'">
-          <span id="lblPTrim" style="font-family:monospace; min-width:26px;">0°</span>
-        </div>
-        <div class="align-row">
-          <label>Roll Trim:</label>
-          <input type="range" min="-45" max="45" value="0" step="1" oninput="mountRollTrim = parseFloat(this.value); document.getElementById('lblRTrim').innerText=this.value+'°'">
-          <span id="lblRTrim" style="font-family:monospace; min-width:26px;">0°</span>
-        </div>
-        <div class="align-row" style="margin-top:4px;">
-          <button class="btn-ctrl" onclick="zeroAttitudeNow()" style="flex:1; justify-content:center; background:#005599;">ZERO LEVEL NOW</button>
-        </div>
-      </div>
-
-      <canvas id="plateCanvas"></canvas>
+      <canvas id="plateCanvas1"></canvas>
     </div>
 
-    <!-- SATELLITE GPS MAP -->
+    <!-- 3D BOX 2: OAR 2 (STARBOARD / ESP32) ATTITUDE & LINEAR ACCELERATION -->
+    <div class="card">
+      <div class="card-title">OAR 2 (STBD) 3D KINEMATICS & LINEAR ACCEL</div>
+      <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
+        <button class="btn-ctrl" onclick="reset3DCamera(2)">RESET CAM</button>
+      </div>
+      <canvas id="plateCanvas2"></canvas>
+    </div>
+
+    <!-- GPS SATELLITE TRACK -->
     <div class="card">
       <div class="card-title" id="mapTitle">GPS Satellite Track</div>
       <div style="position:absolute; top:6px; right:8px; z-index:400;">
@@ -384,167 +256,146 @@
     </div>
   </div>
 
-  <!-- BOTTOM ROW: UNIFIED INTERACTIVE MULTI-SERIES CHART (LOAD + ALL 6 AXES) -->
-  <div class="card" id="chartCard">
-    <div class="chart-header">
-      <div class="legend-group">
-        <span class="legend-pill" id="leg_load" onclick="toggleSeries('load')" style="color:#00ffcc;">● Load (raw)</span>
-        <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax (m/s²)</span>
-        <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#00ff66;">● Ay (m/s²)</span>
-        <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff;">● Az (m/s²)</span>
-        <span class="legend-pill" id="leg_gx" onclick="toggleSeries('gx')" style="color:#ff9900;">● Gx (rad/s)</span>
-        <span class="legend-pill" id="leg_gy" onclick="toggleSeries('gy')" style="color:#d044ff;">● Gy (rad/s)</span>
-        <span class="legend-pill" id="leg_gz" onclick="toggleSeries('gz')" style="color:#ffea00;">● Gz (rad/s)</span>
-      </div>
-      <div class="chart-controls">
-        <button class="btn-analyzer" onclick="openStrokeAnalyzer()" style="padding:2px 8px; font-size:10px;">⚡ ANALYZE STROKES</button>
-        <button class="btn-ctrl" onclick="zoomChart(0.7)">+ ZOOM IN</button>
-        <button class="btn-ctrl" onclick="zoomChart(1.4)">- ZOOM OUT</button>
-        <button class="btn-ctrl" onclick="resetChartZoom()">FIT ALL</button>
-        <button class="btn-ctrl active" id="btnFollow" onclick="toggleAutoFollow()">LIVE FOLLOW</button>
-      </div>
+  <!-- ROW 2: FOUR CORRESPONDING STRIP CHARTS -->
+  <div class="grid-strips">
+    <!-- OAR 1 DYNAMIC DRIVE FORCE -->
+    <div class="card">
+      <div class="card-title" id="lblOar1Force">OAR 1 DYNAMIC DRIVE FORCE (KG)</div>
+      <canvas id="chartForceOar1"></canvas>
     </div>
-    <div id="chartTooltip"></div>
-    <canvas id="interactiveCanvas"></canvas>
+
+    <!-- OAR 1 PLANAR SURGE ACCEL -->
+    <div class="card">
+      <div class="card-title">OAR 1 PLANAR SURGE ACCEL (M/S²)</div>
+      <canvas id="chartSurgeOar1"></canvas>
+    </div>
+
+    <!-- OAR 2 DYNAMIC DRIVE FORCE -->
+    <div class="card">
+      <div class="card-title" id="lblOar2Force">OAR 2 DYNAMIC DRIVE FORCE (KG)</div>
+      <canvas id="chartForceOar2"></canvas>
+    </div>
+
+    <!-- OAR 2 PLANAR SURGE ACCEL -->
+    <div class="card">
+      <div class="card-title">OAR 2 PLANAR SURGE ACCEL (M/S²)</div>
+      <canvas id="chartSurgeOar2"></canvas>
+    </div>
   </div>
 
-  <!-- 7 METRIC BADGES -->
-  <div id="hud">
-    <div class="badge"><div class="badge-val" id="valRaw" style="color: #ffaa00;">--</div><div class="badge-lbl" id="lblRaw">Raw Load</div></div>
-    <div class="badge"><div class="badge-val" id="valNet" style="color: #00ffcc;">--</div><div class="badge-lbl" id="lblNet">Drive Force</div></div>
-    <div class="badge"><div class="badge-val" id="valSurge" style="color: #00e5ff;">--</div><div class="badge-lbl">Clean Surge (m/s²)</div></div>
-    <div class="badge"><div class="badge-val" id="valSpd" style="color: #ffff00;">--</div><div class="badge-lbl">Speed (km/h)</div></div>
-    <div class="badge"><div class="badge-val" id="valPitch" style="color: #ff66cc;">--</div><div class="badge-lbl">Pitch</div></div>
-    <div class="badge"><div class="badge-val" id="valRoll" style="color: #cc66ff;">--</div><div class="badge-lbl">Roll</div></div>
-    <div class="badge"><div class="badge-val" id="valSats" style="color: #aaa;">--</div><div class="badge-lbl">GPS Sats</div></div>
+  <!-- ROW 3: INTERACTIVE MULTI-SERIES CHART FOR OAR 1 -->
+  <div class="card interactive-card" id="cardInterOar1">
+    <div class="chart-header">
+      <div class="legend-group">
+        <span class="legend-pill" id="leg1_load" onclick="toggleSeries(1, 'load')" style="color:#00ffcc;">● Load (raw)</span>
+        <span class="legend-pill" id="leg1_ax" onclick="toggleSeries(1, 'ax')" style="color:#ff4444;">● Ax (m/s²)</span>
+        <span class="legend-pill" id="leg1_ay" onclick="toggleSeries(1, 'ay')" style="color:#00ff66;">● Ay (m/s²)</span>
+        <span class="legend-pill" id="leg1_az" onclick="toggleSeries(1, 'az')" style="color:#3399ff;">● Az (m/s²)</span>
+        <span class="legend-pill" id="leg1_gx" onclick="toggleSeries(1, 'gx')" style="color:#ff9900;">● Gx (rad/s)</span>
+        <span class="legend-pill" id="leg1_gy" onclick="toggleSeries(1, 'gy')" style="color:#d044ff;">● Gy (rad/s)</span>
+        <span class="legend-pill" id="leg1_gz" onclick="toggleSeries(1, 'gz')" style="color:#ffea00;">● Gz (rad/s)</span>
+      </div>
+      <div class="chart-controls">
+        <button class="btn-toggle active" id="btnFlipOar1" onclick="toggleFlipLoad(1)">FLIP PLATE (+/-)</button>
+        <button class="btn-ctrl" onclick="zoomInteractive(1, 0.7)">+ ZOOM IN</button>
+        <button class="btn-ctrl" onclick="zoomInteractive(1, 1.4)">- ZOOM OUT</button>
+        <button class="btn-ctrl" onclick="resetInteractiveZoom(1)">FIT ALL</button>
+        <button class="btn-ctrl active" id="btnFollow1" onclick="toggleFollow(1)">LIVE FOLLOW</button>
+      </div>
+    </div>
+    <div class="chart-tooltip" id="tooltip1"></div>
+    <canvas id="canvasInterOar1"></canvas>
+  </div>
+
+  <!-- ROW 4: INTERACTIVE MULTI-SERIES CHART FOR OAR 2 -->
+  <div class="card interactive-card" id="cardInterOar2">
+    <div class="chart-header">
+      <div class="legend-group">
+        <span class="legend-pill" id="leg2_load" onclick="toggleSeries(2, 'load')" style="color:#00ffcc;">● Load (raw)</span>
+        <span class="legend-pill" id="leg2_ax" onclick="toggleSeries(2, 'ax')" style="color:#ff4444;">● Ax (m/s²)</span>
+        <span class="legend-pill" id="leg2_ay" onclick="toggleSeries(2, 'ay')" style="color:#00ff66;">● Ay (m/s²)</span>
+        <span class="legend-pill" id="leg2_az" onclick="toggleSeries(2, 'az')" style="color:#3399ff;">● Az (m/s²)</span>
+        <span class="legend-pill" id="leg2_gx" onclick="toggleSeries(2, 'gx')" style="color:#ff9900;">● Gx (rad/s)</span>
+        <span class="legend-pill" id="leg2_gy" onclick="toggleSeries(2, 'gy')" style="color:#d044ff;">● Gy (rad/s)</span>
+        <span class="legend-pill" id="leg2_gz" onclick="toggleSeries(2, 'gz')" style="color:#ffea00;">● Gz (rad/s)</span>
+      </div>
+      <div class="chart-controls">
+        <button class="btn-toggle active" id="btnFlipOar2" onclick="toggleFlipLoad(2)">FLIP PLATE (+/-)</button>
+        <button class="btn-ctrl" onclick="zoomInteractive(2, 0.7)">+ ZOOM IN</button>
+        <button class="btn-ctrl" onclick="zoomInteractive(2, 1.4)">- ZOOM OUT</button>
+        <button class="btn-ctrl" onclick="resetInteractiveZoom(2)">FIT ALL</button>
+        <button class="btn-ctrl active" id="btnFollow2" onclick="toggleFollow(2)">LIVE FOLLOW</button>
+      </div>
+    </div>
+    <div class="chart-tooltip" id="tooltip2"></div>
+    <canvas id="canvasInterOar2"></canvas>
+  </div>
+
+  <!-- ROW 5: MASTER COMPARISON & DUAL-OAR SYNCHRONIZED OVERLAY -->
+  <div class="card interactive-card" id="cardMasterOverlay" style="height:280px; min-height:280px;">
+    <div class="chart-header">
+      <div class="legend-group">
+        <span class="legend-pill" id="legM_o1_load" onclick="toggleMasterSeries('o1_load')" style="color:#00ffcc;">● O1 Load</span>
+        <span class="legend-pill" id="legM_o2_load" onclick="toggleMasterSeries('o2_load')" style="color:#ffbb00;">● O2 Load</span>
+        <span class="legend-pill" id="legM_o1_ax" onclick="toggleMasterSeries('o1_ax')" style="color:#ff4444;">● O1 Ax</span>
+        <span class="legend-pill" id="legM_o2_ax" onclick="toggleMasterSeries('o2_ax')" style="color:#ff8888;">● O2 Ax</span>
+        <span class="legend-pill" id="legM_o1_ay" onclick="toggleMasterSeries('o1_ay')" style="color:#00ff66;">● O1 Ay</span>
+        <span class="legend-pill" id="legM_o2_ay" onclick="toggleMasterSeries('o2_ay')" style="color:#66ffaa;">● O2 Ay</span>
+        <span class="legend-pill" id="legM_o1_az" onclick="toggleMasterSeries('o1_az')" style="color:#3399ff;">● O1 Az</span>
+        <span class="legend-pill" id="legM_o2_az" onclick="toggleMasterSeries('o2_az')" style="color:#88ccff;">● O2 Az</span>
+        <span class="legend-pill" id="legM_o1_gx" onclick="toggleMasterSeries('o1_gx')" style="color:#ff9900;">● O1 Gx</span>
+        <span class="legend-pill" id="legM_o2_gx" onclick="toggleMasterSeries('o2_gx')" style="color:#ffc266;">● O2 Gx</span>
+        <span class="legend-pill" id="legM_o1_gy" onclick="toggleMasterSeries('o1_gy')" style="color:#d044ff;">● O1 Gy</span>
+        <span class="legend-pill" id="legM_o2_gy" onclick="toggleMasterSeries('o2_gy')" style="color:#ea99ff;">● O2 Gy</span>
+        <span class="legend-pill" id="legM_o1_gz" onclick="toggleMasterSeries('o1_gz')" style="color:#ffea00;">● O1 Gz</span>
+        <span class="legend-pill" id="legM_o2_gz" onclick="toggleMasterSeries('o2_gz')" style="color:#fff588;">● O2 Gz</span>
+      </div>
+      <div class="chart-controls">
+        <button class="btn-tare" onclick="liveTareAlignment()">LIVE TARE (ALIGN OARS)</button>
+        <button class="btn-toggle" id="btnToggleDelta" onclick="toggleRelativeDeltaView()">RELATIVE DELTA (O2 - O1)</button>
+        <button class="btn-ctrl" onclick="zoomInteractive('master', 0.7)">+ ZOOM IN</button>
+        <button class="btn-ctrl" onclick="zoomInteractive('master', 1.4)">- ZOOM OUT</button>
+        <button class="btn-ctrl" onclick="resetInteractiveZoom('master')">FIT ALL</button>
+        <button class="btn-ctrl active" id="btnFollowMaster" onclick="toggleFollow('master')">LIVE FOLLOW</button>
+      </div>
+    </div>
+    <div class="chart-tooltip" id="tooltipMaster"></div>
+    <canvas id="canvasMasterOverlay"></canvas>
   </div>
 
   <!-- STATUS/PACKET MONITOR -->
   <div id="debugBar">Ready. Connect BLE or Load a CSV session...</div>
 </div>
 
-<!-- ============================================================ -->
-<!-- STROKE BIOMECHANICS & KINEMATIC DECOMPOSITION MODAL          -->
-<!-- ============================================================ -->
-<div id="analyzerModal">
-  <div id="analyzerHeader">
-    <div style="display:flex; align-items:center; gap:10px;">
-      <span style="font-size:14px; font-weight:800; color:#ffaa00; letter-spacing:0.5px;">⚡ STROKE BIOMECHANICS & ENSEMBLE OVERLAY ANALYZER</span>
-      <span id="analyzerStrokeBadge" style="font-size:11px; background:#241d11; border:1px solid #4a3818; color:#ffcc55; padding:2px 8px; border-radius:3px;">0 STROKES FOUND</span>
-    </div>
-    <div style="display:flex; gap:6px;">
-      <button class="btn-ctrl" onclick="exportStrokeAnalyticsCSV()" style="background:#009955; color:#fff;">EXPORT STROKE CSV</button>
-      <button class="btn-ctrl" onclick="closeStrokeAnalyzer()" style="background:#552222; border-color:#883333;">CLOSE ANALYZER ✕</button>
-    </div>
-  </div>
-
-  <div id="analyzerContent">
-    <!-- LEFT SIDEBAR: THRESHOLD & STROKE CAROUSEL -->
-    <div class="analyzer-sidebar">
-      <div class="control-box">
-        <label><span>Analysis Region:</span><span id="lblRegionMode" style="color:#00ffcc;">ZOOM VIEW</span></label>
-        <div style="display:flex; gap:4px;">
-          <button class="btn-ctrl active" id="btnRegZoom" onclick="setAnalyzerRegion('zoom')" style="flex:1;">CURRENT ZOOM</button>
-          <button class="btn-ctrl" id="btnRegAll" onclick="setAnalyzerRegion('all')" style="flex:1;">ENTIRE SESSION</button>
-        </div>
-      </div>
-
-      <div class="control-box">
-        <label><span>Drive Delta Threshold (ΔF):</span><span id="lblDeltaThresh" style="color:#ffaa00;">180</span></label>
-        <input type="range" id="deltaThreshSlider" min="30" max="600" value="180" step="5" oninput="onThresholdChange(this.value)">
-        <div style="font-size:9px; color:#778899;">*Relative jump from recovery baseline to peak drive</div>
-      </div>
-
-      <div class="control-box">
-        <label><span>Min Stroke Period (s):</span><span id="lblMinPeriod" style="color:#00e5ff;">1.2s</span></label>
-        <input type="range" id="minPeriodSlider" min="0.8" max="3.5" value="1.2" step="0.1" oninput="onMinPeriodChange(this.value)">
-      </div>
-
-      <!-- Stroke Scorecard -->
-      <div class="control-box" id="strokeScorecard" style="background:#11151e; border-color:#2a364e;">
-        <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #202b3f; padding-bottom:3px;">STROKE SCORECARD</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:2px;">
-          <div><span style="color:#8899aa;">Stroke Rate:</span> <b id="scRate" style="color:#fff;">--</b> SPM</div>
-          <div><span style="color:#8899aa;">Drive Time:</span> <b id="scDriveT" style="color:#ffaa00;">--</b> s</div>
-          <div><span style="color:#8899aa;">Recovery:</span> <b id="scRecovT" style="color:#00ffcc;">--</b> s</div>
-          <div><span style="color:#8899aa;">Ratio:</span> <b id="scRatio" style="color:#ffcc00;">--</b> %</div>
-          <div><span style="color:#8899aa;">Peak Force:</span> <b id="scPeakF" style="color:#ff4444;">--</b></div>
-          <div><span style="color:#8899aa;">Dist / Stroke:</span> <b id="scDPS" style="color:#3399ff;">--</b> m</div>
-          <div><span style="color:#8899aa;">Avg Speed:</span> <b id="scSpd" style="color:#ffff00;">--</b> km/h</div>
-          <div><span style="color:#8899aa;">Peak Surge:</span> <b id="scSurge" style="color:#00ff66;">--</b> m/s²</div>
-        </div>
-      </div>
-
-      <!-- Stroke List Selector -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-        <span style="font-weight:bold; color:#88a0cc; font-size:10px;">DETECTED STROKES</span>
-        <button class="btn-ctrl" onclick="selectAllStrokes(true)">SELECT ALL</button>
-      </div>
-      <div id="strokeListContainer" style="display:flex; flex-direction:column; gap:4px; max-height:260px; overflow-y:auto;">
-        <!-- Populated dynamically -->
-      </div>
-    </div>
-
-    <!-- RIGHT MAIN: 3 SYNCED OVERLAY CHARTS -->
-    <div class="analyzer-main">
-      <!-- 1. CATCH-ALIGNED FORCE CURVES OVERLAY (WITH AVERAGE CURVE & SD BAND) -->
-      <div class="analyzer-panel">
-        <div class="card-title">1. Catch-Synchronized Force Curves Overlay (All Strokes + Bold Average)</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-          <span style="font-size:9px; background:#221808; border:1px solid #553c12; color:#ffd700; padding:2px 6px; border-radius:3px; font-weight:bold;">★ BOLD GOLD = AVERAGE FORCE</span>
-          <span style="font-size:9px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 6px; border-radius:3px;">FAINT = INDIVIDUAL STROKES</span>
-        </div>
-        <canvas id="overlayForceCanvas"></canvas>
-      </div>
-
-      <!-- 2. KINEMATIC DECOMPOSITION: BLADE ROTATION VS BOAT BOW SURGE -->
-      <div class="analyzer-panel">
-        <div class="card-title">2. Kinematic Decomposition: Blade Rotation (Oar Sweep) vs. Boat Bow Surge Force</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-          <span style="font-size:9px; background:#251608; border:1px solid #542f10; color:#ff9900; padding:2px 6px; border-radius:3px;">● BLADE ROTATION RATE (deg/s)</span>
-          <span style="font-size:9px; background:#082218; border:1px solid #124d35; color:#00ff88; padding:2px 6px; border-radius:3px;">● BOW SURGE ACCEL (m/s²)</span>
-          <span style="font-size:9px; background:#1e1424; border:1px solid #4a285c; color:#d044ff; padding:2px 6px; border-radius:3px;">● AX / AY / AZ</span>
-        </div>
-        <canvas id="overlayKinematicsCanvas"></canvas>
-      </div>
-
-      <!-- 3. SATELLITE GPS BOAT VELOCITY & DISPLACEMENT THROUGH STROKE -->
-      <div class="analyzer-panel">
-        <div class="card-title">3. Satellite GPS Dynamic Velocity & Distance Gained Profile</div>
-        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
-          <span style="font-size:9px; background:#242408; border:1px solid #545410; color:#ffff00; padding:2px 6px; border-radius:3px;">● GPS SPEED (km/h)</span>
-          <span style="font-size:9px; background:#081b24; border:1px solid #103c54; color:#33aaff; padding:2px 6px; border-radius:3px;">● STROKE DISPLACEMENT (m)</span>
-        </div>
-        <canvas id="overlayGpsCanvas"></canvas>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
 // ==============================================================================
-// 1. DATA STORAGE & EXPORT
+// 1. DATA STORAGE & EXPORT (INDEXEDDB & IN-MEMORY)
 // ==============================================================================
 let inMemoryLog = [];
-let invertLoad = true; // Auto inverted polarity by default
+let db;
+const DB_NAME = "IndaBoatTelemetryDB_V3";
+const STORE_NAME = "records";
 
-function toggleLoadInversion() {
-  invertLoad = !invertLoad;
-  document.getElementById('btnInvertLoad').classList.toggle('active', invertLoad);
-  document.getElementById('btnInvertLoad').innerText = invertLoad ? "FLIP LOAD (+/-): ON" : "FLIP LOAD (+/-): OFF";
-  if (chartData.length > 0) {
-    if (isReplayMode && replayData[replayIndex]) {
-      updateHUD(replayData[replayIndex]);
-    } else if (chartData[chartData.length - 1]) {
-      updateHUD(chartData[chartData.length - 1]);
-    }
-    redrawInteractiveChart();
-    if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
+const dbReq = indexedDB.open(DB_NAME, 1);
+dbReq.onupgradeneeded = (e) => {
+  const d = e.target.result;
+  if (!d.objectStoreNames.contains(STORE_NAME)) {
+    d.createObjectStore(STORE_NAME, { autoIncrement: true });
   }
-}
+};
+dbReq.onsuccess = (e) => {
+  db = e.target.result;
+  updateRecordCountDisplay();
+};
 
 function saveRowToStorage(rowStr) {
   inMemoryLog.push(rowStr);
+  if (db) {
+    try {
+      const tx = db.transaction([STORE_NAME], "readwrite");
+      tx.objectStore(STORE_NAME).add(rowStr);
+    } catch (e) {}
+  }
   updateRecordCountDisplay();
 }
 
@@ -557,7 +408,7 @@ function exportDatabase() {
     alert("No data recorded to export. Connect to device or load a CSV first.");
     return;
   }
-  let csvContent = "ms,timestamp,raw_w,ax,ay,az,gx,gy,gz,lat,lng,alt,spd,sats\n" + inMemoryLog.join("\n") + "\n";
+  let csvContent = "ms,timestamp,o1_w,o1_ax,o1_ay,o1_az,o1_gx,o1_gy,o1_gz,lat,lng,alt,spd,sats,o2_w,o2_ax,o2_ay,o2_az,o2_gx,o2_gy,o2_gz\n" + inMemoryLog.join("\n") + "\n";
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -571,18 +422,21 @@ function exportDatabase() {
 function clearDatabase() {
   if (!confirm("Clear all recorded session data?")) return;
   inMemoryLog = [];
-  chartData = [];
-  replayData = [];
-  detectedStrokes = [];
+  dataset = [];
+  forceHistory1.fill(0); surgeHistory1.fill(0);
+  forceHistory2.fill(0); surgeHistory2.fill(0);
+  if (db) {
+    const tx = db.transaction([STORE_NAME], "readwrite");
+    tx.objectStore(STORE_NAME).clear();
+  }
   updateRecordCountDisplay();
   track.setLatLngs([]);
   marker.setLatLng([0, 0]);
-  exitReplayMode();
-  redrawInteractiveChart();
+  redrawAllCharts();
 }
 
 // ==============================================================================
-// 2. BLE LIVE STREAMING ENGINE
+// 2. BLE LIVE STREAMING ENGINE & PACKET INGESTION
 // ==============================================================================
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
@@ -590,6 +444,8 @@ const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 let device = null;
 let txChar = null;
 let streamBuffer = "";
+let pktCount = 0;
+let lastPktCalcTime = performance.now();
 
 async function toggleConnect() {
   if (device && device.gatt.connected) {
@@ -611,7 +467,6 @@ async function toggleConnect() {
     document.getElementById('bleStatus').innerText = "CONNECTED";
     document.getElementById('bleStatus').style.color = "#00ff88";
     document.getElementById('btnConnect').innerText = "DISCONNECT";
-    exitReplayMode();
 
     if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
   } catch (err) {
@@ -623,7 +478,7 @@ async function toggleConnect() {
 function onDisconnected() {
   document.getElementById('bleStatus').innerText = "DISCONNECTED";
   document.getElementById('bleStatus').style.color = "#ff4444";
-  document.getElementById('btnConnect').innerText = "CONNECT";
+  document.getElementById('btnConnect').innerText = "CONNECT BLE";
 }
 
 function handleChunk(event) {
@@ -635,57 +490,137 @@ function handleChunk(event) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
+    pktCount++;
     document.getElementById('debugBar').innerText = `RX [${trimmed.length}b]: ${trimmed}`;
     saveRowToStorage(trimmed);
-    ingestTelemetry(trimmed, true);
+    ingestTelemetryLine(trimmed);
+  }
+
+  const nowP = performance.now();
+  if (nowP - lastPktCalcTime >= 1000) {
+    const hz = ((pktCount * 1000) / (nowP - lastPktCalcTime)).toFixed(0);
+    document.getElementById('pktHealth').innerText = `RATE: ${hz} Hz`;
+    pktCount = 0;
+    lastPktCalcTime = nowP;
   }
 }
 
 // ==============================================================================
-// 3. TELEMETRY PARSING & ATTITUDE MATH
+// 3. TELEMETRY MATH, TRUE 3-AXIS IMU & ISOLATED LINEAR ACCELERATION
 // ==============================================================================
-class NodeState {
+class OarKinematics {
   constructor(id) {
     this.id = id;
-    this.lastSeen = 0;
+    this.lastMs = null;
     this.raw_w = 0;
+    this.tareOffset = 0;
     this.baseline_w = null;
     this.net_force = 0;
-    this.a_raw = [0, 0, 0];
-    this.g_raw = [0, 0, 0];
-    this.pitch_est = 0;
-    this.roll_est = 0;
+
+    // 3-axis Accelerations (m/s²)
+    this.ax = 0; this.ay = 0; this.az = 0;
+    // 3-axis Angular Rates (rad/s)
+    this.gx = 0; this.gy = 0; this.gz = 0;
+
+    // Attitude (radians & degrees)
+    this.pitch = 0; // Pitch (about X or Y depending on orientation)
+    this.roll  = 0; // Roll
+    this.yaw   = 0; // Yaw (pure Gyro integrated)
+
+    // Isolated Non-Rotational Linear Dynamic Acceleration (gravity removed)
+    this.lin_ax = 0;
+    this.lin_ay = 0;
+    this.lin_az = 0;
+    this.planar_surge = 0;
   }
 
   update(raw_w, ax, ay, az, gx, gy, gz, dt) {
-    this.lastSeen = Date.now();
     this.raw_w = raw_w;
-    this.a_raw = [ax, ay, az];
-    this.g_raw = [gx, gy, gz];
+    this.ax = ax; this.ay = ay; this.az = az;
+    this.gx = gx; this.gy = gy; this.gz = gz;
 
-    // Robust median-anchored recovery baseline
+    // Load cell baseline dynamic tracking
     if (this.baseline_w === null) this.baseline_w = raw_w;
-    const rate = 0.01;
+    const rate = 0.015;
     this.baseline_w = (1.0 - rate) * this.baseline_w + rate * raw_w;
     this.net_force = raw_w - this.baseline_w;
 
+    // True 3-Axis Orientation Calculation:
+    // Pure Accel components for Pitch & Roll
     const acc_pitch = Math.atan2(ax, Math.sqrt(az * az + ay * ay));
     const acc_roll  = Math.atan2(az, Math.max(0.05, -ay));
 
-    this.pitch_est = 0.93 * (this.pitch_est + gz * dt) + 0.07 * acc_pitch;
-    this.roll_est  = 0.93 * (this.roll_est  + gx * dt) + 0.07 * acc_roll;
+    // Complementary Filter for Pitch & Roll (combines gyro integration with accel vector)
+    this.pitch = 0.94 * (this.pitch + gz * dt) + 0.06 * acc_pitch;
+    this.roll  = 0.94 * (this.roll  + gx * dt) + 0.06 * acc_roll;
+    // Yaw integrates pure Z/Y gyro rate with zero force coupling
+    this.yaw   = this.yaw + gy * dt;
+
+    // Dynamic Gravity Decomposition:
+    // Gravity vector in body frame derived from current attitude
+    const gx_comp = 9.80665 * Math.sin(this.pitch);
+    const gy_comp = -9.80665 * Math.cos(this.pitch) * Math.cos(this.roll);
+    const gz_comp = 9.80665 * Math.cos(this.pitch) * Math.sin(this.roll);
+
+    // Non-Rotational Linear Acceleration Vector (True dynamic push)
+    this.lin_ax = ax - gx_comp;
+    this.lin_ay = ay - gy_comp;
+    this.lin_az = az - gz_comp;
+
+    // Planar surge along longitudinal boat axis
+    this.planar_surge = ax - (9.80665 * Math.sin(this.pitch));
   }
 }
 
-const node1 = new NodeState(1);
-const node2 = new NodeState(2);
+const oar1 = new OarKinematics(1);
+const oar2 = new OarKinematics(2);
 
-let lastTimeSec = null;
-let current_d = {
-  pitch_deg: 0, roll_deg: 0, force_net: 0, a_surge: 0,
-  raw_w: 0, ax: 0, ay: 0, az: 0, gx: 0, gy: 0, gz: 0
-};
-let chartData = [];
+let flipLoad1 = true;
+let flipLoad2 = true;
+let tareAlignmentDelta = 0;
+let isRelativeDeltaMode = false;
+
+function toggleFlipLoad(oarNum) {
+  if (oarNum === 1) {
+    flipLoad1 = !flipLoad1;
+    document.getElementById('btnFlipOar1').classList.toggle('active', flipLoad1);
+    document.getElementById('btnFlipOar1Top').classList.toggle('active', flipLoad1);
+  } else {
+    flipLoad2 = !flipLoad2;
+    document.getElementById('btnFlipOar2').classList.toggle('active', flipLoad2);
+    document.getElementById('btnFlipOar2Top').classList.toggle('active', flipLoad2);
+  }
+  redrawAllCharts();
+}
+
+function liveTareAll() {
+  oar1.tareOffset = oar1.raw_w;
+  oar2.tareOffset = oar2.raw_w;
+  oar1.baseline_w = oar1.raw_w;
+  oar2.baseline_w = oar2.raw_w;
+}
+
+function liveTareAlignment() {
+  const f1 = (flipLoad1 ? -1 : 1) * (oar1.raw_w - oar1.tareOffset);
+  const f2 = (flipLoad2 ? -1 : 1) * (oar2.raw_w - oar2.tareOffset);
+  tareAlignmentDelta = f2 - f1;
+}
+
+function toggleRelativeDeltaView() {
+  isRelativeDeltaMode = !isRelativeDeltaMode;
+  document.getElementById('btnToggleDelta').classList.toggle('active', isRelativeDeltaMode);
+  redrawInteractiveChart('master');
+}
+
+// Circular ring buffers for Screenshot 1 charts
+const STRIP_SIZE = 140;
+let forceHistory1 = new Array(STRIP_SIZE).fill(0);
+let surgeHistory1 = new Array(STRIP_SIZE).fill(0);
+let forceHistory2 = new Array(STRIP_SIZE).fill(0);
+let surgeHistory2 = new Array(STRIP_SIZE).fill(0);
+
+let dataset = [];
+let lastGlobalTime = null;
 
 function parseCsvTokens(row) {
   const parts = [];
@@ -701,147 +636,119 @@ function parseCsvTokens(row) {
   return parts;
 }
 
-function ingestTelemetry(row, updateLiveChart = true) {
-  const parts = parseCsvTokens(row);
-  if (parts.length < 10) return null;
+function ingestTelemetryLine(line) {
+  const parts = parseCsvTokens(line);
+  if (parts.length < 9) return;
 
-  const ms    = parseInt(parts[0], 10);
-  const timeS = parts[1] ? parts[1].replace(/"/g, '') : '';
-  const raw_w = parseFloat(parts[2]);
-  const ax    = parseFloat(parts[3]);
-  const ay    = parseFloat(parts[4]);
-  const az    = parseFloat(parts[5]);
-  const gx    = parseFloat(parts[6]);
-  const gy    = parseFloat(parts[7]);
-  const gz    = parseFloat(parts[8]);
-  const lat   = parseFloat(parts[9]);
-  const lng   = parseFloat(parts[10]);
-  const spd   = parts[12] !== undefined ? parseFloat(parts[12]) : 0;
-  const sats  = parts[13] !== undefined ? parseInt(parts[13], 10) : 0;
-
-  if (isNaN(raw_w) || isNaN(ax)) return null;
+  const ms = parseInt(parts[0], 10);
+  const timeStr = parts[1] ? parts[1].replace(/"/g, '') : '';
+  if (isNaN(ms)) return;
 
   const t_sec = ms / 1000.0;
-  const dt = lastTimeSec === null ? 0.033 : Math.min(0.2, Math.max(0.001, t_sec - lastTimeSec));
-  lastTimeSec = t_sec;
+  const dt = lastGlobalTime === null ? 0.025 : Math.min(0.2, Math.max(0.001, t_sec - lastGlobalTime));
+  lastGlobalTime = t_sec;
 
-  node1.update(raw_w, ax, ay, az, gx, gy, gz, dt);
+  // OAR 1 Telemetry (Port)
+  const o1_w  = parseFloat(parts[2]) || 0;
+  const o1_ax = parseFloat(parts[3]) || 0;
+  const o1_ay = parseFloat(parts[4]) || 0;
+  const o1_az = parseFloat(parts[5]) || 0;
+  const o1_gx = parseFloat(parts[6]) || 0;
+  const o1_gy = parseFloat(parts[7]) || 0;
+  const o1_gz = parseFloat(parts[8]) || 0;
 
-  const fusedPitch = node1.pitch_est;
-  const fusedRoll  = node1.roll_est;
-  const u_up_x = Math.sin(fusedPitch);
-  const fusedSurge = node1.a_raw[0] - (9.80665 * u_up_x);
+  // GPS Telemetry
+  const lat  = parseFloat(parts[9])  || 0;
+  const lng  = parseFloat(parts[10]) || 0;
+  const alt  = parseFloat(parts[11]) || 0;
+  const spd  = parseFloat(parts[12]) || 0;
+  const sats = parseInt(parts[13], 10) || 0;
 
-  current_d = {
-    pitch_deg: fusedPitch * (180.0 / Math.PI),
-    roll_deg:  fusedRoll  * (180.0 / Math.PI),
-    force_net: node1.net_force,
-    a_surge:   fusedSurge,
-    raw_w, ax, ay, az, gx, gy, gz
-  };
-
-  const point = {
-    ms, timeStr: timeS, raw_w, ax, ay, az, gx, gy, gz,
-    net_force: node1.net_force, surge: fusedSurge,
-    lat, lng, spd, sats,
-    pitch_deg: current_d.pitch_deg,
-    roll_deg: current_d.roll_deg
-  };
-
-  if (updateLiveChart) {
-    chartData.push(point);
-    if (chartData.length > 5000) chartData.shift();
-    updateHUD(point);
+  // OAR 2 Telemetry (Starboard - ESP32)
+  let o2_w = 0, o2_ax = 0, o2_ay = 0, o2_az = 0, o2_gx = 0, o2_gy = 0, o2_gz = 0;
+  if (parts.length >= 21) {
+    o2_w  = parseFloat(parts[14]) || 0;
+    o2_ax = parseFloat(parts[15]) || 0;
+    o2_ay = parseFloat(parts[16]) || 0;
+    o2_az = parseFloat(parts[17]) || 0;
+    o2_gx = parseFloat(parts[18]) || 0;
+    o2_gy = parseFloat(parts[19]) || 0;
+    o2_gz = parseFloat(parts[20]) || 0;
   }
 
-  return point;
-}
+  // Update IMU Kinematics independently
+  oar1.update(o1_w, o1_ax, o1_ay, o1_az, o1_gx, o1_gy, o1_gz, dt);
+  oar2.update(o2_w, o2_ax, o2_ay, o2_az, o2_gx, o2_gy, o2_gz, dt);
 
-function updateHUD(d) {
-  const effRaw = (invertLoad ? -1 : 1) * d.raw_w;
-  const effNet = (invertLoad ? -1 : 1) * d.net_force;
+  const effForce1 = (flipLoad1 ? -1 : 1) * (o1_w - oar1.tareOffset);
+  const effForce2 = (flipLoad2 ? -1 : 1) * (o2_w - oar2.tareOffset);
 
-  document.getElementById('valRaw').innerText = effRaw.toFixed(1);
-  document.getElementById('valNet').innerText = (effNet >= 0 ? "+" : "") + effNet.toFixed(1);
-  document.getElementById('valSurge').innerText = (d.surge >= 0 ? "+" : "") + d.surge.toFixed(2);
-  document.getElementById('valSpd').innerText   = d.spd.toFixed(1);
-  document.getElementById('valPitch').innerText = d.pitch_deg.toFixed(1) + "°";
-  document.getElementById('valRoll').innerText  = d.roll_deg.toFixed(1) + "°";
-  document.getElementById('valSats').innerText  = isNaN(d.sats) ? 0 : d.sats;
+  forceHistory1.push(effForce1); forceHistory1.shift();
+  surgeHistory1.push(oar1.planar_surge); surgeHistory1.shift();
 
-  if (d.lat && d.lng && !isNaN(d.lat) && !isNaN(d.lng) && Math.abs(d.lat) > 0.001) {
-    const coord = [d.lat, d.lng];
-    marker.setLatLng(coord);
-    track.addLatLng(coord);
-    if (!isReplayMode && isAutoFollow) map.panTo(coord, { animate: true, duration: 0.1 });
-    document.getElementById('mapTitle').innerText = `GPS Track (${d.spd.toFixed(1)} km/h | ${d.sats} Sats)`;
+  forceHistory2.push(effForce2); forceHistory2.shift();
+  surgeHistory2.push(oar2.planar_surge); surgeHistory2.shift();
+
+  const record = {
+    ms, timeStr,
+    o1_w, o1_ax, o1_ay, o1_az, o1_gx, o1_gy, o1_gz,
+    o2_w, o2_ax, o2_ay, o2_az, o2_gx, o2_gy, o2_gz,
+    effForce1, effForce2,
+    o1_surge: oar1.planar_surge,
+    o2_surge: oar2.planar_surge,
+    lat, lng, spd, sats
+  };
+
+  dataset.push(record);
+  if (dataset.length > 5000) dataset.shift();
+
+  // GPS Map point
+  if (lat !== 0 && lng !== 0 && Math.abs(lat) > 0.001) {
+    const pos = [lat, lng];
+    marker.setLatLng(pos);
+    track.addLatLng(pos);
+    map.panTo(pos, { animate: true, duration: 0.1 });
+    document.getElementById('mapTitle').innerText = `GPS Track (${spd.toFixed(1)} km/h | ${sats} Sats)`;
   }
 }
 
 // ==============================================================================
-// 4. 3D ATTITUDE & 6-DOF KINEMATICS
+// 4. TOP 3D IMU ATTITUDE & NON-ROTATIONAL LINEAR ACCELERATION ANIMATIONS
 // ==============================================================================
-let showForceArrow = false;
-let show6DofSymbols = true;
-let mountYawDeg = 0;
-let mountPitchTrim = 0;
-let mountRollTrim = 0;
-let zeroPitchOffset = 0;
-let zeroRollOffset = 0;
-let camYaw = -0.4;
-let camPitch = 0.45;
-let is3DOrbiting = false;
-let orbitStartX = 0, orbitStartY = 0;
+let camYaw1 = -0.4, camPitch1 = 0.45;
+let camYaw2 = -0.4, camPitch2 = 0.45;
+let isOrbiting1 = false, isOrbiting2 = false;
+let startX1 = 0, startY1 = 0, startX2 = 0, startY2 = 0;
 
-const plateCanvas = document.getElementById('plateCanvas');
+const plateCn1 = document.getElementById('plateCanvas1');
+const plateCn2 = document.getElementById('plateCanvas2');
 
-plateCanvas.addEventListener('mousedown', (e) => {
-  is3DOrbiting = true;
-  orbitStartX = e.clientX;
-  orbitStartY = e.clientY;
-});
-window.addEventListener('mouseup', () => { is3DOrbiting = false; });
-plateCanvas.addEventListener('mousemove', (e) => {
-  if (!is3DOrbiting) return;
-  camYaw += (e.clientX - orbitStartX) * 0.01;
-  camPitch = Math.max(-1.2, Math.min(1.2, camPitch + (e.clientY - orbitStartY) * 0.01));
-  orbitStartX = e.clientX;
-  orbitStartY = e.clientY;
-  renderPlateCanvas();
+plateCn1.addEventListener('mousedown', (e) => { isOrbiting1 = true; startX1 = e.clientX; startY1 = e.clientY; });
+window.addEventListener('mouseup', () => { isOrbiting1 = false; isOrbiting2 = false; });
+plateCn1.addEventListener('mousemove', (e) => {
+  if (!isOrbiting1) return;
+  camYaw1 += (e.clientX - startX1) * 0.01;
+  camPitch1 = Math.max(-1.2, Math.min(1.2, camPitch1 + (e.clientY - startY1) * 0.01));
+  startX1 = e.clientX; startY1 = e.clientY;
+  renderPlateCanvas(1);
 });
 
-function reset3DCamera() {
-  camYaw = -0.4; camPitch = 0.45;
-  renderPlateCanvas();
+plateCn2.addEventListener('mousedown', (e) => { isOrbiting2 = true; startX2 = e.clientX; startY2 = e.clientY; });
+plateCn2.addEventListener('mousemove', (e) => {
+  if (!isOrbiting2) return;
+  camYaw2 += (e.clientX - startX2) * 0.01;
+  camPitch2 = Math.max(-1.2, Math.min(1.2, camPitch2 + (e.clientY - startY2) * 0.01));
+  startX2 = e.clientX; startY2 = e.clientY;
+  renderPlateCanvas(2);
+});
+
+function reset3DCamera(oarNum) {
+  if (oarNum === 1) { camYaw1 = -0.4; camPitch1 = 0.45; renderPlateCanvas(1); }
+  else { camYaw2 = -0.4; camPitch2 = 0.45; renderPlateCanvas(2); }
 }
 
-function toggleForceArrow() {
-  showForceArrow = !showForceArrow;
-  document.getElementById('btnToggleForceArrow').classList.toggle('active', showForceArrow);
-  document.getElementById('btnToggleForceArrow').innerText = showForceArrow ? "FORCE ARROW: ON" : "FORCE ARROW: OFF";
-  renderPlateCanvas();
-}
-
-function toggle6DofSymbols() {
-  show6DofSymbols = !show6DofSymbols;
-  document.getElementById('btnToggle6Dof').classList.toggle('active', show6DofSymbols);
-  document.getElementById('btnToggle6Dof').innerText = show6DofSymbols ? "6-DOF: ON" : "6-DOF: OFF";
-  renderPlateCanvas();
-}
-
-function toggleAlignDrawer() {
-  const d = document.getElementById('alignDrawer');
-  d.style.display = d.style.display === 'flex' ? 'none' : 'flex';
-}
-
-function zeroAttitudeNow() {
-  zeroPitchOffset = current_d.pitch_deg;
-  zeroRollOffset  = current_d.roll_deg;
-  renderPlateCanvas();
-}
-
-function renderPlateCanvas() {
-  const cn = plateCanvas;
+function renderPlateCanvas(oarNum) {
+  const cn = oarNum === 1 ? plateCn1 : plateCn2;
   const cx = cn.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const w = cn.clientWidth;
@@ -857,43 +764,54 @@ function renderPlateCanvas() {
   cx.fillStyle = '#0f1116';
   cx.fillRect(0, 0, w, h);
 
-  const pitchRad = ((current_d.pitch_deg - zeroPitchOffset + mountPitchTrim) * Math.PI) / 180.0;
-  const rollRad  = ((current_d.roll_deg - zeroRollOffset + mountRollTrim) * Math.PI) / 180.0;
-  const mountYaw = (mountYawDeg * Math.PI) / 180.0;
+  const oar = oarNum === 1 ? oar1 : oar2;
+  const camY = oarNum === 1 ? camYaw1 : camYaw2;
+  const camP = oarNum === 1 ? camPitch1 : camPitch2;
+
+  // True 3-Axis Euler Angles (Pitch, Roll, Yaw) - Zero load cell data mixed in!
+  const pitchRad = oar.pitch;
+  const rollRad  = oar.roll;
+  const yawRad   = oar.yaw;
 
   function rotate3D(pt) {
-    let x = pt[0] * Math.cos(mountYaw) - pt[1] * Math.sin(mountYaw);
-    let y = pt[0] * Math.sin(mountYaw) + pt[1] * Math.cos(mountYaw);
-    let z = pt[2];
+    // 1. Yaw (Rz)
+    const cosY = Math.cos(yawRad), sinY = Math.sin(yawRad);
+    let x1 = pt[0] * cosY - pt[1] * sinY;
+    let y1 = pt[0] * sinY + pt[1] * cosY;
+    let z1 = pt[2];
 
+    // 2. Roll (Rx)
     const cosR = Math.cos(rollRad), sinR = Math.sin(rollRad);
-    let y1 = y * cosR - z * sinR;
-    let z1 = y * sinR + z * cosR;
+    let y2 = y1 * cosR - z1 * sinR;
+    let z2 = y1 * sinR + z1 * cosR;
 
+    // 3. Pitch (Ry)
     const cosP = Math.cos(pitchRad), sinP = Math.sin(pitchRad);
-    let x2 = x * cosP + z1 * sinP;
-    let z2 = -x * sinP + z1 * cosP;
+    let x3 = x1 * cosP + z2 * sinP;
+    let z3 = -x1 * sinP + z2 * cosP;
 
-    const cosCY = Math.cos(camYaw), sinCY = Math.sin(camYaw);
-    let x3 = x2 * cosCY + z2 * sinCY;
-    let z3 = -x2 * sinCY + z2 * cosCY;
+    // Camera view transform
+    const cosCY = Math.cos(camY), sinCY = Math.sin(camY);
+    let x4 = x3 * cosCY + z3 * sinCY;
+    let z4 = -x3 * sinCY + z3 * cosCY;
 
-    const cosCP = Math.cos(camPitch), sinCP = Math.sin(camPitch);
-    let y4 = y1 * cosCP - z3 * sinCP;
-    let z4 = y1 * sinCP + z3 * cosCP;
+    const cosCP = Math.cos(camP), sinCP = Math.sin(camP);
+    let y5 = y2 * cosCP - z4 * sinCP;
+    let z5 = y2 * sinCP + z4 * cosCP;
 
-    return [x3, y4, z4];
+    return [x4, y5, z5];
   }
 
   const centerX = w / 2;
   const centerY = h / 2 + 10;
-  const scale = Math.min(w, h) * 0.0038;
+  const scale = Math.min(w, h) * 0.0036;
 
   function project(pt3) {
     const r = rotate3D(pt3);
     return [centerX + r[0] * scale, centerY + r[1] * scale, r[2]];
   }
 
+  // 3D Chassis / Sensor Plate Geometry
   const pw = 55, pl = 85, pth = 8;
   const corners = [
     [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth],
@@ -913,10 +831,12 @@ function renderPlateCanvas() {
     cx.stroke();
   }
 
+  // Draw 3D Box Faces
   drawPoly([3, 2, 6, 7], '#1d222c', '#333b4d');
   drawPoly([1, 2, 6, 5], '#252c38', '#424c61');
-  drawPoly([0, 1, 2, 3], '#114466', '#00ffcc');
+  drawPoly([0, 1, 2, 3], oarNum === 1 ? '#0e3a53' : '#4a3812', oarNum === 1 ? '#00e5ff' : '#ffaa00');
 
+  // Center IMU IC
   const chipW = 16, chipL = 20, chipH = 4;
   const chipZ = -pth - 3;
   const chipCorners = [
@@ -924,278 +844,315 @@ function renderPlateCanvas() {
     [chipW, chipL, chipZ - chipH],   [-chipW, chipL, chipZ - chipH]
   ];
   const chipPts = chipCorners.map(project);
-
   cx.beginPath();
   cx.moveTo(chipPts[0][0], chipPts[0][1]);
   for (let i = 1; i < 4; i++) cx.lineTo(chipPts[i][0], chipPts[i][1]);
   cx.closePath();
-  cx.fillStyle = '#222';
+  cx.fillStyle = '#1c1f26';
   cx.fill();
-  cx.strokeStyle = '#ffbb00';
-  cx.lineWidth = 1.5;
+  cx.strokeStyle = oarNum === 1 ? '#00ffcc' : '#ffcc00';
   cx.stroke();
 
-  const chipCenter3D = [0, 0, chipZ - chipH];
-  const chipCenter2D = project(chipCenter3D);
+  const center2D = project([0, 0, chipZ - chipH]);
 
-  cx.fillStyle = '#ffbb00';
-  cx.font = '8px monospace';
-  cx.fillText("IMU", chipCenter2D[0] - 8, chipCenter2D[1] - 4);
+  // ANIMATION OF NON-ROTATIONAL LINEAR ACCELERATION (Dynamic Inertial Force Vector)
+  // Length and direction represent dynamic acceleration with gravity fully removed
+  const linScale = 4.0;
+  const tipVec = [
+    oar.lin_ax * linScale,
+    oar.lin_ay * linScale,
+    oar.lin_az * linScale
+  ];
+  const tip2D = project([tipVec[0], tipVec[1], chipZ - chipH + tipVec[2]]);
 
-  const effLoad = (invertLoad ? -1 : 1) * current_d.raw_w;
-  if (showForceArrow) {
-    const fMag = Math.max(-70, Math.min(70, effLoad * 0.12));
-    const tip2D = project([0, 0, -pth - fMag]);
-    const base2D = project([0, 0, -pth]);
+  cx.beginPath();
+  cx.moveTo(center2D[0], center2D[1]);
+  cx.lineTo(tip2D[0], tip2D[1]);
+  cx.strokeStyle = '#00ff66';
+  cx.lineWidth = 3.2;
+  cx.stroke();
 
-    cx.beginPath();
-    cx.moveTo(base2D[0], base2D[1]);
-    cx.lineTo(tip2D[0], tip2D[1]);
-    cx.strokeStyle = '#00ffcc';
-    cx.lineWidth = 3.5;
-    cx.stroke();
-  }
+  // Vector Arrowhead
+  cx.beginPath();
+  cx.arc(tip2D[0], tip2D[1], 4, 0, Math.PI * 2);
+  cx.fillStyle = '#00ff66';
+  cx.fill();
 
-  if (show6DofSymbols) {
-    const aScale = 2.8;
-    function drawVectorArrow(vec, col, label, val) {
-      const p1 = chipCenter2D;
-      const p2 = project([
-        chipCenter3D[0] + vec[0] * aScale,
-        chipCenter3D[1] + vec[1] * aScale,
-        chipCenter3D[2] + vec[2] * aScale
-      ]);
-
-      cx.beginPath();
-      cx.moveTo(p1[0], p1[1]);
-      cx.lineTo(p2[0], p2[1]);
-      cx.strokeStyle = col;
-      cx.lineWidth = 2.2;
-      cx.stroke();
-
-      cx.font = '9px monospace';
-      cx.fillStyle = col;
-      cx.fillText(`${label}: ${(val >= 0 ? '+' : '') + val.toFixed(2)}`, p2[0] + 5, p2[1] + 3);
-    }
-
-    drawVectorArrow([current_d.ax, 0, 0], '#ff4444', 'Ax', current_d.ax);
-    drawVectorArrow([0, current_d.ay, 0], '#00ff66', 'Ay', current_d.ay);
-    drawVectorArrow([0, 0, current_d.az], '#3399ff', 'Az', current_d.az);
-
-    function drawTwistArc(axis, rate, col, label) {
-      const radius = 24;
-      const arcLen = Math.min(Math.PI * 1.5, Math.max(0.6, Math.abs(rate) * 1.8));
-      const steps = 12;
-      const sign = rate >= 0 ? 1 : -1;
-
-      cx.beginPath();
-      let lastPt = null;
-      for (let s = 0; s <= steps; s++) {
-        const theta = (s / steps) * arcLen * sign;
-        let pt = [0, 0, 0];
-        if (axis === 'x') pt = [0, radius * Math.cos(theta), radius * Math.sin(theta)];
-        else if (axis === 'y') pt = [radius * Math.cos(theta), 0, radius * Math.sin(theta)];
-        else pt = [radius * Math.cos(theta), radius * Math.sin(theta), 0];
-
-        const p2d = project([chipCenter3D[0] + pt[0], chipCenter3D[1] + pt[1], chipCenter3D[2] + pt[2]]);
-        if (s === 0) cx.moveTo(p2d[0], p2d[1]);
-        else cx.lineTo(p2d[0], p2d[1]);
-        lastPt = p2d;
-      }
-      cx.strokeStyle = col;
-      cx.lineWidth = 2.0;
-      cx.stroke();
-
-      if (lastPt) {
-        cx.font = '9px monospace';
-        cx.fillStyle = col;
-        cx.fillText(`${label}: ${(rate >= 0 ? '+' : '') + rate.toFixed(2)}`, lastPt[0] + 6, lastPt[1] - 4);
-      }
-    }
-
-    drawTwistArc('x', current_d.gx, '#ff9900', 'Gx');
-    drawTwistArc('y', current_d.gy, '#d044ff', 'Gy');
-    drawTwistArc('z', current_d.gz, '#ffea00', 'Gz');
-  }
-
+  // Coordinate / Attitude Labels
   cx.font = '10px monospace';
-  cx.fillStyle = '#00e6ff';
-  cx.fillText(`PITCH: ${(current_d.pitch_deg >= 0 ? '+' : '') + current_d.pitch_deg.toFixed(1)}°`, 10, h - 10);
+  cx.fillStyle = '#00e5ff';
+  cx.fillText(`PITCH: ${(oar.pitch * 180 / Math.PI).toFixed(1)}°`, 10, h - 24);
   cx.fillStyle = '#cc66ff';
-  cx.fillText(`ROLL:  ${(current_d.roll_deg >= 0 ? '+' : '') + current_d.roll_deg.toFixed(1)}°`, 110, h - 10);
-  cx.fillStyle = '#8899aa';
-  cx.fillText(`LOAD:  ${effLoad.toFixed(1)}`, 200, h - 10);
+  cx.fillText(`ROLL:  ${(oar.roll * 180 / Math.PI).toFixed(1)}°`, 105, h - 24);
+  cx.fillStyle = '#ffea00';
+  cx.fillText(`YAW:   ${(oar.yaw * 180 / Math.PI).toFixed(1)}°`, 195, h - 24);
+
+  const linMag = Math.hypot(oar.lin_ax, oar.lin_ay, oar.lin_az);
+  cx.fillStyle = '#00ff66';
+  cx.fillText(`DYNAMIC LINEAR ACCEL: ${linMag.toFixed(2)} m/s² (VECTOR: ${oar.lin_ax.toFixed(1)}, ${oar.lin_ay.toFixed(1)}, ${oar.lin_az.toFixed(1)})`, 10, h - 10);
 
   cx.restore();
 }
 
 // ==============================================================================
-// 5. LEAFLET SATELLITE MAP
+// 5. FOUR AUTO-SCALED STRIP CHARTS (SCREENSHOT 1 EXACT REPRODUCTION)
 // ==============================================================================
-const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
+function drawScreenshotStripChart(canvasId, arr, col, unit, minSpan) {
+  const cn = document.getElementById(canvasId);
+  const cx = cn.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = cn.clientWidth;
+  const h = cn.clientHeight;
 
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19,
-  crossOrigin: true
-}).addTo(map);
+  if (cn.width !== w * dpr || cn.height !== h * dpr) {
+    cn.width = w * dpr;
+    cn.height = h * dpr;
+  }
 
-const track = L.polyline([], { color: '#00e5ff', weight: 3.5, opacity: 0.9 }).addTo(map);
-const marker = L.circleMarker([0, 0], { radius: 6, color: '#ffffff', fillColor: '#ff0044', fillOpacity: 1, weight: 2 }).addTo(map);
+  cx.save();
+  cx.scale(dpr, dpr);
+  cx.clearRect(0, 0, w, h);
 
-function recenterMap() {
-  const latLngs = track.getLatLngs();
-  if (latLngs && latLngs.length > 0) {
-    map.fitBounds(L.latLngBounds(latLngs), { padding: [25, 25], maxZoom: 18 });
+  const gutter = 52;
+  const chartW = w - gutter - 12;
+  const chartH = h - 26;
+  const topPad = 16;
+
+  let vMin = Infinity, vMax = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] < vMin) vMin = arr[i];
+    if (arr[i] > vMax) vMax = arr[i];
+  }
+  if (!isFinite(vMin) || !isFinite(vMax)) { vMin = -1; vMax = 1; }
+
+  let span = vMax - vMin;
+  if (span < minSpan) {
+    const mid = (vMax + vMin) / 2.0;
+    vMin = mid - (minSpan / 2.0);
+    vMax = mid + (minSpan / 2.0);
   } else {
-    map.invalidateSize();
+    vMin -= span * 0.14;
+    vMax += span * 0.14;
   }
+
+  const ticks = 4;
+  cx.font = '10px monospace';
+  cx.textAlign = 'right';
+  cx.textBaseline = 'middle';
+
+  for (let i = 0; i <= ticks; i++) {
+    const val = vMin + (i / ticks) * (vMax - vMin);
+    const y = topPad + chartH - (i / ticks) * chartH;
+
+    cx.strokeStyle = (Math.abs(val) < (vMax - vMin) / 20.0) ? '#384050' : '#171b22';
+    cx.lineWidth = 1;
+    cx.beginPath();
+    cx.moveTo(gutter, y);
+    cx.lineTo(gutter + chartW, y);
+    cx.stroke();
+
+    cx.fillStyle = '#778899';
+    cx.fillText((val >= 0 ? '+' : '') + val.toFixed(1), gutter - 6, y);
+  }
+
+  cx.strokeStyle = col;
+  cx.lineWidth = 2.0;
+  cx.beginPath();
+  const step = chartW / (arr.length - 1);
+
+  for (let i = 0; i < arr.length; i++) {
+    const norm = (arr[i] - vMin) / (vMax - vMin || 1);
+    const x = gutter + i * step;
+    const y = topPad + chartH - Math.max(0, Math.min(1, norm)) * chartH;
+
+    if (i === 0) cx.moveTo(x, y);
+    else cx.lineTo(x, y);
+  }
+  cx.stroke();
+
+  cx.fillStyle = '#556677';
+  cx.textAlign = 'left';
+  cx.fillText(unit, gutter + 4, topPad + 10);
+
+  cx.restore();
 }
 
 // ==============================================================================
-// 6. MAIN MULTI-SERIES CHART
+// 6. THREE INTERACTIVE MULTI-SERIES CHARTS (SCREENSHOT 2 & MASTER OVERLAY)
 // ==============================================================================
-const chartCanvas = document.getElementById('interactiveCanvas');
-const chartCtx = chartCanvas.getContext('2d');
-const chartTooltip = document.getElementById('chartTooltip');
-
-let seriesVisible = { load: true, ax: true, ay: true, az: true, gx: true, gy: true, gz: true };
-let viewStart = 0.0;
-let viewEnd = 1.0;
-let isAutoFollow = true;
-let chartHoverIndex = null;
-let replayMarkerIndex = null;
-
-function toggleSeries(key) {
-  seriesVisible[key] = !seriesVisible[key];
-  document.getElementById(`leg_${key}`).classList.toggle('off', !seriesVisible[key]);
-  redrawInteractiveChart();
-}
-
-function toggleAutoFollow() {
-  isAutoFollow = !isAutoFollow;
-  document.getElementById('btnFollow').classList.toggle('active', isAutoFollow);
-  if (isAutoFollow) {
-    viewEnd = 1.0;
-    viewStart = Math.max(0, 1.0 - 0.25);
+const interConfigs = {
+  1: {
+    canvas: document.getElementById('canvasInterOar1'),
+    tooltip: document.getElementById('tooltip1'),
+    series: { load: true, ax: true, ay: true, az: true, gx: true, gy: true, gz: true },
+    viewStart: 0.0, viewEnd: 1.0, autoFollow: true, hoverIdx: null, isDragging: false, dragStartX: 0, dragStartRange: [0, 1]
+  },
+  2: {
+    canvas: document.getElementById('canvasInterOar2'),
+    tooltip: document.getElementById('tooltip2'),
+    series: { load: true, ax: true, ay: true, az: true, gx: true, gy: true, gz: true },
+    viewStart: 0.0, viewEnd: 1.0, autoFollow: true, hoverIdx: null, isDragging: false, dragStartX: 0, dragStartRange: [0, 1]
+  },
+  'master': {
+    canvas: document.getElementById('canvasMasterOverlay'),
+    tooltip: document.getElementById('tooltipMaster'),
+    series: {
+      o1_load: true, o2_load: true,
+      o1_ax: true, o2_ax: false,
+      o1_ay: false, o2_ay: false,
+      o1_az: false, o2_az: false,
+      o1_gx: false, o2_gx: false,
+      o1_gy: false, o2_gy: false,
+      o1_gz: false, o2_gz: false
+    },
+    viewStart: 0.0, viewEnd: 1.0, autoFollow: true, hoverIdx: null, isDragging: false, dragStartX: 0, dragStartRange: [0, 1]
   }
-  redrawInteractiveChart();
+};
+
+function toggleSeries(oarNum, key) {
+  const cfg = interConfigs[oarNum];
+  cfg.series[key] = !cfg.series[key];
+  document.getElementById(`leg${oarNum}_${key}`).classList.toggle('off', !cfg.series[key]);
+  redrawInteractiveChart(oarNum);
 }
 
-function zoomChart(scaleFactor) {
-  isAutoFollow = false;
-  document.getElementById('btnFollow').classList.remove('active');
-  const mid = (viewStart + viewEnd) / 2;
-  const halfSpan = ((viewEnd - viewStart) * scaleFactor) / 2;
-  viewStart = Math.max(0, mid - halfSpan);
-  viewEnd = Math.min(1.0, mid + halfSpan);
-  if (viewEnd <= viewStart) viewEnd = Math.min(1.0, viewStart + 0.05);
-  redrawInteractiveChart();
+function toggleMasterSeries(key) {
+  const cfg = interConfigs['master'];
+  cfg.series[key] = !cfg.series[key];
+  document.getElementById(`legM_${key}`).classList.toggle('off', !cfg.series[key]);
+  redrawInteractiveChart('master');
 }
 
-function resetChartZoom() {
-  viewStart = 0.0;
-  viewEnd = 1.0;
-  redrawInteractiveChart();
+function toggleFollow(key) {
+  const cfg = interConfigs[key];
+  cfg.autoFollow = !cfg.autoFollow;
+  const btnId = key === 'master' ? 'btnFollowMaster' : `btnFollow${key}`;
+  document.getElementById(btnId).classList.toggle('active', cfg.autoFollow);
+  if (cfg.autoFollow) { cfg.viewEnd = 1.0; cfg.viewStart = Math.max(0, 1.0 - 0.25); }
+  redrawInteractiveChart(key);
 }
 
-chartCanvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  isAutoFollow = false;
-  document.getElementById('btnFollow').classList.remove('active');
-  zoomChart(e.deltaY < 0 ? 0.85 : 1.15);
-}, { passive: false });
+function zoomInteractive(key, factor) {
+  const cfg = interConfigs[key];
+  cfg.autoFollow = false;
+  const btnId = key === 'master' ? 'btnFollowMaster' : `btnFollow${key}`;
+  document.getElementById(btnId).classList.remove('active');
+  const mid = (cfg.viewStart + cfg.viewEnd) / 2;
+  const span = ((cfg.viewEnd - cfg.viewStart) * factor) / 2;
+  cfg.viewStart = Math.max(0, mid - span);
+  cfg.viewEnd = Math.min(1.0, mid + span);
+  if (cfg.viewEnd <= cfg.viewStart) cfg.viewEnd = Math.min(1.0, cfg.viewStart + 0.05);
+  redrawInteractiveChart(key);
+}
 
-let isDragging = false;
-let dragStartX = 0;
-let dragStartRange = [0, 1];
+function resetInteractiveZoom(key) {
+  const cfg = interConfigs[key];
+  cfg.viewStart = 0.0; cfg.viewEnd = 1.0;
+  redrawInteractiveChart(key);
+}
 
-chartCanvas.addEventListener('mousedown', (e) => {
-  isDragging = true;
-  dragStartX = e.clientX;
-  dragStartRange = [viewStart, viewEnd];
-  isAutoFollow = false;
-  document.getElementById('btnFollow').classList.remove('active');
+// Bind Mouse Zoom and Pan Events
+Object.keys(interConfigs).forEach(key => {
+  const cfg = interConfigs[key];
+  const cn = cfg.canvas;
+
+  cn.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoomInteractive(key, e.deltaY < 0 ? 0.85 : 1.15);
+  }, { passive: false });
+
+  cn.addEventListener('mousedown', (e) => {
+    cfg.isDragging = true;
+    cfg.dragStartX = e.clientX;
+    cfg.dragStartRange = [cfg.viewStart, cfg.viewEnd];
+    cfg.autoFollow = false;
+    const btnId = key === 'master' ? 'btnFollowMaster' : `btnFollow${key}`;
+    document.getElementById(btnId).classList.remove('active');
+  });
+
+  window.addEventListener('mouseup', () => { cfg.isDragging = false; });
+
+  cn.addEventListener('mousemove', (e) => {
+    const rect = cn.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    if (cfg.isDragging) {
+      const dx = e.clientX - cfg.dragStartX;
+      const span = cfg.dragStartRange[1] - cfg.dragStartRange[0];
+      const shift = -(dx / rect.width) * span;
+      cfg.viewStart = Math.max(0, cfg.dragStartRange[0] + shift);
+      cfg.viewEnd = Math.min(1.0, cfg.dragStartRange[1] + shift);
+      redrawInteractiveChart(key);
+      return;
+    }
+    handleInteractiveHover(key, mouseX, mouseY, rect.width, rect.height);
+  });
+
+  cn.addEventListener('mouseleave', () => {
+    cfg.hoverIdx = null;
+    cfg.tooltip.style.display = 'none';
+    redrawInteractiveChart(key);
+  });
 });
 
-window.addEventListener('mouseup', () => { isDragging = false; });
-
-chartCanvas.addEventListener('mousemove', (e) => {
-  const rect = chartCanvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
-
-  if (isDragging) {
-    const dx = e.clientX - dragStartX;
-    const span = dragStartRange[1] - dragStartRange[0];
-    const shift = -(dx / rect.width) * span;
-    viewStart = Math.max(0, dragStartRange[0] + shift);
-    viewEnd = Math.min(1.0, dragStartRange[1] + shift);
-    if (viewStart === 0) viewEnd = span;
-    if (viewEnd === 1.0) viewStart = 1.0 - span;
-    redrawInteractiveChart();
-    return;
-  }
-
-  handleChartHover(mouseX, mouseY, rect.width, rect.height);
-});
-
-chartCanvas.addEventListener('mouseleave', () => {
-  chartHoverIndex = null;
-  chartTooltip.style.display = 'none';
-  redrawInteractiveChart();
-});
-
-chartCanvas.addEventListener('click', () => {
-  if (chartHoverIndex !== null && isReplayMode) {
-    jumpToReplayIndex(chartHoverIndex);
-  }
-});
-
-function handleChartHover(mouseX, mouseY, w, h) {
-  if (chartData.length === 0) return;
+function handleInteractiveHover(key, mouseX, mouseY, w, h) {
+  if (dataset.length === 0) return;
+  const cfg = interConfigs[key];
   const gutterL = 60, gutterR = 55;
   const plotW = w - gutterL - gutterR;
 
   if (mouseX < gutterL || mouseX > w - gutterR) {
-    chartHoverIndex = null;
-    chartTooltip.style.display = 'none';
-    redrawInteractiveChart();
+    cfg.hoverIdx = null;
+    cfg.tooltip.style.display = 'none';
+    redrawInteractiveChart(key);
     return;
   }
 
-  const sIdx = Math.floor(viewStart * (chartData.length - 1));
-  const eIdx = Math.ceil(viewEnd * (chartData.length - 1));
+  const sIdx = Math.floor(cfg.viewStart * (dataset.length - 1));
+  const eIdx = Math.ceil(cfg.viewEnd * (dataset.length - 1));
   const count = eIdx - sIdx;
   if (count <= 0) return;
 
   const ratio = (mouseX - gutterL) / plotW;
-  const idx = Math.min(chartData.length - 1, Math.max(0, Math.round(sIdx + ratio * count)));
-  chartHoverIndex = idx;
+  const idx = Math.min(dataset.length - 1, Math.max(0, Math.round(sIdx + ratio * count)));
+  cfg.hoverIdx = idx;
 
-  const d = chartData[idx];
-  const effL = (invertLoad ? -1 : 1) * d.raw_w;
+  const d = dataset[idx];
+  cfg.tooltip.style.display = 'block';
+  cfg.tooltip.style.left = `${Math.min(w - 240, Math.max(10, mouseX + 15))}px`;
+  cfg.tooltip.style.top = `${Math.min(h - 150, Math.max(30, mouseY - 50))}px`;
 
-  chartTooltip.style.display = 'block';
-  chartTooltip.style.left = `${Math.min(w - 240, Math.max(10, mouseX + 15))}px`;
-  chartTooltip.style.top = `${Math.min(h - 150, Math.max(30, mouseY - 50))}px`;
-
-  chartTooltip.innerHTML = `
-    <div style="color:#88aacc; font-weight:bold; margin-bottom:2px;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
-    <div style="color:#00ffcc;">LOAD: ${effL.toFixed(2)}</div>
-    <div style="color:#ff4444;">Ax:   ${d.ax.toFixed(2)} m/s²</div>
-    <div style="color:#00ff66;">Ay:   ${d.ay.toFixed(2)} m/s²</div>
-    <div style="color:#3399ff;">Az:   ${d.az.toFixed(2)} m/s²</div>
-    <div style="color:#ff9900;">Gx:   ${d.gx.toFixed(3)} rad/s</div>
-    <div style="color:#d044ff;">Gy:   ${d.gy.toFixed(3)} rad/s</div>
-    <div style="color:#ffea00;">Gz:   ${d.gz.toFixed(3)} rad/s</div>
-  `;
-
-  redrawInteractiveChart();
+  if (key === 1 || key === 2) {
+    const pfx = key === 1 ? 'o1_' : 'o2_';
+    const effL = key === 1 ? (flipLoad1 ? -1 : 1) * d.o1_w : (flipLoad2 ? -1 : 1) * d.o2_w;
+    cfg.tooltip.innerHTML = `
+      <div style="color:#88aacc; font-weight:bold;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
+      <div style="color:#00ffcc;">LOAD: ${effL.toFixed(2)}</div>
+      <div style="color:#ff4444;">Ax:   ${d[pfx+'ax'].toFixed(2)} m/s²</div>
+      <div style="color:#00ff66;">Ay:   ${d[pfx+'ay'].toFixed(2)} m/s²</div>
+      <div style="color:#3399ff;">Az:   ${d[pfx+'az'].toFixed(2)} m/s²</div>
+      <div style="color:#ff9900;">Gx:   ${d[pfx+'gx'].toFixed(3)} rad/s</div>
+      <div style="color:#d044ff;">Gy:   ${d[pfx+'gy'].toFixed(3)} rad/s</div>
+      <div style="color:#ffea00;">Gz:   ${d[pfx+'gz'].toFixed(3)} rad/s</div>
+    `;
+  } else {
+    const f1 = (flipLoad1 ? -1 : 1) * (d.o1_w - oar1.tareOffset);
+    const f2 = (flipLoad2 ? -1 : 1) * (d.o2_w - oar2.tareOffset) - tareAlignmentDelta;
+    cfg.tooltip.innerHTML = `
+      <div style="color:#88aacc; font-weight:bold;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
+      <div style="color:#00ffcc;">O1 FORCE: ${f1.toFixed(1)} kg</div>
+      <div style="color:#ffbb00;">O2 FORCE: ${f2.toFixed(1)} kg</div>
+      <div style="color:#ff77aa;">DELTA (O2-O1): ${(f2 - f1).toFixed(1)} kg</div>
+    `;
+  }
+  redrawInteractiveChart(key);
 }
 
-function redrawInteractiveChart() {
-  const cn = chartCanvas;
-  const cx = chartCtx;
+function redrawInteractiveChart(key) {
+  const cfg = interConfigs[key];
+  const cn = cfg.canvas;
+  const cx = cn.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const w = cn.clientWidth;
   const h = cn.clientHeight;
@@ -1213,182 +1170,168 @@ function redrawInteractiveChart() {
   const plotW = w - gutterL - gutterR;
   const plotH = h - padTop - padBottom;
 
-  if (chartData.length < 2) {
+  if (dataset.length < 2) {
     cx.fillStyle = "#444";
-    cx.font = "12px monospace";
+    cx.font = "11px monospace";
     cx.textAlign = "center";
-    cx.fillText("Awaiting sensor data or loaded file...", w / 2, h / 2);
+    cx.fillText("Awaiting sensor data or loaded session...", w / 2, h / 2);
     cx.restore();
     return;
   }
 
-  if (isAutoFollow && !isReplayMode) {
-    const windowSpan = 150;
-    const total = chartData.length;
+  if (cfg.autoFollow) {
+    const windowSpan = 160;
+    const total = dataset.length;
     if (total > windowSpan) {
-      viewStart = (total - windowSpan) / total;
-      viewEnd = 1.0;
+      cfg.viewStart = (total - windowSpan) / total;
+      cfg.viewEnd = 1.0;
     } else {
-      viewStart = 0; viewEnd = 1.0;
+      cfg.viewStart = 0; cfg.viewEnd = 1.0;
     }
   }
 
-  const sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
-  const eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
-  const slice = chartData.slice(sIdx, eIdx + 1);
+  const sIdx = Math.max(0, Math.floor(cfg.viewStart * (dataset.length - 1)));
+  const eIdx = Math.min(dataset.length - 1, Math.ceil(cfg.viewEnd * (dataset.length - 1)));
+  const slice = dataset.slice(sIdx, eIdx + 1);
 
   let fMin = Infinity, fMax = -Infinity;
   let mMin = Infinity, mMax = -Infinity;
 
   for (let i = 0; i < slice.length; i++) {
     const p = slice[i];
-    const effL = (invertLoad ? -1 : 1) * p.raw_w;
 
-    if (seriesVisible.load) {
-      if (effL < fMin) fMin = effL;
-      if (effL > fMax) fMax = effL;
-    }
-    const checkMotion = (v, enabled) => {
-      if (enabled) {
-        if (v < mMin) mMin = v;
-        if (v > mMax) mMax = v;
+    if (key === 1 || key === 2) {
+      const pfx = key === 1 ? 'o1_' : 'o2_';
+      const isFlip = key === 1 ? flipLoad1 : flipLoad2;
+      const effL = (isFlip ? -1 : 1) * p[pfx + 'w'];
+      if (cfg.series.load) { if (effL < fMin) fMin = effL; if (effL > fMax) fMax = effL; }
+
+      const checkM = (v, enabled) => { if (enabled) { if (v < mMin) mMin = v; if (v > mMax) mMax = v; } };
+      checkM(p[pfx + 'ax'], cfg.series.ax);
+      checkM(p[pfx + 'ay'], cfg.series.ay);
+      checkM(p[pfx + 'az'], cfg.series.az);
+      checkM(p[pfx + 'gx'], cfg.series.gx);
+      checkM(p[pfx + 'gy'], cfg.series.gy);
+      checkM(p[pfx + 'gz'], cfg.series.gz);
+    } else {
+      // Master Overlay bounds
+      const f1 = (flipLoad1 ? -1 : 1) * (p.o1_w - oar1.tareOffset);
+      const f2 = (flipLoad2 ? -1 : 1) * (p.o2_w - oar2.tareOffset) - tareAlignmentDelta;
+
+      if (isRelativeDeltaMode) {
+        const delta = f2 - f1;
+        if (delta < fMin) fMin = delta; if (delta > fMax) fMax = delta;
+      } else {
+        if (cfg.series.o1_load) { if (f1 < fMin) fMin = f1; if (f1 > fMax) fMax = f1; }
+        if (cfg.series.o2_load) { if (f2 < fMin) fMin = f2; if (f2 > fMax) fMax = f2; }
       }
-    };
-    checkMotion(p.ax, seriesVisible.ax);
-    checkMotion(p.ay, seriesVisible.ay);
-    checkMotion(p.az, seriesVisible.az);
-    checkMotion(p.gx, seriesVisible.gx);
-    checkMotion(p.gy, seriesVisible.gy);
-    checkMotion(p.gz, seriesVisible.gz);
+
+      const checkM = (v, enabled) => { if (enabled) { if (v < mMin) mMin = v; if (v > mMax) mMax = v; } };
+      checkM(p.o1_ax, cfg.series.o1_ax); checkM(p.o2_ax, cfg.series.o2_ax);
+      checkM(p.o1_ay, cfg.series.o1_ay); checkM(p.o2_ay, cfg.series.o2_ay);
+      checkM(p.o1_az, cfg.series.o1_az); checkM(p.o2_az, cfg.series.o2_az);
+      checkM(p.o1_gx, cfg.series.o1_gx); checkM(p.o2_gx, cfg.series.o2_gx);
+      checkM(p.o1_gy, cfg.series.o1_gy); checkM(p.o2_gy, cfg.series.o2_gy);
+      checkM(p.o1_gz, cfg.series.o1_gz); checkM(p.o2_gz, cfg.series.o2_gz);
+    }
   }
 
-  if (!isFinite(fMin) || !isFinite(fMax)) { fMin = -100; fMax = 100; }
+  if (!isFinite(fMin) || !isFinite(fMax)) { fMin = -50; fMax = 50; }
   if (!isFinite(mMin) || !isFinite(mMax)) { mMin = -12; mMax = 12; }
 
-  const fPad = Math.max(2.0, (fMax - fMin) * 0.1);
+  const fPad = Math.max(1.0, (fMax - fMin) * 0.12);
   fMin -= fPad; fMax += fPad;
 
-  const mPad = Math.max(1.0, (mMax - mMin) * 0.15);
+  const mPad = Math.max(0.5, (mMax - mMin) * 0.12);
   mMin -= mPad; mMax += mPad;
 
+  // Grid Ticks
   const ticks = 4;
   cx.font = "10px monospace";
-  cx.lineWidth = 1;
-
   for (let i = 0; i <= ticks; i++) {
     const y = padTop + plotH - (i / ticks) * plotH;
     cx.strokeStyle = "#161b24";
-    cx.beginPath();
-    cx.moveTo(gutterL, y);
-    cx.lineTo(gutterL + plotW, y);
-    cx.stroke();
+    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
 
     const valF = fMin + (i / ticks) * (fMax - fMin);
     cx.fillStyle = "#00ffcc";
     cx.textAlign = "right";
-    cx.textBaseline = "middle";
-    cx.fillText(`${valF.toFixed(1)}`, gutterL - 6, y);
+    cx.fillText(`${valF.toFixed(1)}`, gutterL - 6, y + 3);
 
     const valM = mMin + (i / ticks) * (mMax - mMin);
     cx.fillStyle = "#8899aa";
     cx.textAlign = "left";
-    cx.fillText(`${valM.toFixed(1)}`, gutterL + plotW + 6, y);
+    cx.fillText(`${valM.toFixed(1)}`, gutterL + plotW + 6, y + 3);
   }
 
   cx.fillStyle = "#00ffcc";
   cx.textAlign = "left";
-  cx.fillText("LOAD (raw)", 6, padTop - 12);
+  cx.fillText(key === 'master' ? (isRelativeDeltaMode ? "RELATIVE DELTA (O2 - O1)" : "FORCE (kg)") : "LOAD (raw)", 6, padTop - 12);
 
   cx.fillStyle = "#8899aa";
   cx.textAlign = "right";
   cx.fillText("MOTION (m/s² | rad/s)", w - 6, padTop - 12);
 
-  function drawLine(key, color, minV, maxV) {
-    if (!seriesVisible[key]) return;
-    cx.strokeStyle = color;
+  function drawLine(valFn, col, minV, maxV, isDashed = false) {
+    cx.strokeStyle = col;
     cx.lineWidth = 1.6;
+    if (isDashed) cx.setLineDash([4, 3]); else cx.setLineDash([]);
     cx.beginPath();
     for (let i = 0; i < slice.length; i++) {
-      const p = slice[i];
-      const val = key === 'load' ? ((invertLoad ? -1 : 1) * p.raw_w) : p[key];
-      const normX = i / (slice.length - 1);
-      const normY = (val - minV) / (maxV - minV);
+      const val = valFn(slice[i]);
+      const normX = i / (slice.length - 1 || 1);
+      const normY = (val - minV) / (maxV - minV || 1);
       const x = gutterL + normX * plotW;
       const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-      if (i === 0) cx.moveTo(x, y);
-      else cx.lineTo(x, y);
+      if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
     }
-    cx.stroke();
-  }
-
-  drawLine('load', '#00ffcc', fMin, fMax);
-  drawLine('ax',   '#ff4444', mMin, mMax);
-  drawLine('ay',   '#00ff66', mMin, mMax);
-  drawLine('az',   '#3399ff', mMin, mMax);
-  drawLine('gx',   '#ff9900', mMin, mMax);
-  drawLine('gy',   '#d044ff', mMin, mMax);
-  drawLine('gz',   '#ffea00', mMin, mMax);
-
-  // Catch Markers overlay on main timeline
-  if (detectedStrokes.length > 0) {
-    for (const st of detectedStrokes) {
-      if (st.catchIdx >= sIdx && st.catchIdx <= eIdx) {
-        const nx = (st.catchIdx - sIdx) / (eIdx - sIdx || 1);
-        const x = gutterL + nx * plotW;
-        cx.strokeStyle = '#ffaa00';
-        cx.lineWidth = 1.2;
-        cx.setLineDash([3, 3]);
-        cx.beginPath();
-        cx.moveTo(x, padTop);
-        cx.lineTo(x, padTop + plotH);
-        cx.stroke();
-        cx.setLineDash([]);
-      }
-    }
-  }
-
-  // Replay Line
-  if (isReplayMode && replayMarkerIndex !== null && replayMarkerIndex >= sIdx && replayMarkerIndex <= eIdx) {
-    const rx = gutterL + ((replayMarkerIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
-    cx.strokeStyle = '#ffffff';
-    cx.lineWidth = 2;
-    cx.setLineDash([4, 3]);
-    cx.beginPath();
-    cx.moveTo(rx, padTop);
-    cx.lineTo(rx, padTop + plotH);
     cx.stroke();
     cx.setLineDash([]);
+  }
+
+  if (key === 1 || key === 2) {
+    const pfx = key === 1 ? 'o1_' : 'o2_';
+    const isFlip = key === 1 ? flipLoad1 : flipLoad2;
+    if (cfg.series.load) drawLine(p => (isFlip ? -1 : 1) * p[pfx + 'w'], '#00ffcc', fMin, fMax);
+    if (cfg.series.ax)   drawLine(p => p[pfx + 'ax'], '#ff4444', mMin, mMax);
+    if (cfg.series.ay)   drawLine(p => p[pfx + 'ay'], '#00ff66', mMin, mMax);
+    if (cfg.series.az)   drawLine(p => p[pfx + 'az'], '#3399ff', mMin, mMax);
+    if (cfg.series.gx)   drawLine(p => p[pfx + 'gx'], '#ff9900', mMin, mMax);
+    if (cfg.series.gy)   drawLine(p => p[pfx + 'gy'], '#d044ff', mMin, mMax);
+    if (cfg.series.gz)   drawLine(p => p[pfx + 'gz'], '#ffea00', mMin, mMax);
+  } else {
+    // Master Comparison Draw
+    if (isRelativeDeltaMode) {
+      drawLine(p => {
+        const f1 = (flipLoad1 ? -1 : 1) * (p.o1_w - oar1.tareOffset);
+        const f2 = (flipLoad2 ? -1 : 1) * (p.o2_w - oar2.tareOffset) - tareAlignmentDelta;
+        return f2 - f1;
+      }, '#ff0077', fMin, fMax);
+    } else {
+      if (cfg.series.o1_load) drawLine(p => (flipLoad1 ? -1 : 1) * (p.o1_w - oar1.tareOffset), '#00ffcc', fMin, fMax);
+      if (cfg.series.o2_load) drawLine(p => (flipLoad2 ? -1 : 1) * (p.o2_w - oar2.tareOffset) - tareAlignmentDelta, '#ffbb00', fMin, fMax, true);
+    }
+    if (cfg.series.o1_ax) drawLine(p => p.o1_ax, '#ff4444', mMin, mMax);
+    if (cfg.series.o2_ax) drawLine(p => p.o2_ax, '#ff8888', mMin, mMax, true);
+    if (cfg.series.o1_ay) drawLine(p => p.o1_ay, '#00ff66', mMin, mMax);
+    if (cfg.series.o2_ay) drawLine(p => p.o2_ay, '#66ffaa', mMin, mMax, true);
+    if (cfg.series.o1_az) drawLine(p => p.o1_az, '#3399ff', mMin, mMax);
+    if (cfg.series.o2_az) drawLine(p => p.o2_az, '#88ccff', mMin, mMax, true);
+    if (cfg.series.o1_gx) drawLine(p => p.o1_gx, '#ff9900', mMin, mMax);
+    if (cfg.series.o2_gx) drawLine(p => p.o2_gx, '#ffc266', mMin, mMax, true);
+    if (cfg.series.o1_gy) drawLine(p => p.o1_gy, '#d044ff', mMin, mMax);
+    if (cfg.series.o2_gy) drawLine(p => p.o2_gy, '#ea99ff', mMin, mMax, true);
+    if (cfg.series.o1_gz) drawLine(p => p.o1_gz, '#ffea00', mMin, mMax);
+    if (cfg.series.o2_gz) drawLine(p => p.o2_gz, '#fff588', mMin, mMax, true);
   }
 
   // Hover Snapping Dots
-  if (chartHoverIndex !== null && chartHoverIndex >= sIdx && chartHoverIndex <= eIdx) {
-    const hx = gutterL + ((chartHoverIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
-    const tgt = chartData[chartHoverIndex];
-
+  if (cfg.hoverIdx !== null && cfg.hoverIdx >= sIdx && cfg.hoverIdx <= eIdx) {
+    const hx = gutterL + ((cfg.hoverIdx - sIdx) / (eIdx - sIdx || 1)) * plotW;
     cx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    cx.lineWidth = 1;
     cx.setLineDash([3, 3]);
-    cx.beginPath();
-    cx.moveTo(hx, padTop);
-    cx.lineTo(hx, padTop + plotH);
-    cx.stroke();
+    cx.beginPath(); cx.moveTo(hx, padTop); cx.lineTo(hx, padTop + plotH); cx.stroke();
     cx.setLineDash([]);
-
-    function drawDot(val, minV, maxV, col) {
-      const ny = (val - minV) / (maxV - minV);
-      const y = padTop + plotH - Math.max(0, Math.min(1, ny)) * plotH;
-      cx.beginPath();
-      cx.arc(hx, y, 3.5, 0, Math.PI * 2);
-      cx.fillStyle = col;
-      cx.fill();
-    }
-    if (seriesVisible.load) drawDot((invertLoad ? -1 : 1) * tgt.raw_w, fMin, fMax, '#00ffcc');
-    if (seriesVisible.ax)   drawDot(tgt.ax, mMin, mMax, '#ff4444');
-    if (seriesVisible.ay)   drawDot(tgt.ay, mMin, mMax, '#00ff66');
-    if (seriesVisible.az)   drawDot(tgt.az, mMin, mMax, '#3399ff');
-    if (seriesVisible.gx)   drawDot(tgt.gx, mMin, mMax, '#ff9900');
-    if (seriesVisible.gy)   drawDot(tgt.gy, mMin, mMax, '#d044ff');
-    if (seriesVisible.gz)   drawDot(tgt.gz, mMin, mMax, '#ffea00');
   }
 
   cx.fillStyle = "#667788";
@@ -1401,17 +1344,28 @@ function redrawInteractiveChart() {
 }
 
 // ==============================================================================
-// 7. FILE IMPORT & TRUE REAL-TIME SYNCED REPLAY
+// 7. LEAFLET SATELLITE GPS MAP
 // ==============================================================================
-let isReplayMode = false;
-let replayData = [];
-let replayIndex = 0;
-let isReplayPlaying = false;
-let replaySpeed = 1.0;
-let replayStartPerf = 0;
-let replayStartDataMs = 0;
-let replayAnimId = null;
+const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19, crossOrigin: true
+}).addTo(map);
 
+const track = L.polyline([], { color: '#00e5ff', weight: 3.5, opacity: 0.9 }).addTo(map);
+const marker = L.circleMarker([0, 0], { radius: 6, color: '#ffffff', fillColor: '#ff0044', fillOpacity: 1, weight: 2 }).addTo(map);
+
+function recenterMap() {
+  const latLngs = track.getLatLngs();
+  if (latLngs && latLngs.length > 0) {
+    map.fitBounds(L.latLngBounds(latLngs), { padding: [25, 25], maxZoom: 18 });
+  } else {
+    map.invalidateSize();
+  }
+}
+
+// ==============================================================================
+// 8. FILE LOADER (CSV / RAW HEX APP LOGS)
+// ==============================================================================
 function handleFileSelected(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -1449,12 +1403,12 @@ function parseAndLoadFile(content) {
         const parts = line.split('\t').map(p => p.trim());
         const appIdx = parts.indexOf("Application");
         const useful = appIdx !== -1 ? parts.slice(appIdx + 1) : parts;
-        if (useful.length >= 10 && !isNaN(parseFloat(useful[0]))) {
+        if (useful.length >= 8 && !isNaN(parseFloat(useful[0]))) {
           rows.push(`${useful[0]},"${useful[1]}",${useful.slice(2).join(',')}`);
         }
       } else if (line.includes(',')) {
         const tokens = line.split(',');
-        if (tokens.length >= 10 && !isNaN(parseFloat(tokens[0]))) {
+        if (tokens.length >= 8 && !isNaN(parseFloat(tokens[0]))) {
           rows.push(line);
         }
       }
@@ -1466,31 +1420,16 @@ function parseAndLoadFile(content) {
     return;
   }
 
-  const cleanRows = [];
-  let lastMs = null;
-  for (const r of rows) {
-    const p = parseCsvTokens(r);
-    const m = parseInt(p[0], 10);
-    if (m !== lastMs) {
-      cleanRows.push(r);
-      lastMs = m;
-    }
-  }
-
-  replayData = [];
-  chartData = [];
+  dataset = [];
   track.setLatLngs([]);
-
   const gpsCoords = [];
-  for (const r of cleanRows) {
+
+  for (const r of rows) {
     saveRowToStorage(r);
-    const pt = ingestTelemetry(r, false);
-    if (pt) {
-      replayData.push(pt);
-      chartData.push(pt);
-      if (pt.lat && pt.lng && Math.abs(pt.lat) > 0.001) {
-        gpsCoords.push([pt.lat, pt.lng]);
-      }
+    ingestTelemetryLine(r);
+    const p = dataset[dataset.length - 1];
+    if (p && p.lat && p.lng && Math.abs(p.lat) > 0.001) {
+      gpsCoords.push([p.lat, p.lng]);
     }
   }
 
@@ -1503,736 +1442,37 @@ function parseAndLoadFile(content) {
     }, 150);
   }
 
-  enterReplayMode();
-}
-
-function enterReplayMode() {
-  isReplayMode = true;
-  document.getElementById('modeBadge').style.display = "inline-block";
-  document.getElementById('replayBar').style.display = "flex";
-  document.getElementById('replaySlider').max = replayData.length - 1;
-  document.getElementById('btnFollow').classList.remove('active');
-  isAutoFollow = false;
-  resetChartZoom();
-  jumpToReplayIndex(0);
-}
-
-function exitReplayMode() {
-  pauseReplay();
-  isReplayMode = false;
-  document.getElementById('modeBadge').style.display = "none";
-  document.getElementById('replayBar').style.display = "none";
-  isAutoFollow = true;
-  document.getElementById('btnFollow').classList.add('active');
-  replayMarkerIndex = null;
-  redrawInteractiveChart();
-}
-
-function changeReplaySpeed(val) {
-  replaySpeed = parseFloat(val);
-  if (isReplayPlaying) {
-    replayStartPerf = performance.now();
-    replayStartDataMs = replayData[replayIndex].ms;
-  }
-}
-
-function toggleReplayPlay() {
-  if (isReplayPlaying) pauseReplay();
-  else startReplay();
-}
-
-function startReplay() {
-  if (replayIndex >= replayData.length - 1) replayIndex = 0;
-  isReplayPlaying = true;
-  document.getElementById('btnPlay').innerText = "PAUSE";
-  document.getElementById('btnPlay').style.background = "#e67300";
-
-  replayStartPerf = performance.now();
-  replayStartDataMs = replayData[replayIndex].ms;
-
-  function loop() {
-    if (!isReplayPlaying) return;
-    const now = performance.now();
-    const elapsedRealMs = (now - replayStartPerf) * replaySpeed;
-    const targetDataMs = replayStartDataMs + elapsedRealMs;
-
-    while (replayIndex < replayData.length - 1 && replayData[replayIndex + 1].ms <= targetDataMs) {
-      replayIndex++;
-    }
-
-    jumpToReplayIndex(replayIndex, false);
-
-    if (replayIndex >= replayData.length - 1) {
-      pauseReplay();
-      return;
-    }
-    replayAnimId = requestAnimationFrame(loop);
-  }
-  replayAnimId = requestAnimationFrame(loop);
-}
-
-function pauseReplay() {
-  isReplayPlaying = false;
-  if (replayAnimId) {
-    cancelAnimationFrame(replayAnimId);
-    replayAnimId = null;
-  }
-  document.getElementById('btnPlay').innerText = "PLAY";
-  document.getElementById('btnPlay').style.background = "#009955";
-}
-
-function stepReplay(step) {
-  pauseReplay();
-  jumpToReplayIndex(Math.max(0, Math.min(replayData.length - 1, replayIndex + step)));
-}
-
-function onReplaySliderInput(val) {
-  pauseReplay();
-  jumpToReplayIndex(parseInt(val, 10));
-}
-
-function jumpToReplayIndex(idx, resetClock = true) {
-  if (idx < 0 || idx >= replayData.length) return;
-  replayIndex = idx;
-  replayMarkerIndex = idx;
-  document.getElementById('replaySlider').value = idx;
-
-  const pt = replayData[idx];
-  const totalSec = ((replayData[replayData.length - 1].ms - replayData[0].ms) / 1000).toFixed(1);
-  const curSec = ((pt.ms - replayData[0].ms) / 1000).toFixed(1);
-
-  document.getElementById('replayTimeDisplay').innerText = `${idx + 1}/${replayData.length} (${curSec}s / ${totalSec}s)`;
-
-  current_d = {
-    pitch_deg: pt.pitch_deg,
-    roll_deg:  pt.roll_deg,
-    force_net: pt.net_force,
-    a_surge:   pt.surge,
-    raw_w: pt.raw_w,
-    ax: pt.ax, ay: pt.ay, az: pt.az,
-    gx: pt.gx, gy: pt.gy, gz: pt.gz
-  };
-
-  updateHUD(pt);
-
-  if (resetClock && isReplayPlaying) {
-    replayStartPerf = performance.now();
-    replayStartDataMs = pt.ms;
-  }
-
-  redrawInteractiveChart();
-  renderPlateCanvas();
+  redrawAllCharts();
 }
 
 // ==============================================================================
-// 8. STROKE BIOMECHANICS & KINEMATICS ENGINE
+// 9. MASTER ANIMATION & RENDER LOOP
 // ==============================================================================
-let detectedStrokes = [];
-let selectedStrokeId = null; // null = all / average
-let analyzerRegionMode = 'zoom'; // 'zoom' or 'all'
-let driveDeltaThreshold = 180;
-let minStrokePeriodSec = 1.2;
+function redrawAllCharts() {
+  drawScreenshotStripChart('chartForceOar1', forceHistory1, '#00ffcc', 'kg', 5.0);
+  drawScreenshotStripChart('chartSurgeOar1', surgeHistory1, '#ffaa00', 'm/s²', 0.8);
+  drawScreenshotStripChart('chartForceOar2', forceHistory2, '#00ffcc', 'kg', 5.0);
+  drawScreenshotStripChart('chartSurgeOar2', surgeHistory2, '#ffaa00', 'm/s²', 0.8);
 
-function openStrokeAnalyzer() {
-  if (chartData.length < 10) {
-    alert("Load a CSV file or record telemetry before running Stroke Analysis.");
-    return;
-  }
-  document.getElementById('analyzerModal').style.display = 'flex';
-  runStrokeAnalysis();
+  redrawInteractiveChart(1);
+  redrawInteractiveChart(2);
+  redrawInteractiveChart('master');
 }
 
-function closeStrokeAnalyzer() {
-  document.getElementById('analyzerModal').style.display = 'none';
-  redrawInteractiveChart();
+function masterLoop() {
+  renderPlateCanvas(1);
+  renderPlateCanvas(2);
+  redrawAllCharts();
+  requestAnimationFrame(masterLoop);
 }
 
-function setAnalyzerRegion(mode) {
-  analyzerRegionMode = mode;
-  document.getElementById('btnRegZoom').classList.toggle('active', mode === 'zoom');
-  document.getElementById('btnRegAll').classList.toggle('active', mode === 'all');
-  document.getElementById('lblRegionMode').innerText = mode === 'zoom' ? 'ZOOM VIEW' : 'ENTIRE SESSION';
-  runStrokeAnalysis();
-}
-
-function onThresholdChange(val) {
-  driveDeltaThreshold = parseFloat(val);
-  document.getElementById('lblDeltaThresh').innerText = driveDeltaThreshold;
-  runStrokeAnalysis();
-}
-
-function onMinPeriodChange(val) {
-  minStrokePeriodSec = parseFloat(val);
-  document.getElementById('lblMinPeriod').innerText = minStrokePeriodSec + "s";
-  runStrokeAnalysis();
-}
-
-// Robust Biomechanical Segmentation: Catch -> Peak -> Finish -> Recovery
-function runStrokeAnalysis() {
-  let sIdx = 0, eIdx = chartData.length - 1;
-  if (analyzerRegionMode === 'zoom') {
-    sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
-    eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
-  }
-
-  const rawSubset = chartData.slice(sIdx, eIdx + 1);
-  if (rawSubset.length < 20) return;
-
-  // 1. Compute effective force array based on load polarity
-  const fArr = rawSubset.map(d => (invertLoad ? -1 : 1) * d.raw_w);
-
-  // 2. Compute local recovery baseline (25th percentile of window)
-  const sorted = [...fArr].sort((a,b) => a - b);
-  const baseline = sorted[Math.floor(sorted.length * 0.25)];
-
-  // 3. Peak Finding based on ΔF threshold
-  const peaks = [];
-  const minSamplesBetween = Math.max(8, Math.floor(minStrokePeriodSec / 0.1));
-
-  for (let i = 2; i < fArr.length - 2; i++) {
-    const val = fArr[i];
-    const deflection = val - baseline;
-    if (deflection > driveDeltaThreshold) {
-      if (val >= fArr[i-1] && val >= fArr[i-2] && val > fArr[i+1] && val >= fArr[i+2]) {
-        if (peaks.length === 0 || (i - peaks[peaks.length - 1]) >= minSamplesBetween) {
-          peaks.push(i);
-        } else if (val > fArr[peaks[peaks.length - 1]]) {
-          peaks[peaks.length - 1] = i; // Retain highest peak
-        }
-      }
-    }
-  }
-
-  detectedStrokes = [];
-  for (let p = 0; p < peaks.length - 1; p++) {
-    const pIdx = peaks[p];
-    const nextPIdx = peaks[p+1];
-
-    // Find Catch: search backwards for deflection falling to 12% of peak
-    const peakDeflection = fArr[pIdx] - baseline;
-    const catchCutoff = baseline + peakDeflection * 0.15;
-    let catchRel = pIdx;
-    while (catchRel > (p === 0 ? 0 : peaks[p-1]) && fArr[catchRel] > catchCutoff) {
-      catchRel--;
-    }
-
-    // Find Finish: search forwards for force returning to baseline
-    let finishRel = pIdx;
-    while (finishRel < nextPIdx && fArr[finishRel] > catchCutoff) {
-      finishRel++;
-    }
-
-    // Next Catch is the start of following stroke
-    let nextCatchRel = nextPIdx;
-    const nextPeakDeflection = fArr[nextPIdx] - baseline;
-    const nextCutoff = baseline + nextPeakDeflection * 0.15;
-    while (nextCatchRel > finishRel && fArr[nextCatchRel] > nextCutoff) {
-      nextCatchRel--;
-    }
-
-    const strokeGlobalCatch = sIdx + catchRel;
-    const strokeGlobalFinish = sIdx + finishRel;
-    const strokeGlobalNextCatch = sIdx + nextCatchRel;
-
-    const strokePts = chartData.slice(strokeGlobalCatch, strokeGlobalNextCatch + 1);
-    if (strokePts.length < 5) continue;
-
-    const t0 = strokePts[0].ms / 1000.0;
-    const tDrive = (chartData[strokeGlobalFinish].ms - chartData[strokeGlobalCatch].ms) / 1000.0;
-    const tTotal = (strokePts[strokePts.length - 1].ms - strokePts[0].ms) / 1000.0;
-    const tRecov = Math.max(0.1, tTotal - tDrive);
-
-    // Kinematic Decomposition across the stroke
-    const times = [];
-    const forceVals = [];
-    const bladeRotVals = [];
-    const bowSurgeVals = [];
-    const axVals = [], ayVals = [], azVals = [];
-    const gpsSpdVals = [];
-    const distVals = [];
-
-    let cumDist = 0;
-    let lastP = strokePts[0];
-
-    for (let k = 0; k < strokePts.length; k++) {
-      const pt = strokePts[k];
-      const dtK = k === 0 ? 0.033 : (pt.ms - strokePts[k-1].ms) / 1000.0;
-      const tRel = (pt.ms / 1000.0) - t0;
-      times.push(tRel);
-
-      // Force
-      const fK = (invertLoad ? -1 : 1) * pt.raw_w - baseline;
-      forceVals.push(fK);
-
-      // 1. Blade Rotation Magnitude (deg/s) from Gyro Vector
-      const rotMagnitude = Math.hypot(pt.gx, pt.gy, pt.gz) * (180.0 / Math.PI);
-      bladeRotVals.push(rotMagnitude);
-
-      // 2. Boat Bow Surge Acceleration (m/s²): Hull forward surge isolated from gravity tilt & arm whip
-      const pitchRad = (pt.pitch_deg * Math.PI) / 180.0;
-      const cleanSurge = pt.ax - (9.80665 * Math.sin(pitchRad));
-      bowSurgeVals.push(cleanSurge);
-
-      axVals.push(pt.ax);
-      ayVals.push(pt.ay);
-      azVals.push(pt.az);
-
-      // 3. Satellite GPS Velocity & Incremental Displacement
-      const spdKmh = pt.spd || 0;
-      gpsSpdVals.push(spdKmh);
-      const vMps = spdKmh / 3.6;
-      cumDist += vMps * dtK;
-      distVals.push(cumDist);
-    }
-
-    const maxF = Math.max(...forceVals);
-    const avgSpd = gpsSpdVals.reduce((a,b)=>a+b, 0) / gpsSpdVals.length;
-    const spm = tTotal > 0 ? (60.0 / tTotal) : 0;
-
-    detectedStrokes.push({
-      id: p + 1,
-      enabled: true,
-      catchIdx: strokeGlobalCatch,
-      finishIdx: strokeGlobalFinish,
-      nextCatchIdx: strokeGlobalNextCatch,
-      tTotal, tDrive, tRecov,
-      ratio: (tDrive / tTotal) * 100.0,
-      peakF: maxF,
-      spm,
-      avgSpd,
-      distTotal: cumDist,
-      peakSurge: Math.max(...bowSurgeVals),
-      times, forceVals, bladeRotVals, bowSurgeVals,
-      axVals, ayVals, azVals, gpsSpdVals, distVals
-    });
-  }
-
-  document.getElementById('analyzerStrokeBadge').innerText = `${detectedStrokes.length} STROKES DETECTED`;
-  populateStrokeListUI();
-  updateScorecard();
-  renderAllOverlayCharts();
-}
-
-function populateStrokeListUI() {
-  const container = document.getElementById('strokeListContainer');
-  container.innerHTML = '';
-
-  const allItem = document.createElement('div');
-  allItem.className = `stroke-list-item ${selectedStrokeId === null ? 'selected' : ''}`;
-  allItem.innerHTML = `<span style="font-weight:bold; color:#ffaa00;">★ ENSEMBLE AVERAGE (${detectedStrokes.filter(s=>s.enabled).length})</span>`;
-  allItem.onclick = () => { selectedStrokeId = null; populateStrokeListUI(); updateScorecard(); renderAllOverlayCharts(); };
-  container.appendChild(allItem);
-
-  detectedStrokes.forEach(s => {
-    const it = document.createElement('div');
-    it.className = `stroke-list-item ${selectedStrokeId === s.id ? 'selected' : ''} ${!s.enabled ? 'dimmed' : ''}`;
-    it.innerHTML = `
-      <div style="display:flex; align-items:center; gap:6px;">
-        <input type="checkbox" ${s.enabled ? 'checked' : ''} onclick="event.stopPropagation(); toggleStrokeEnabled(${s.id})">
-        <b>#${s.id}</b> 
-        <span style="color:#aaa;">${s.spm.toFixed(0)} SPM | ${s.distTotal.toFixed(1)}m</span>
-      </div>
-      <b style="color:#ffaa00;">${s.peakF.toFixed(0)}</b>
-    `;
-    it.onclick = () => { selectedStrokeId = s.id; populateStrokeListUI(); updateScorecard(); renderAllOverlayCharts(); };
-    container.appendChild(it);
-  });
-}
-
-function toggleStrokeEnabled(id) {
-  const st = detectedStrokes.find(s => s.id === id);
-  if (st) st.enabled = !st.enabled;
-  populateStrokeListUI();
-  updateScorecard();
-  renderAllOverlayCharts();
-}
-
-function selectAllStrokes(val) {
-  detectedStrokes.forEach(s => s.enabled = val);
-  populateStrokeListUI();
-  updateScorecard();
-  renderAllOverlayCharts();
-}
-
-function updateScorecard() {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) return;
-
-  let target = null;
-  if (selectedStrokeId !== null) {
-    target = detectedStrokes.find(s => s.id === selectedStrokeId);
-  }
-
-  if (target) {
-    document.getElementById('scRate').innerText   = target.spm.toFixed(1);
-    document.getElementById('scDriveT').innerText  = target.tDrive.toFixed(2);
-    document.getElementById('scRecovT').innerText  = target.tRecov.toFixed(2);
-    document.getElementById('scRatio').innerText   = target.ratio.toFixed(0);
-    document.getElementById('scPeakF').innerText   = target.peakF.toFixed(1);
-    document.getElementById('scDPS').innerText     = target.distTotal.toFixed(2);
-    document.getElementById('scSpd').innerText     = target.avgSpd.toFixed(1);
-    document.getElementById('scSurge').innerText   = target.peakSurge.toFixed(2);
-  } else {
-    // Average metrics
-    const avg = (fn) => (active.reduce((acc, s) => acc + fn(s), 0) / active.length);
-    document.getElementById('scRate').innerText   = avg(s=>s.spm).toFixed(1);
-    document.getElementById('scDriveT').innerText  = avg(s=>s.tDrive).toFixed(2);
-    document.getElementById('scRecovT').innerText  = avg(s=>s.tRecov).toFixed(2);
-    document.getElementById('scRatio').innerText   = avg(s=>s.ratio).toFixed(0);
-    document.getElementById('scPeakF').innerText   = avg(s=>s.peakF).toFixed(1);
-    document.getElementById('scDPS').innerText     = avg(s=>s.distTotal).toFixed(2);
-    document.getElementById('scSpd').innerText     = avg(s=>s.avgSpd).toFixed(1);
-    document.getElementById('scSurge').innerText   = avg(s=>s.peakSurge).toFixed(2);
-  }
-}
-
-// ==============================================================================
-// 9. OVERLAY GRAPH RENDERING ENGINE (TIME SYNCHRONIZED AT CATCH)
-// ==============================================================================
-function renderAllOverlayCharts() {
-  renderEnsembleForceChart();
-  renderEnsembleKinematicsChart();
-  renderEnsembleGpsChart();
-}
-
-// Compute resampled mean and standard deviation curve on uniform time grid
-function computeResampledAverage(key, maxTime, numSteps = 120) {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) return { times: [], mean: [], stdDevUpper: [], stdDevLower: [] };
-
-  const timeGrid = [];
-  const mean = [];
-  const stdDevUpper = [];
-  const stdDevLower = [];
-
-  for (let step = 0; step <= numSteps; step++) {
-    const t = (step / numSteps) * maxTime;
-    timeGrid.push(t);
-
-    const values = [];
-    for (const st of active) {
-      if (t > st.tTotal) continue;
-      // Linear interpolation
-      const tArr = st.times;
-      const vArr = st[key];
-      let vInterp = vArr[0];
-      for (let i = 0; i < tArr.length - 1; i++) {
-        if (t >= tArr[i] && t <= tArr[i+1]) {
-          const frac = (t - tArr[i]) / (tArr[i+1] - tArr[i] || 1);
-          vInterp = vArr[i] + frac * (vArr[i+1] - vArr[i]);
-          break;
-        }
-      }
-      values.push(vInterp);
-    }
-
-    if (values.length > 0) {
-      const avg = values.reduce((a, b) => a + b, 0) / values.length;
-      const variance = values.reduce((acc, v) => acc + Math.pow(v - avg, 2), 0) / values.length;
-      const sd = Math.sqrt(variance);
-      mean.push(avg);
-      stdDevUpper.push(avg + sd);
-      stdDevLower.push(avg - sd);
-    } else {
-      mean.push(0); stdDevUpper.push(0); stdDevLower.push(0);
-    }
-  }
-
-  return { times: timeGrid, mean, stdDevUpper, stdDevLower };
-}
-
-// Chart 1: Catch-Synchronized Force Ensemble
-function renderEnsembleForceChart() {
-  const cn = document.getElementById('overlayForceCanvas');
-  const cx = cn.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth, h = cn.clientHeight;
-
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr; cn.height = h * dpr;
-  }
-
-  cx.save();
-  cx.scale(dpr, dpr);
-  cx.clearRect(0, 0, w, h);
-
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { cx.restore(); return; }
-
-  const maxT = Math.max(...active.map(s => s.tTotal));
-  const maxF = Math.max(10, Math.max(...active.map(s => s.peakF)) * 1.15);
-  const avgDriveT = active.reduce((a,s)=>a+s.tDrive,0) / active.length;
-
-  const gutterL = 50, gutterR = 25, padTop = 28, padBottom = 22;
-  const plotW = w - gutterL - gutterR;
-  const plotH = h - padTop - padBottom;
-
-  // Background phase tint (Drive vs Recovery)
-  const driveX = gutterL + (avgDriveT / maxT) * plotW;
-  cx.fillStyle = 'rgba(0, 255, 204, 0.05)';
-  cx.fillRect(gutterL, padTop, driveX - gutterL, plotH);
-  cx.fillStyle = 'rgba(255, 170, 0, 0.03)';
-  cx.fillRect(driveX, padTop, plotW - (driveX - gutterL), plotH);
-
-  // Drive/Recovery Boundary Line
-  cx.strokeStyle = '#00ffcc';
-  cx.lineWidth = 1;
-  cx.setLineDash([3, 3]);
-  cx.beginPath();
-  cx.moveTo(driveX, padTop);
-  cx.lineTo(driveX, padTop + plotH);
-  cx.stroke();
-  cx.setLineDash([]);
-  cx.font = '9px monospace';
-  cx.fillStyle = '#00ffcc';
-  cx.fillText("AVG FINISH", driveX - 30, padTop + 10);
-
-  // Ticks
-  cx.strokeStyle = '#1a2230';
-  cx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = padTop + plotH - (i / 4) * plotH;
-    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-    cx.fillStyle = '#778899';
-    cx.textAlign = 'right';
-    cx.fillText(((i / 4) * maxF).toFixed(0), gutterL - 6, y + 3);
-  }
-
-  // Draw Individual Faint Stroke Curves
-  for (const st of active) {
-    const isTarget = selectedStrokeId === st.id;
-    cx.strokeStyle = isTarget ? '#ff0055' : 'rgba(0, 229, 255, 0.22)';
-    cx.lineWidth = isTarget ? 2.8 : 1.2;
-    cx.beginPath();
-    for (let k = 0; k < st.times.length; k++) {
-      const x = gutterL + (st.times[k] / maxT) * plotW;
-      const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
-      if (k === 0) cx.moveTo(x, y);
-      else cx.lineTo(x, y);
-    }
-    cx.stroke();
-  }
-
-  // Compute and Draw Bold Gold Average Force Curve + Standard Deviation Band
-  const avgCurve = computeResampledAverage('forceVals', maxT);
-
-  // Shaded SD Envelope
-  cx.fillStyle = 'rgba(255, 215, 0, 0.12)';
-  cx.beginPath();
-  for (let i = 0; i < avgCurve.times.length; i++) {
-    const x = gutterL + (avgCurve.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (Math.max(0, avgCurve.stdDevUpper[i]) / maxF) * plotH;
-    if (i === 0) cx.moveTo(x, y);
-    else cx.lineTo(x, y);
-  }
-  for (let i = avgCurve.times.length - 1; i >= 0; i--) {
-    const x = gutterL + (avgCurve.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (Math.max(0, avgCurve.stdDevLower[i]) / maxF) * plotH;
-    cx.lineTo(x, y);
-  }
-  cx.closePath();
-  cx.fill();
-
-  // Bold Average Line
-  cx.strokeStyle = '#ffd700';
-  cx.lineWidth = 3.2;
-  cx.beginPath();
-  for (let i = 0; i < avgCurve.times.length; i++) {
-    const x = gutterL + (avgCurve.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (avgCurve.mean[i] / maxF) * plotH;
-    if (i === 0) cx.moveTo(x, y);
-    else cx.lineTo(x, y);
-  }
-  cx.stroke();
-
-  // Labels
-  cx.fillStyle = '#88a0cc';
-  cx.textAlign = 'left';
-  cx.fillText("0.00s (CATCH)", gutterL, h - 6);
-  cx.textAlign = 'right';
-  cx.fillText(`+${maxT.toFixed(2)}s (STROKE END)`, gutterL + plotW, h - 6);
-
-  cx.restore();
-}
-
-// Chart 2: Kinematic Decomposition (Blade Rotation vs. Boat Bow Surge)
-function renderEnsembleKinematicsChart() {
-  const cn = document.getElementById('overlayKinematicsCanvas');
-  const cx = cn.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth, h = cn.clientHeight;
-
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr; cn.height = h * dpr;
-  }
-
-  cx.save();
-  cx.scale(dpr, dpr);
-  cx.clearRect(0, 0, w, h);
-
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { cx.restore(); return; }
-
-  const maxT = Math.max(...active.map(s => s.tTotal));
-  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
-  const plotW = w - gutterL - gutterR;
-  const plotH = h - padTop - padBottom;
-
-  const avgRot = computeResampledAverage('bladeRotVals', maxT);
-  const avgSurge = computeResampledAverage('bowSurgeVals', maxT);
-
-  const maxRot = Math.max(90, Math.max(...avgRot.mean) * 1.25);
-  let minS = Math.min(-2, Math.min(...avgSurge.mean) - 0.5);
-  let maxS = Math.max(3, Math.max(...avgSurge.mean) + 0.5);
-
-  // Left Ticks (Rotation deg/s) & Right Ticks (Surge m/s²)
-  for (let i = 0; i <= 4; i++) {
-    const y = padTop + plotH - (i / 4) * plotH;
-    cx.strokeStyle = "#161b24";
-    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-
-    cx.fillStyle = '#ff9900';
-    cx.textAlign = 'right';
-    cx.fillText(((i / 4) * maxRot).toFixed(0) + "°/s", gutterL - 6, y + 3);
-
-    const valS = minS + (i / 4) * (maxS - minS);
-    cx.fillStyle = '#00ff88';
-    cx.textAlign = 'left';
-    cx.fillText(valS.toFixed(1) + "m/s²", gutterL + plotW + 6, y + 3);
-  }
-
-  // Draw Blade Rotation Curve (Orange)
-  cx.strokeStyle = '#ff9900';
-  cx.lineWidth = 2.4;
-  cx.beginPath();
-  for (let i = 0; i < avgRot.times.length; i++) {
-    const x = gutterL + (avgRot.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (avgRot.mean[i] / maxRot) * plotH;
-    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-  }
-  cx.stroke();
-
-  // Draw Boat Bow Surge Acceleration Curve (Luminous Green)
-  cx.strokeStyle = '#00ff88';
-  cx.lineWidth = 2.4;
-  cx.beginPath();
-  for (let i = 0; i < avgSurge.times.length; i++) {
-    const x = gutterL + (avgSurge.times[i] / maxT) * plotW;
-    const normY = (avgSurge.mean[i] - minS) / (maxS - minS);
-    const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
-    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-  }
-  cx.stroke();
-
-  cx.restore();
-}
-
-// Chart 3: GPS Boat Velocity & Incremental Displacement Profile
-function renderEnsembleGpsChart() {
-  const cn = document.getElementById('overlayGpsCanvas');
-  const cx = cn.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth, h = cn.clientHeight;
-
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr; cn.height = h * dpr;
-  }
-
-  cx.save();
-  cx.scale(dpr, dpr);
-  cx.clearRect(0, 0, w, h);
-
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { cx.restore(); return; }
-
-  const maxT = Math.max(...active.map(s => s.tTotal));
-  const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
-  const plotW = w - gutterL - gutterR;
-  const plotH = h - padTop - padBottom;
-
-  const avgSpd = computeResampledAverage('gpsSpdVals', maxT);
-  const avgDist = computeResampledAverage('distVals', maxT);
-
-  let minV = Math.max(0, Math.min(...avgSpd.mean) - 1.0);
-  let maxV = Math.max(5, Math.max(...avgSpd.mean) + 1.0);
-  const maxD = Math.max(2, Math.max(...avgDist.mean) * 1.15);
-
-  for (let i = 0; i <= 4; i++) {
-    const y = padTop + plotH - (i / 4) * plotH;
-    cx.strokeStyle = "#161b24";
-    cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
-
-    const valV = minV + (i / 4) * (maxV - minV);
-    cx.fillStyle = '#ffff00';
-    cx.textAlign = 'right';
-    cx.fillText(valV.toFixed(1) + "k/h", gutterL - 6, y + 3);
-
-    const valD = (i / 4) * maxD;
-    cx.fillStyle = '#33aaff';
-    cx.textAlign = 'left';
-    cx.fillText(valD.toFixed(1) + "m", gutterL + plotW + 6, y + 3);
-  }
-
-  // Draw GPS Speed (Yellow)
-  cx.strokeStyle = '#ffff00';
-  cx.lineWidth = 2.4;
-  cx.beginPath();
-  for (let i = 0; i < avgSpd.times.length; i++) {
-    const x = gutterL + (avgSpd.times[i] / maxT) * plotW;
-    const y = padTop + plotH - ((avgSpd.mean[i] - minV) / (maxV - minV)) * plotH;
-    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-  }
-  cx.stroke();
-
-  // Draw Stroke Displacement (Cyan Blue)
-  cx.strokeStyle = '#33aaff';
-  cx.lineWidth = 2.4;
-  cx.beginPath();
-  for (let i = 0; i < avgDist.times.length; i++) {
-    const x = gutterL + (avgDist.times[i] / maxT) * plotW;
-    const y = padTop + plotH - (avgDist.mean[i] / maxD) * plotH;
-    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
-  }
-  cx.stroke();
-
-  cx.restore();
-}
-
-function exportStrokeAnalyticsCSV() {
-  const active = detectedStrokes.filter(s => s.enabled);
-  if (active.length === 0) { alert("No strokes available to export."); return; }
-
-  let csv = "stroke_id,duration_s,drive_time_s,recovery_time_s,ratio_pct,spm,peak_force,distance_m,avg_spd_kmh,peak_surge_mps2\n";
-  active.forEach(s => {
-    csv += `${s.id},${s.tTotal.toFixed(3)},${s.tDrive.toFixed(3)},${s.tRecov.toFixed(3)},${s.ratio.toFixed(1)},${s.spm.toFixed(1)},${s.peakF.toFixed(2)},${s.distTotal.toFixed(2)},${s.avgSpd.toFixed(2)},${s.peakSurge.toFixed(2)}\n`;
-  });
-
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `indaboat_strokes_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
-}
-
-// ==============================================================================
-// 10. MASTER RENDER LOOP
-// ==============================================================================
-function renderLoop() {
-  renderPlateCanvas();
-  if (isAutoFollow && !isReplayMode) redrawInteractiveChart();
-  requestAnimationFrame(renderLoop);
-}
-
-requestAnimationFrame(renderLoop);
+requestAnimationFrame(masterLoop);
 
 window.addEventListener('resize', () => {
   map.invalidateSize();
-  redrawInteractiveChart();
-  renderPlateCanvas();
-  if (document.getElementById('analyzerModal').style.display === 'flex') renderAllOverlayCharts();
+  redrawAllCharts();
+  renderPlateCanvas(1);
+  renderPlateCanvas(2);
 });
 
 setTimeout(() => map.invalidateSize(), 500);
