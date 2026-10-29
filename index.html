@@ -21,22 +21,24 @@
 
     /* TOPBAR */
     #topbar {
-      height: 44px;
       min-height: 44px;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      padding: 0 12px;
+      padding: 6px 12px;
       background: #111317;
       border-bottom: 1px solid #232731;
       position: sticky;
       top: 0;
       z-index: 1000;
+      gap: 8px;
     }
-    .topbar-left, .topbar-right {
+    .topbar-group {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      flex-wrap: wrap;
     }
     button {
       background: #0070e0;
@@ -63,6 +65,8 @@
     .btn-ctrl.active { background: #0070e0; border-color: #0099ff; color: #fff; }
     .btn-tare { background: #c25e00; border: 1px solid #ff7700; color: #fff; font-weight: bold; }
     .btn-tare:hover { background: #e06d00; }
+    .btn-rec { background: #cc2200; border: 1px solid #ff4422; color: #fff; font-weight: bold; }
+    .btn-rec.recording { background: #444; border-color: #666; }
 
     #bleStatus { font-size: 11px; font-weight: bold; letter-spacing: 0.5px; color: #ff4444; }
 
@@ -209,18 +213,31 @@
 <body>
 
 <div id="topbar">
-  <div class="topbar-left">
+  <div class="topbar-group">
     <button id="btnConnect" onclick="toggleConnect()">CONNECT BLE</button>
     <span id="bleStatus">DISCONNECTED</span>
     <span id="pktHealth" style="font-size:10px; color:#88a0cc; background:#181c24; border:1px solid #2a3140; padding:2px 6px; border-radius:3px;">RATE: 0 Hz</span>
-    <button class="btn-toggle active" id="btnFlipOar1Top" onclick="toggleFlipLoad(1)">FLIP OAR 1 (+/-)</button>
-    <button class="btn-toggle active" id="btnFlipOar2Top" onclick="toggleFlipLoad(2)">FLIP OAR 2 (+/-)</button>
-    <button class="btn-tare" onclick="liveTareAll()">TARE LOAD CELLS (0.00)</button>
+    <button class="btn-toggle active" id="btnFlipOar1Top" onclick="toggleFlipLoad(1)">FLIP O1 (+/-)</button>
+    <button class="btn-toggle active" id="btnFlipOar2Top" onclick="toggleFlipLoad(2)">FLIP O2 (+/-)</button>
+    <button class="btn-tare" onclick="liveTareAll()">TARE (0.00)</button>
   </div>
-  <div class="topbar-right">
+
+  <!-- STROKECOACH SD MEMORY CONTROLS -->
+  <div class="topbar-group" style="background:#181c24; padding:3px 8px; border-radius:4px; border:1px solid #2a3140;">
+    <button id="btnRecPiece" class="btn-rec" onclick="togglePieceRecord()">● START PIECE</button>
+    <button class="btn-ctrl" onclick="sendBleCommand('LIST')">LIST MEMORY</button>
+    <select id="pieceDropdown" style="background:#0f1116; color:#00ffcc; border:1px solid #333; font-size:10px; padding:2px 4px; border-radius:3px;">
+      <option value="">(Select Stored Piece)</option>
+    </select>
+    <button class="btn-ctrl" onclick="recallSelectedPiece()" style="background:#0088cc; font-weight:bold;">RECALL PIECE</button>
+    <button class="btn-ctrl" onclick="clearSdMemory()" style="background:#442222;">CLEAR SD</button>
+    <button class="btn-ctrl" onclick="sendBleCommand('OTA')" style="background:#552288;">OTA MODE</button>
+  </div>
+
+  <div class="topbar-group">
     <input type="file" id="fileInput" accept=".csv,.txt,.log,.tsv" style="display:none;" onchange="handleFileSelected(event)">
-    <button class="btn-import" onclick="document.getElementById('fileInput').click()">LOAD CSV / LOG</button>
-    <button class="btn-export" onclick="exportDatabase()">EXPORT CSV (<span id="dbCount">0</span>)</button>
+    <button class="btn-import" onclick="document.getElementById('fileInput').click()">LOAD CSV</button>
+    <button class="btn-export" onclick="exportDatabase()">EXPORT (<span id="dbCount">0</span>)</button>
     <button class="btn-clear" onclick="clearDatabase()">CLEAR</button>
   </div>
 </div>
@@ -228,7 +245,7 @@
 <div class="dashboard-container">
   <!-- ROW 1: 3D ANIMATION BOXES & SATELLITE GPS MAP -->
   <div class="grid-top">
-    <!-- 3D BOX 1: OAR 1 (PORT / NANO) ATTITUDE & LINEAR ACCELERATION -->
+    <!-- 3D BOX 1: OAR 1 ATTITUDE & LINEAR ACCELERATION -->
     <div class="card">
       <div class="card-title">OAR 1 (PORT) 3D KINEMATICS & LINEAR ACCEL</div>
       <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
@@ -237,7 +254,7 @@
       <canvas id="plateCanvas1"></canvas>
     </div>
 
-    <!-- 3D BOX 2: OAR 2 (STARBOARD / ESP32) ATTITUDE & LINEAR ACCELERATION -->
+    <!-- 3D BOX 2: OAR 2 ATTITUDE & LINEAR ACCELERATION -->
     <div class="card">
       <div class="card-title">OAR 2 (STBD) 3D KINEMATICS & LINEAR ACCEL</div>
       <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
@@ -260,7 +277,7 @@
   <div class="grid-strips">
     <!-- OAR 1 DYNAMIC DRIVE FORCE -->
     <div class="card">
-      <div class="card-title" id="lblOar1Force">OAR 1 DYNAMIC DRIVE FORCE (KG)</div>
+      <div class="card-title">OAR 1 DYNAMIC DRIVE FORCE (KG)</div>
       <canvas id="chartForceOar1"></canvas>
     </div>
 
@@ -272,7 +289,7 @@
 
     <!-- OAR 2 DYNAMIC DRIVE FORCE -->
     <div class="card">
-      <div class="card-title" id="lblOar2Force">OAR 2 DYNAMIC DRIVE FORCE (KG)</div>
+      <div class="card-title">OAR 2 DYNAMIC DRIVE FORCE (KG)</div>
       <canvas id="chartForceOar2"></canvas>
     </div>
 
@@ -369,11 +386,11 @@
 
 <script>
 // ==============================================================================
-// 1. DATA STORAGE & EXPORT (INDEXEDDB & IN-MEMORY)
+// 1. DATA STORAGE & EXPORT
 // ==============================================================================
 let inMemoryLog = [];
 let db;
-const DB_NAME = "IndaBoatTelemetryDB_V3";
+const DB_NAME = "IndaBoatTelemetryDB_V4";
 const STORE_NAME = "records";
 
 const dbReq = indexedDB.open(DB_NAME, 1);
@@ -436,16 +453,20 @@ function clearDatabase() {
 }
 
 // ==============================================================================
-// 2. BLE LIVE STREAMING ENGINE & PACKET INGESTION
+// 2. TWO-WAY BLE ENGINE (NOTIFY RX + WRITE TX)
 // ==============================================================================
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // Hub -> Browser (Notify)
+const RX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // Browser -> Hub (Write)
 
 let device = null;
 let txChar = null;
+let rxChar = null;
 let streamBuffer = "";
 let pktCount = 0;
 let lastPktCalcTime = performance.now();
+
+let isPieceRecording = false;
 
 async function toggleConnect() {
   if (device && device.gatt.connected) {
@@ -460,7 +481,10 @@ async function toggleConnect() {
     device.addEventListener('gattserverdisconnected', onDisconnected);
     const server = await device.gatt.connect();
     const service = await server.getPrimaryService(SERVICE_UUID);
+    
     txChar = await service.getCharacteristic(TX_CHAR_UUID);
+    rxChar = await service.getCharacteristic(RX_CHAR_UUID);
+
     await txChar.startNotifications();
     txChar.addEventListener('characteristicvaluechanged', handleChunk);
 
@@ -471,7 +495,7 @@ async function toggleConnect() {
     if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
   } catch (err) {
     console.error(err);
-    alert("BLE notice: " + err.message);
+    alert("BLE Notice: " + err.message);
   }
 }
 
@@ -479,6 +503,113 @@ function onDisconnected() {
   document.getElementById('bleStatus').innerText = "DISCONNECTED";
   document.getElementById('bleStatus').style.color = "#ff4444";
   document.getElementById('btnConnect').innerText = "CONNECT BLE";
+  txChar = null;
+  rxChar = null;
+}
+
+async function sendBleCommand(cmd) {
+  if (!rxChar || !device || !device.gatt.connected) {
+    alert("Connect BLE first!");
+    return;
+  }
+  try {
+    const encoder = new TextEncoder();
+    await rxChar.writeValue(encoder.encode(cmd + "\n"));
+    console.log("[BLE TX]", cmd);
+  } catch (e) {
+    console.error("BLE Write Error:", e);
+  }
+}
+
+// StrokeCoach Piece Controls
+function togglePieceRecord() {
+  if (!isPieceRecording) {
+    sendBleCommand("START");
+  } else {
+    sendBleCommand("STOP");
+  }
+}
+
+function recallSelectedPiece() {
+  const sel = document.getElementById('pieceDropdown').value;
+  if (!sel) {
+    alert("Select a piece from the dropdown first. Click 'LIST MEMORY' to fetch pieces.");
+    return;
+  }
+  dataset = []; // Clear current chart view for clean historical playback
+  track.setLatLngs([]);
+  sendBleCommand("READ:" + sel);
+}
+
+function clearSdMemory() {
+  if (!confirm("Delete all saved piece logs from the SD card?")) return;
+  sendBleCommand("CLEAR");
+}
+
+function updateRecButtonUI(recording, fileName) {
+  const btn = document.getElementById('btnRecPiece');
+  if (recording) {
+    btn.innerText = `■ STOP (${fileName})`;
+    btn.classList.add('recording');
+  } else {
+    btn.innerText = "● START PIECE";
+    btn.classList.remove('recording');
+  }
+}
+
+function handleLoggerResponse(str) {
+  if (str.startsWith("!STARTED:")) {
+    const fName = str.substring(9);
+    isPieceRecording = true;
+    updateRecButtonUI(true, fName);
+  } 
+  else if (str.startsWith("!STOPPED:")) {
+    const fName = str.substring(9);
+    isPieceRecording = false;
+    updateRecButtonUI(false, fName);
+    sendBleCommand("LIST"); // Auto-refresh stored pieces
+  } 
+  else if (str === "!LIST_START") {
+    const dd = document.getElementById('pieceDropdown');
+    dd.innerHTML = '<option value="">(Select Stored Piece)</option>';
+  } 
+  else if (str.startsWith("!ITEM:")) {
+    const payload = str.substring(6);
+    const [fName, fBytes] = payload.split(',');
+    const kb = fBytes ? Math.round(parseInt(fBytes, 10) / 1024) : 0;
+    const dd = document.getElementById('pieceDropdown');
+    const opt = document.createElement('option');
+    opt.value = fName;
+    opt.innerText = `${fName} (${kb} KB)`;
+    dd.appendChild(opt);
+  } 
+  else if (str === "!LIST_END") {
+    console.log("[SD] File list updated.");
+  } 
+  else if (str === "!READ_START") {
+    console.log("[SD] Commencing playback...");
+  } 
+  else if (str.startsWith("!ROW:")) {
+    const rowData = str.substring(5);
+    saveRowToStorage(rowData);
+    ingestTelemetryLine(rowData);
+  } 
+  else if (str === "!END" || str === "#RECOVER_COMPLETE") {
+    recenterMap();
+    redrawAllCharts();
+    alert("Piece download complete! Loaded into charts.");
+  } 
+  else if (str === "!CLEARED_ALL") {
+    document.getElementById('pieceDropdown').innerHTML = '<option value="">(Memory Empty)</option>';
+    alert("All SD card sessions erased.");
+  } 
+  else if (str.startsWith("!OTA_READY:")) {
+    const ip = str.substring(11);
+    alert(`Logger in Web OTA Mode!\nConnect to Wi-Fi 'IndaBoat-Logger-OTA' (pass: indaboat123) and visit http://${ip} to upload firmware.`);
+  } 
+  else if (str.startsWith("!ERR:")) {
+    alert("SD Card Logger: " + str);
+  }
 }
 
 function handleChunk(event) {
@@ -490,8 +621,16 @@ function handleChunk(event) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    pktCount++;
+
     document.getElementById('debugBar').innerText = `RX [${trimmed.length}b]: ${trimmed}`;
+
+    // Intercept Logger responses (prefixed with '!' or '#')
+    if (trimmed.startsWith("!") || trimmed.startsWith("#")) {
+      handleLoggerResponse(trimmed);
+      continue;
+    }
+
+    pktCount++;
     saveRowToStorage(trimmed);
     ingestTelemetryLine(trimmed);
   }
@@ -506,28 +645,23 @@ function handleChunk(event) {
 }
 
 // ==============================================================================
-// 3. TELEMETRY MATH, TRUE 3-AXIS IMU & ISOLATED LINEAR ACCELERATION
+// 3. TELEMETRY MATH & KINEMATICS ENGINE
 // ==============================================================================
 class OarKinematics {
   constructor(id) {
     this.id = id;
-    this.lastMs = null;
     this.raw_w = 0;
     this.tareOffset = 0;
     this.baseline_w = null;
     this.net_force = 0;
 
-    // 3-axis Accelerations (m/s²)
     this.ax = 0; this.ay = 0; this.az = 0;
-    // 3-axis Angular Rates (rad/s)
     this.gx = 0; this.gy = 0; this.gz = 0;
 
-    // Attitude (radians & degrees)
-    this.pitch = 0; // Pitch (about X or Y depending on orientation)
-    this.roll  = 0; // Roll
-    this.yaw   = 0; // Yaw (pure Gyro integrated)
+    this.pitch = 0;
+    this.roll  = 0;
+    this.yaw   = 0;
 
-    // Isolated Non-Rotational Linear Dynamic Acceleration (gravity removed)
     this.lin_ax = 0;
     this.lin_ay = 0;
     this.lin_az = 0;
@@ -539,35 +673,29 @@ class OarKinematics {
     this.ax = ax; this.ay = ay; this.az = az;
     this.gx = gx; this.gy = gy; this.gz = gz;
 
-    // Load cell baseline dynamic tracking
     if (this.baseline_w === null) this.baseline_w = raw_w;
     const rate = 0.015;
     this.baseline_w = (1.0 - rate) * this.baseline_w + rate * raw_w;
     this.net_force = raw_w - this.baseline_w;
 
-    // True 3-Axis Orientation Calculation:
-    // Pure Accel components for Pitch & Roll
+    // Pure 3-Axis Orientation
     const acc_pitch = Math.atan2(ax, Math.sqrt(az * az + ay * ay));
     const acc_roll  = Math.atan2(az, Math.max(0.05, -ay));
 
-    // Complementary Filter for Pitch & Roll (combines gyro integration with accel vector)
     this.pitch = 0.94 * (this.pitch + gz * dt) + 0.06 * acc_pitch;
     this.roll  = 0.94 * (this.roll  + gx * dt) + 0.06 * acc_roll;
-    // Yaw integrates pure Z/Y gyro rate with zero force coupling
     this.yaw   = this.yaw + gy * dt;
 
-    // Dynamic Gravity Decomposition:
-    // Gravity vector in body frame derived from current attitude
+    // Gravity Decomposition
     const gx_comp = 9.80665 * Math.sin(this.pitch);
     const gy_comp = -9.80665 * Math.cos(this.pitch) * Math.cos(this.roll);
     const gz_comp = 9.80665 * Math.cos(this.pitch) * Math.sin(this.roll);
 
-    // Non-Rotational Linear Acceleration Vector (True dynamic push)
+    // Non-Rotational Linear Dynamic Acceleration
     this.lin_ax = ax - gx_comp;
     this.lin_ay = ay - gy_comp;
     this.lin_az = az - gz_comp;
 
-    // Planar surge along longitudinal boat axis
     this.planar_surge = ax - (9.80665 * Math.sin(this.pitch));
   }
 }
@@ -612,7 +740,6 @@ function toggleRelativeDeltaView() {
   redrawInteractiveChart('master');
 }
 
-// Circular ring buffers for Screenshot 1 charts
 const STRIP_SIZE = 140;
 let forceHistory1 = new Array(STRIP_SIZE).fill(0);
 let surgeHistory1 = new Array(STRIP_SIZE).fill(0);
@@ -648,7 +775,7 @@ function ingestTelemetryLine(line) {
   const dt = lastGlobalTime === null ? 0.025 : Math.min(0.2, Math.max(0.001, t_sec - lastGlobalTime));
   lastGlobalTime = t_sec;
 
-  // OAR 1 Telemetry (Port)
+  // OAR 1 Telemetry
   const o1_w  = parseFloat(parts[2]) || 0;
   const o1_ax = parseFloat(parts[3]) || 0;
   const o1_ay = parseFloat(parts[4]) || 0;
@@ -664,7 +791,7 @@ function ingestTelemetryLine(line) {
   const spd  = parseFloat(parts[12]) || 0;
   const sats = parseInt(parts[13], 10) || 0;
 
-  // OAR 2 Telemetry (Starboard - ESP32)
+  // OAR 2 Telemetry
   let o2_w = 0, o2_ax = 0, o2_ay = 0, o2_az = 0, o2_gx = 0, o2_gy = 0, o2_gz = 0;
   if (parts.length >= 21) {
     o2_w  = parseFloat(parts[14]) || 0;
@@ -676,7 +803,6 @@ function ingestTelemetryLine(line) {
     o2_gz = parseFloat(parts[20]) || 0;
   }
 
-  // Update IMU Kinematics independently
   oar1.update(o1_w, o1_ax, o1_ay, o1_az, o1_gx, o1_gy, o1_gz, dt);
   oar2.update(o2_w, o2_ax, o2_ay, o2_az, o2_gx, o2_gy, o2_gz, dt);
 
@@ -702,7 +828,6 @@ function ingestTelemetryLine(line) {
   dataset.push(record);
   if (dataset.length > 5000) dataset.shift();
 
-  // GPS Map point
   if (lat !== 0 && lng !== 0 && Math.abs(lat) > 0.001) {
     const pos = [lat, lng];
     marker.setLatLng(pos);
@@ -713,7 +838,7 @@ function ingestTelemetryLine(line) {
 }
 
 // ==============================================================================
-// 4. TOP 3D IMU ATTITUDE & NON-ROTATIONAL LINEAR ACCELERATION ANIMATIONS
+// 4. TOP 3D IMU ATTITUDE & LINEAR ACCELERATION ANIMATIONS
 // ==============================================================================
 let camYaw1 = -0.4, camPitch1 = 0.45;
 let camYaw2 = -0.4, camPitch2 = 0.45;
@@ -768,29 +893,24 @@ function renderPlateCanvas(oarNum) {
   const camY = oarNum === 1 ? camYaw1 : camYaw2;
   const camP = oarNum === 1 ? camPitch1 : camPitch2;
 
-  // True 3-Axis Euler Angles (Pitch, Roll, Yaw) - Zero load cell data mixed in!
   const pitchRad = oar.pitch;
   const rollRad  = oar.roll;
   const yawRad   = oar.yaw;
 
   function rotate3D(pt) {
-    // 1. Yaw (Rz)
     const cosY = Math.cos(yawRad), sinY = Math.sin(yawRad);
     let x1 = pt[0] * cosY - pt[1] * sinY;
     let y1 = pt[0] * sinY + pt[1] * cosY;
     let z1 = pt[2];
 
-    // 2. Roll (Rx)
     const cosR = Math.cos(rollRad), sinR = Math.sin(rollRad);
     let y2 = y1 * cosR - z1 * sinR;
     let z2 = y1 * sinR + z1 * cosR;
 
-    // 3. Pitch (Ry)
     const cosP = Math.cos(pitchRad), sinP = Math.sin(pitchRad);
     let x3 = x1 * cosP + z2 * sinP;
     let z3 = -x1 * sinP + z2 * cosP;
 
-    // Camera view transform
     const cosCY = Math.cos(camY), sinCY = Math.sin(camY);
     let x4 = x3 * cosCY + z3 * sinCY;
     let z4 = -x3 * sinCY + z3 * cosCY;
@@ -811,7 +931,6 @@ function renderPlateCanvas(oarNum) {
     return [centerX + r[0] * scale, centerY + r[1] * scale, r[2]];
   }
 
-  // 3D Chassis / Sensor Plate Geometry
   const pw = 55, pl = 85, pth = 8;
   const corners = [
     [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth],
@@ -831,12 +950,10 @@ function renderPlateCanvas(oarNum) {
     cx.stroke();
   }
 
-  // Draw 3D Box Faces
   drawPoly([3, 2, 6, 7], '#1d222c', '#333b4d');
   drawPoly([1, 2, 6, 5], '#252c38', '#424c61');
   drawPoly([0, 1, 2, 3], oarNum === 1 ? '#0e3a53' : '#4a3812', oarNum === 1 ? '#00e5ff' : '#ffaa00');
 
-  // Center IMU IC
   const chipW = 16, chipL = 20, chipH = 4;
   const chipZ = -pth - 3;
   const chipCorners = [
@@ -855,8 +972,7 @@ function renderPlateCanvas(oarNum) {
 
   const center2D = project([0, 0, chipZ - chipH]);
 
-  // ANIMATION OF NON-ROTATIONAL LINEAR ACCELERATION (Dynamic Inertial Force Vector)
-  // Length and direction represent dynamic acceleration with gravity fully removed
+  // Dynamic Linear Acceleration Vector
   const linScale = 4.0;
   const tipVec = [
     oar.lin_ax * linScale,
@@ -872,13 +988,11 @@ function renderPlateCanvas(oarNum) {
   cx.lineWidth = 3.2;
   cx.stroke();
 
-  // Vector Arrowhead
   cx.beginPath();
   cx.arc(tip2D[0], tip2D[1], 4, 0, Math.PI * 2);
   cx.fillStyle = '#00ff66';
   cx.fill();
 
-  // Coordinate / Attitude Labels
   cx.font = '10px monospace';
   cx.fillStyle = '#00e5ff';
   cx.fillText(`PITCH: ${(oar.pitch * 180 / Math.PI).toFixed(1)}°`, 10, h - 24);
@@ -895,7 +1009,7 @@ function renderPlateCanvas(oarNum) {
 }
 
 // ==============================================================================
-// 5. FOUR AUTO-SCALED STRIP CHARTS (SCREENSHOT 1 EXACT REPRODUCTION)
+// 5. FOUR AUTO-SCALED STRIP CHARTS
 // ==============================================================================
 function drawScreenshotStripChart(canvasId, arr, col, unit, minSpan) {
   const cn = document.getElementById(canvasId);
@@ -978,7 +1092,7 @@ function drawScreenshotStripChart(canvasId, arr, col, unit, minSpan) {
 }
 
 // ==============================================================================
-// 6. THREE INTERACTIVE MULTI-SERIES CHARTS (SCREENSHOT 2 & MASTER OVERLAY)
+// 6. THREE INTERACTIVE MULTI-SERIES CHARTS
 // ==============================================================================
 const interConfigs = {
   1: {
@@ -1051,7 +1165,6 @@ function resetInteractiveZoom(key) {
   redrawInteractiveChart(key);
 }
 
-// Bind Mouse Zoom and Pan Events
 Object.keys(interConfigs).forEach(key => {
   const cfg = interConfigs[key];
   const cn = cfg.canvas;
@@ -1214,7 +1327,6 @@ function redrawInteractiveChart(key) {
       checkM(p[pfx + 'gy'], cfg.series.gy);
       checkM(p[pfx + 'gz'], cfg.series.gz);
     } else {
-      // Master Overlay bounds
       const f1 = (flipLoad1 ? -1 : 1) * (p.o1_w - oar1.tareOffset);
       const f2 = (flipLoad2 ? -1 : 1) * (p.o2_w - oar2.tareOffset) - tareAlignmentDelta;
 
@@ -1245,7 +1357,6 @@ function redrawInteractiveChart(key) {
   const mPad = Math.max(0.5, (mMax - mMin) * 0.12);
   mMin -= mPad; mMax += mPad;
 
-  // Grid Ticks
   const ticks = 4;
   cx.font = "10px monospace";
   for (let i = 0; i <= ticks; i++) {
@@ -1300,7 +1411,6 @@ function redrawInteractiveChart(key) {
     if (cfg.series.gy)   drawLine(p => p[pfx + 'gy'], '#d044ff', mMin, mMax);
     if (cfg.series.gz)   drawLine(p => p[pfx + 'gz'], '#ffea00', mMin, mMax);
   } else {
-    // Master Comparison Draw
     if (isRelativeDeltaMode) {
       drawLine(p => {
         const f1 = (flipLoad1 ? -1 : 1) * (p.o1_w - oar1.tareOffset);
@@ -1325,7 +1435,6 @@ function redrawInteractiveChart(key) {
     if (cfg.series.o2_gz) drawLine(p => p.o2_gz, '#fff588', mMin, mMax, true);
   }
 
-  // Hover Snapping Dots
   if (cfg.hoverIdx !== null && cfg.hoverIdx >= sIdx && cfg.hoverIdx <= eIdx) {
     const hx = gutterL + ((cfg.hoverIdx - sIdx) / (eIdx - sIdx || 1)) * plotW;
     cx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
@@ -1364,7 +1473,7 @@ function recenterMap() {
 }
 
 // ==============================================================================
-// 8. FILE LOADER (CSV / RAW HEX APP LOGS)
+// 8. FILE LOADER
 // ==============================================================================
 function handleFileSelected(e) {
   const file = e.target.files[0];
