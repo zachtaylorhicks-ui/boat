@@ -1,57 +1,426 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>indaboat Live HUD</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>indaboat Dual-Telemetry Master Suite</title>
+
+  <!-- Leaflet CSS & JS for Satellite Imagery -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #08090b; color: #eee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; overflow: hidden; height: 100vh; }
-    #topbar { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #111317; border-bottom: 1px solid #232731; }
-    button { background: #0070e0; border: none; color: #fff; font-weight: bold; padding: 6px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; }
-    button:active { filter: brightness(1.2); }
-    .btn-export { background: #009955; }
-    .btn-clear { background: #444; }
 
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: 240px 1fr 75px 22px;
-      gap: 6px;
-      padding: 6px;
-      height: calc(100vh - 42px);
+  <style>
+    /* ==========================================================================
+       1. GLOBAL RESET & BASE STYLING
+       ========================================================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
-    .card { background: #0f1116; border: 1px solid #1f232c; border-radius: 5px; position: relative; overflow: hidden; }
+    :root {
+      --bg-master: #07080a;
+      --bg-panel: #0d1017;
+      --bg-panel-alt: #131722;
+      --bg-input: #1a202c;
+      --border-dark: #1b2333;
+      --border-light: #2c384e;
+      --accent-cyan: #00ffcc;
+      --accent-blue: #0088ff;
+      --accent-green: #00ff88;
+      --accent-gold: #ffd700;
+      --accent-pink: #ff66cc;
+      --accent-red: #ff3344;
+      --accent-orange: #ff8800;
+      --accent-purple: #7b2cbf;
+      --text-main: #f0f4f8;
+      --text-muted: #8899aa;
+      --text-dim: #556677;
+      --font-mono: "SF Mono", "Roboto Mono", Menlo, Consolas, Monaco, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-master);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Common Button Archetypes */
+    button {
+      background: var(--accent-blue);
+      border: 1px solid transparent;
+      color: #fff;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      user-select: none;
+      transition: background 0.15s ease, filter 0.15s ease, border-color 0.15s ease;
+      letter-spacing: 0.3px;
+    }
+    button:active { filter: brightness(1.3); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-connect { background: #0066cc; }
+    .btn-connect.connected { background: #009944; border-color: #00ff88; }
+    .btn-active-rec { background: #cc0033 !important; border-color: #ff3366 !important; animation: pulseRed 1.4s infinite; }
+    @keyframes pulseRed { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+    .btn-ctrl { background: #181f2b; border: 1px solid #283447; color: #ccd6e0; padding: 4px 8px; font-size: 10px; border-radius: 3px; }
+    .btn-ctrl:hover { background: #222c3d; color: #fff; }
+    .btn-ctrl.active { background: #0070e0; border-color: #00aaff; color: #fff; }
+    .btn-toggle { background: #222938; border: 1px solid #364259; font-size: 10px; padding: 4px 8px; }
+    .btn-toggle.active { background: #0088cc; border-color: #33bbff; color: #fff; }
+    .btn-flatline { background: #882200; border: 1px solid #aa3300; font-size: 10px; }
+    .btn-flatline.active { background: #ff3300; color: #fff; border-color: #ff6633; }
+    .btn-analyzer { background: #ffaa00; color: #0a0c10; font-weight: 900; border: 1px solid #ffbb22; }
+    .btn-analyzer:hover { background: #ffbb22; }
+
+    /* ==========================================================================
+       2. TOP MASTER DUAL-TELEMETRY NAVIGATION BAR
+       ========================================================================== */
+    #masterHeader {
+      height: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      background: #0d1017;
+      border-bottom: 1px solid #1a2233;
+      z-index: 1000;
+    }
+
+    #viewTabs { display: flex; gap: 6px; }
+    .tab-btn {
+      background: #141924;
+      border: 1px solid #232d40;
+      color: var(--text-muted);
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 800;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #0088cc;
+      color: #fff;
+      border-color: #00bbff;
+      box-shadow: 0 0 10px rgba(0, 136, 204, 0.4);
+    }
+
+    .badge-status-chip {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 3px 7px;
+      border-radius: 3px;
+      border: 1px solid var(--border-light);
+      background: #10141f;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #777;
+    }
+    .status-dot.green { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+    .status-dot.red { background: #ff3344; box-shadow: 0 0 6px #ff3344; }
+    .status-dot.yellow { background: #ffaa00; box-shadow: 0 0 6px #ffaa00; }
+
+    /* Containers */
+    .view-container {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+    }
+    .view-container.active { display: flex; }
+
+    /* Common Card Styling */
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
     .card-title {
       position: absolute;
       top: 6px;
       left: 8px;
-      font-size: 11px;
-      letter-spacing: 0.5px;
+      font-size: 10px;
+      letter-spacing: 0.6px;
       text-transform: uppercase;
-      color: #aaa;
+      color: #b0c0d0;
       z-index: 10;
-      font-weight: 700;
-      background: rgba(15,17,22,0.85);
-      padding: 2px 6px;
+      font-weight: 800;
+      background: rgba(13, 16, 23, 0.88);
+      padding: 2px 7px;
       border-radius: 3px;
+      pointer-events: none;
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
-
-    #map { width: 100%; height: 100%; }
     canvas { width: 100%; height: 100%; display: block; }
 
+    /* ==========================================================================
+       3. VIEW 1: MOBILE-OPTIMIZED HOMEPAGE LIVE DASHBOARD
+       ========================================================================== */
+    #liveHomepageView {
+      padding: 6px;
+      gap: 6px;
+    }
+
+    /* Layer 1: Split Dual-IMU Kinematics & Live GPS Track */
+    .layer-top-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: 220px;
+      min-height: 200px;
+      gap: 6px;
+    }
+
+    /* Layer 2: Center Controls & Comprehensive Workout Stats */
+    .layer-controls-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: #0f131c;
+      border: 1px solid #1c2436;
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .action-button-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .btn-action {
+      flex: 1;
+      min-width: 90px;
+      height: 36px;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 900;
+      border-radius: 5px;
+      text-transform: uppercase;
+    }
+    .btn-start { background: #009944; border-color: #00cc55; }
+    .btn-pause { background: #d97706; border-color: #f59e0b; }
+    .btn-end { background: #b91c1c; border-color: #ef4444; }
+    .btn-recall-main { background: #7b2cbf; border-color: #9d4edd; }
+    .btn-calib { background: #1d4ed8; border-color: #3b82f6; }
+
+    .stats-grid-primary {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .stat-badge {
+      background: #080a0f;
+      border: 1px solid #182030;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 4px;
+    }
+    .stat-val {
+      font-size: 19px;
+      font-weight: 900;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      line-height: 1.1;
+    }
+    .stat-lbl {
+      font-size: 8px;
+      color: #7b8ea3;
+      text-transform: uppercase;
+      margin-top: 3px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    /* Layer 3: Live Flow Chart */
+    .layer-flow-chart {
+      height: 185px;
+      min-height: 165px;
+      position: relative;
+    }
+
+    /* Layer 4: Dedicated Dual Individual Stroke Overlay Charts */
+    .layer-individual-overlays {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: 220px;
+      min-height: 200px;
+      gap: 6px;
+    }
+    .layer-beep-chart {
+      height: 100%;
+      position: relative;
+    }
+
+    /* ==========================================================================
+       4. VIEW 2: FULL ADVANCED TELEMETRY SUITE
+       ========================================================================== */
+    #advancedSuiteView {
+      padding: 6px;
+      gap: 6px;
+    }
+    #topbarAdv {
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #11141c;
+      border: 1px solid #202738;
+      border-radius: 5px;
+      padding: 0 8px;
+    }
+    #replayBar {
+      height: 38px;
+      min-height: 38px;
+      background: #131722;
+      border-bottom: 1px solid #232c3f;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      gap: 10px;
+      font-size: 11px;
+    }
+    .grid-top {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      height: 250px;
+      min-height: 200px;
+      gap: 6px;
+    }
+    #canvas3dControls {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      z-index: 20;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    #alignDrawer {
+      position: absolute;
+      top: 34px;
+      right: 8px;
+      z-index: 30;
+      background: rgba(14, 18, 27, 0.96);
+      border: 1px solid #2c3850;
+      border-radius: 5px;
+      padding: 10px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 11px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+      width: 210px;
+    }
+    .align-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .align-row label { color: #8fa5cc; }
+
+    #chartCard { flex: 1; min-height: 210px; position: relative; }
+    .chart-header {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      right: 8px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+    .chart-controls { display: flex; gap: 4px; align-items: center; pointer-events: auto; }
+    .legend-group {
+      display: flex;
+      gap: 4px;
+      pointer-events: auto;
+      background: rgba(14, 17, 24, 0.94);
+      padding: 3px 6px;
+      border-radius: 4px;
+      border: 1px solid #232c3d;
+      flex-wrap: wrap;
+      max-width: 65%;
+    }
+    .legend-pill {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      background: #161b26;
+      border: 1px solid #263247;
+    }
+    .legend-pill.off { opacity: 0.3; filter: grayscale(1); }
+
+    .chart-tooltip-box {
+      position: absolute;
+      display: none;
+      background: rgba(8, 10, 15, 0.96);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 4px;
+      padding: 6px 9px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: #eee;
+      pointer-events: none;
+      z-index: 50;
+      white-space: nowrap;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.9);
+      line-height: 1.4;
+    }
+
     #hud {
-      grid-column: span 2;
+      height: 56px;
+      min-height: 56px;
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       gap: 6px;
     }
     .badge {
-      background: #0f1116;
-      border: 1px solid #1f232c;
+      background: #0d1017;
+      border: 1px solid #1c2333;
       border-radius: 5px;
       display: flex;
       flex-direction: column;
@@ -59,549 +428,2753 @@
       justify-content: center;
       padding: 2px 4px;
     }
-    .badge-val { font-size: 18px; font-weight: 800; color: #00ffcc; line-height: 1.1; }
-    .badge-lbl { font-size: 9px; color: #777; text-transform: uppercase; margin-top: 2px; font-weight: 600; }
+    .badge-val { font-size: 16px; font-weight: 900; color: var(--accent-cyan); line-height: 1.1; font-family: var(--font-mono); }
+    .badge-lbl { font-size: 9px; color: #7b8a9c; text-transform: uppercase; margin-top: 2px; font-weight: 700; }
 
     #debugBar {
-      grid-column: span 2;
+      height: 22px;
+      min-height: 22px;
       background: #050608;
-      border: 1px solid #16181f;
+      border: 1px solid #151821;
       border-radius: 3px;
-      padding: 2px 8px;
+      padding: 0 8px;
       font-size: 10px;
       color: #00ff88;
-      font-family: monospace;
+      font-family: var(--font-mono);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      line-height: 18px;
+      line-height: 20px;
+    }
+
+    /* ==========================================================================
+       5. VIEW 3: STRAVA-STYLE BASIC RECALL & CROPPING MODAL
+       ========================================================================== */
+    #modalBasicRecall {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 7, 11, 0.98);
+      z-index: 1500;
+      flex-direction: column;
+      padding: 12px;
+      gap: 10px;
+      overflow-y: auto;
+    }
+    .recall-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #202a3d;
+      padding-bottom: 10px;
+    }
+    .strava-hero {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      background: #0e121a;
+      border: 1px solid #1e2638;
+      border-radius: 6px;
+      padding: 12px;
+    }
+    .strava-stat { display: flex; flex-direction: column; }
+    .strava-val { font-size: 26px; font-weight: 900; color: var(--accent-cyan); font-family: var(--font-mono); }
+    .strava-lbl { font-size: 9px; color: #8fa0b5; text-transform: uppercase; margin-top: 2px; font-weight: 700; }
+
+    .crop-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: #121722;
+      border: 1px solid #232e42;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 11px;
+    }
+    .crop-slider-container { display: flex; align-items: center; gap: 8px; flex: 1; }
+
+    /* ==========================================================================
+       6. VIEW 4: EXACT 4-CHART STROKE ANALYZER MODAL
+       ========================================================================== */
+    #analyzerModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 5, 8, 0.98);
+      z-index: 2000;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #analyzerHeader {
+      height: 44px;
+      background: #10141d;
+      border-bottom: 1px solid #222a3d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+    }
+    #analyzerContent {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 290px 1fr;
+      min-height: 0;
+      gap: 8px;
+      padding: 8px;
+    }
+    .analyzer-sidebar {
+      background: #0e1118;
+      border: 1px solid #1c2333;
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      gap: 8px;
+      overflow-y: auto;
+    }
+    .analyzer-main {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .analyzer-panel {
+      flex: 1;
+      min-height: 190px;
+      background: #0e1118;
+      border: 1px solid #1c2333;
+      border-radius: 5px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stroke-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 7px;
+      background: #141924;
+      border: 1px solid #242f44;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 10px;
+      user-select: none;
+    }
+    .stroke-list-item:hover { background: #1a2232; }
+    .stroke-list-item.selected { border-color: var(--accent-gold); background: #262010; }
+    .stroke-list-item.dimmed { opacity: 0.35; text-decoration: line-through; }
+    .control-box {
+      background: #131722;
+      border: 1px solid #222b3d;
+      border-radius: 4px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 10px;
+    }
+    .control-box label { color: #8fa2bf; font-weight: 700; display: flex; justify-content: space-between; }
+
+    /* Custom range sliders */
+    input[type=range] {
+      accent-color: #00ffcc;
+      height: 4px;
+      background: #202738;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 900px) {
+      .layer-top-grid { grid-template-columns: 1fr; height: 380px; }
+      .layer-individual-overlays { grid-template-columns: 1fr; height: 380px; }
+      .grid-top { grid-template-columns: 1fr; height: 380px; }
+      #analyzerContent { grid-template-columns: 1fr; }
+      .stats-grid-primary { grid-template-columns: repeat(3, 1fr); }
+      .strava-hero { grid-template-columns: repeat(3, 1fr); }
     }
   </style>
 </head>
 <body>
 
-<div id="topbar">
-  <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
-  <span id="bleStatus" style="font-size: 12px; color: #ff4444; font-weight: bold; letter-spacing: 1px;">DISCONNECTED</span>
-  <div style="display: flex; gap: 6px;">
-    <button class="btn-export" onclick="exportDatabase()">EXPORT (<span id="dbCount">0</span>)</button>
-    <button class="btn-clear" onclick="clearDatabase()">CLEAR</button>
+  <!-- ========================================================================
+       TOP MASTER BAR (ALWAYS VISIBLE)
+       ======================================================================== -->
+  <header id="masterHeader">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button id="btnConnect" class="btn-connect" onclick="toggleConnect()">CONNECT BLE</button>
+      <div id="viewTabs">
+        <button class="tab-btn active" id="tabLive" onclick="switchView('live')">LIVE DASHBOARD</button>
+        <button class="tab-btn" id="tabAdvanced" onclick="switchView('advanced')">ADVANCED SUITE</button>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span class="badge-status-chip" id="chipMemory">MEM: <b id="lblMemCount" style="color:#00ffcc;">0</b> PTS</span>
+      <span class="badge-status-chip" id="chipSdCard">
+        <span class="status-dot green" id="sdDot"></span>
+        <span id="sdCardStatus">SD: READY</span>
+      </span>
+      <span class="badge-status-chip" id="chipBle">
+        <span class="status-dot red" id="bleDot"></span>
+        <span id="bleStatus" style="font-weight:bold; color:#ff4444;">DISCONNECTED</span>
+      </span>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       VIEW 1: HOMEPAGE LIVE VIEW (MOBILE-OPTIMIZED)
+       ======================================================================== -->
+  <main class="view-container active" id="liveHomepageView">
+
+    <!-- LAYER 1: UPPER DUAL ACCELEROMETERS & LIVE SATELLITE MAP -->
+    <section class="layer-top-grid">
+      <!-- DUAL ACCELEROMETER FUSION & 3D KINEMATICS -->
+      <div class="card">
+        <div class="card-title">Dual IMU Kinematics (Fused Oar 1 + Oar 2)</div>
+        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
+          <span style="font-size:9px; background:#162030; border:1px solid #2b3b55; color:#00ffcc; padding:2px 6px; border-radius:3px; font-weight:bold;">
+            6-DOF SENSOR FUSION ACTIVE
+          </span>
+        </div>
+        <canvas id="dualImuCanvas"></canvas>
+      </div>
+
+      <!-- SATELLITE GPS MAP -->
+      <div class="card">
+        <div class="card-title" id="liveMapTitle">GPS Satellite Track</div>
+        <div style="position:absolute; top:6px; right:8px; z-index:400;">
+          <button class="btn-ctrl" onclick="recenterLiveMap()">RECENTER</button>
+        </div>
+        <div id="liveMap"></div>
+      </div>
+    </section>
+
+    <!-- LAYER 2: CENTER ACTION BUTTONS & WORKOUT METRICS -->
+    <section class="layer-controls-stats">
+      <div class="action-button-row">
+        <button class="btn-action btn-start" id="btnStart" onclick="handleSessionAction('START')">START SESSION</button>
+        <button class="btn-action btn-pause" id="btnPause" onclick="handleSessionAction('PAUSE')">PAUSE SESSION</button>
+        <button class="btn-action btn-end" id="btnEnd" onclick="handleSessionAction('END')">END SESSION</button>
+        <button class="btn-action btn-recall-main" onclick="openBasicRecallModal()">RECALL SESSION</button>
+        <button class="btn-action btn-calib" onclick="zeroDualImuNow()">CALIBRATE</button>
+      </div>
+
+      <!-- LIVE & AVERAGE WORKOUT STATS -->
+      <div class="stats-grid-primary">
+        <div class="stat-badge"><div class="stat-val" id="liveSPM">--</div><div class="stat-lbl">Live Rate (SPM)</div></div>
+        <div class="stat-badge"><div class="stat-val" id="liveSplit" style="color:#ffff00;">--:--</div><div class="stat-lbl">Live Split (/500m)</div></div>
+        <div class="stat-badge"><div class="stat-val" id="liveDistance">0m</div><div class="stat-lbl">Distance</div></div>
+        <div class="stat-badge"><div class="stat-val" id="liveTime" style="color:#00e5ff;">00:00</div><div class="stat-lbl">Elapsed Time</div></div>
+        <div class="stat-badge"><div class="stat-val" id="avgSPM" style="color:#ffaa00;">--</div><div class="stat-lbl">Avg SPM</div></div>
+        <div class="stat-badge"><div class="stat-val" id="avgSplit" style="color:#ffea00;">--:--</div><div class="stat-lbl">Avg Split</div></div>
+      </div>
+    </section>
+
+    <!-- LAYER 3: FULL LIVE SCROLLING CHART (BOTH PLATES + SURGE) -->
+    <section class="card layer-flow-chart">
+      <div class="card-title">Live Telemetry Flow (Force Plates & Surge)</div>
+      <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
+        <span style="font-size:9px; background:#0f1d24; border:1px solid #1c3b4a; color:#00ffcc; padding:2px 6px; border-radius:3px;">● Plate 1 Force</span>
+        <span style="font-size:9px; background:#241022; border:1px solid #4a1c44; color:#ff66cc; padding:2px 6px; border-radius:3px;">● Plate 2 Force</span>
+        <span style="font-size:9px; background:#082218; border:1px solid #124d35; color:#00ff88; padding:2px 6px; border-radius:3px; font-weight:bold;">● Clean Bow Surge</span>
+      </div>
+      <canvas id="liveFlowCanvas"></canvas>
+    </section>
+
+    <!-- LAYER 4: INDIVIDUAL FORCE PLATE OVERLAYS (ONE FOR EACH PLATE) -->
+    <section class="layer-individual-overlays">
+      <!-- PLATE 1 INDIVIDUAL OVERLAY -->
+      <div class="card layer-beep-chart">
+        <div class="card-title">Plate 1 Stroke Profile (Equalized Baseline)</div>
+        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
+          <span style="font-size:8px; background:#221808; border:1px solid #553c12; color:#ffd700; padding:2px 5px; border-radius:3px; font-weight:bold;">★ P1 AVG (GOLD)</span>
+          <span style="font-size:8px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 5px; border-radius:3px; font-weight:bold;">P2 AVG (CYAN)</span>
+          <span style="font-size:8px; background:#161a22; border:1px solid #283040; color:#888; padding:2px 5px; border-radius:3px;">GHOST (GREY)</span>
+        </div>
+        <canvas id="strokeBeepCanvasP1"></canvas>
+      </div>
+
+      <!-- PLATE 2 INDIVIDUAL OVERLAY -->
+      <div class="card layer-beep-chart">
+        <div class="card-title">Plate 2 Stroke Profile (Equalized Baseline)</div>
+        <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
+          <span style="font-size:8px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 5px; border-radius:3px; font-weight:bold;">★ P2 AVG (CYAN)</span>
+          <span style="font-size:8px; background:#221808; border:1px solid #553c12; color:#ffd700; padding:2px 5px; border-radius:3px; font-weight:bold;">P1 AVG (GOLD)</span>
+          <span style="font-size:8px; background:#161a22; border:1px solid #283040; color:#888; padding:2px 5px; border-radius:3px;">GHOST (GREY)</span>
+        </div>
+        <canvas id="strokeBeepCanvasP2"></canvas>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================
+       VIEW 2: ADVANCED ANALYSIS SUITE
+       ======================================================================== -->
+  <main class="view-container" id="advancedSuiteView">
+
+    <div id="topbarAdv">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button class="btn-toggle active" id="btnInvertLoad" onclick="toggleLoadInversion()">FLIP LOAD (+/-)</button>
+        <button class="btn-flatline" id="btnFlatlineTool" onclick="toggleFlatlineMode()">✏️ FLATLINE SPIKE</button>
+        <button class="btn-ctrl" onclick="resetFlatlines()">⟲ RESET FLATLINES</button>
+        <button class="btn-analyzer" onclick="openStrokeAnalyzer()">⚡ STROKE ANALYZER (4 CHARTS)</button>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <input type="file" id="fileInput" accept=".csv,.txt,.log,.tsv" style="display:none;" onchange="handleFileSelected(event)" />
+        <button class="btn-ctrl" onclick="document.getElementById('fileInput').click()" style="background:#7b2cbf;">LOAD CSV / LOG</button>
+        <button class="btn-ctrl" onclick="exportDatabase()" style="background:#009955;">EXPORT (<span id="dbCount">0</span>)</button>
+        <button class="btn-ctrl" onclick="clearDatabase()" style="background:#3a3f4b;">CLEAR</button>
+      </div>
+    </div>
+
+    <!-- TIMED REPLAY SCRUBBER BAR -->
+    <div id="replayBar">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button id="btnPlay" class="btn-ctrl" onclick="toggleReplayPlay()" style="background:#009955; color:#fff; font-weight:bold; width:60px;">PLAY</button>
+        <button class="btn-ctrl" onclick="stepReplay(-1)">⏮</button>
+        <button class="btn-ctrl" onclick="stepReplay(1)">⏭</button>
+        <span style="font-size:10px; color:#8899aa;">SPEED:</span>
+        <select id="replaySpeed" onchange="changeReplaySpeed(this.value)" style="background:#1b202c; color:#ddd; border:1px solid #2e3547; border-radius:3px; padding:2px 4px; font-size:10px;">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1.0x (Real-Time)</option>
+          <option value="2">2.0x</option>
+          <option value="5">5.0x</option>
+        </select>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:650px;">
+        <input type="range" id="replaySlider" min="0" max="100" value="0" style="flex:1; cursor:pointer;" oninput="onReplaySliderInput(this.value)" />
+        <span id="replayTimeDisplay" style="font-family:monospace; font-size:10px; color:#00e5ff; white-space:nowrap; min-width:170px;">0 / 0 (0.00s)</span>
+      </div>
+      <button class="btn-ctrl" onclick="exitReplayMode()" style="background:#442222; border-color:#663333;">EXIT</button>
+    </div>
+
+    <div class="grid-top">
+      <!-- 2.5D ISOMETRIC ACCELEROMETER ATTITUDE -->
+      <div class="card">
+        <div class="card-title">Accelerometer Plate Orientation (Original)</div>
+        <div id="canvas3dControls">
+          <button class="btn-ctrl" id="btnToggleForceArrow" onclick="toggleForceArrow()">FORCE ARROW: OFF</button>
+          <button class="btn-ctrl" onclick="toggleAlignDrawer()">⚙ ALIGN</button>
+        </div>
+
+        <div id="alignDrawer">
+          <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #252e42; padding-bottom:3px;">Plate Mounting Offsets</div>
+          <div class="align-row">
+            <label>Pitch Trim:</label>
+            <input type="range" min="-45" max="45" value="0" step="1" oninput="mountPitchTrim = parseFloat(this.value); document.getElementById('lblPTrim').innerText=this.value+'°'; renderPlateCanvas();" />
+            <span id="lblPTrim" style="font-family:monospace; min-width:26px;">0°</span>
+          </div>
+          <div class="align-row">
+            <label>Roll Trim:</label>
+            <input type="range" min="-45" max="45" value="0" step="1" oninput="mountRollTrim = parseFloat(this.value); document.getElementById('lblRTrim').innerText=this.value+'°'; renderPlateCanvas();" />
+            <span id="lblRTrim" style="font-family:monospace; min-width:26px;">0°</span>
+          </div>
+          <div class="align-row" style="margin-top:4px;">
+            <button class="btn-ctrl" onclick="zeroAttitudeNow()" style="flex:1; justify-content:center; background:#005599;">ZERO LEVEL NOW</button>
+          </div>
+        </div>
+
+        <canvas id="plateCanvas"></canvas>
+      </div>
+
+      <!-- SATELLITE GPS MAP -->
+      <div class="card">
+        <div class="card-title" id="mapTitle">GPS Satellite Track (Original)</div>
+        <div style="position:absolute; top:6px; right:8px; z-index:400;">
+          <button class="btn-ctrl" onclick="recenterMap()">RECENTER TRACK</button>
+        </div>
+        <div id="map"></div>
+      </div>
+    </div>
+
+    <!-- MAIN INTERACTIVE TELEMETRY CHART WITH VERTICAL SCRUBBER LINE -->
+    <div class="card" id="chartCard">
+      <div class="chart-header">
+        <div class="legend-group">
+          <span class="legend-pill" id="leg_load" onclick="toggleSeries('load')" style="color:#00ffcc;">● Force Plate</span>
+          <span class="legend-pill" id="leg_surge" onclick="toggleSeries('surge')" style="color:#00ff88; font-weight:bold;">● Bow Surge (m/s²)</span>
+          <span class="legend-pill" id="leg_ax" onclick="toggleSeries('ax')" style="color:#ff4444;">● Ax</span>
+          <span class="legend-pill" id="leg_ay" onclick="toggleSeries('ay')" style="color:#22cc88;">● Ay</span>
+          <span class="legend-pill" id="leg_az" onclick="toggleSeries('az')" style="color:#3399ff;">● Az</span>
+          <span class="legend-pill" id="leg_gx" onclick="toggleSeries('gx')" style="color:#ffaa00;">● Gx</span>
+          <span class="legend-pill" id="leg_gy" onclick="toggleSeries('gy')" style="color:#d044ff;">● Gy</span>
+          <span class="legend-pill" id="leg_gz" onclick="toggleSeries('gz')" style="color:#ffea00;">● Gz</span>
+          <span class="legend-pill" id="leg_gpsSpd" onclick="toggleSeries('gpsSpd')" style="color:#ffff00;">● GPS Speed</span>
+        </div>
+        <div class="chart-controls">
+          <button class="btn-analyzer" onclick="openStrokeAnalyzer()" style="padding:2px 8px; font-size:10px;">⚡ ANALYZE STROKES</button>
+          <button class="btn-ctrl" onclick="zoomChart(0.7)">+ ZOOM</button>
+          <button class="btn-ctrl" onclick="zoomChart(1.4)">- ZOOM</button>
+          <button class="btn-ctrl" onclick="resetChartZoom()">FIT ALL</button>
+          <button class="btn-ctrl active" id="btnFollow" onclick="toggleAutoFollow()">LIVE FOLLOW</button>
+        </div>
+      </div>
+      <div id="chartTooltip" class="chart-tooltip-box"></div>
+      <canvas id="interactiveCanvas"></canvas>
+    </div>
+
+    <!-- 7 METRIC BADGES -->
+    <div id="hud">
+      <div class="badge"><div class="badge-val" id="valRaw" style="color: #ffaa00;">--</div><div class="badge-lbl" id="lblRaw">Raw Load</div></div>
+      <div class="badge"><div class="badge-val" id="valNet" style="color: #00ffcc;">--</div><div class="badge-lbl" id="lblNet">Drive Force</div></div>
+      <div class="badge"><div class="badge-val" id="valSurge" style="color: #00e5ff;">--</div><div class="badge-lbl">Clean Surge (m/s²)</div></div>
+      <div class="badge"><div class="badge-val" id="valSpd" style="color: #ffff00;">--</div><div class="badge-lbl">Speed (km/h)</div></div>
+      <div class="badge"><div class="badge-val" id="valPitch" style="color: #ff66cc;">--</div><div class="badge-lbl">Pitch</div></div>
+      <div class="badge"><div class="badge-val" id="valRoll" style="color: #cc66ff;">--</div><div class="badge-lbl">Roll</div></div>
+      <div class="badge"><div class="badge-val" id="valSats" style="color: #aaa;">--</div><div class="badge-lbl">GPS Sats</div></div>
+    </div>
+
+    <!-- STATUS MONITOR -->
+    <div id="debugBar">Ready. Connect BLE or Load a CSV session...</div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 3: STRAVA-STYLE BASIC RECALL MODAL
+       ======================================================================== -->
+  <div id="modalBasicRecall">
+    <div class="recall-header">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:16px; font-weight:900; color:#ffaa00;">★ WORKOUT ACTIVITY SUMMARY</span>
+        <span id="recallSessionTitle" style="font-size:11px; color:#88a0cc;">Session Recall</span>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-ctrl" onclick="triggerWirelessSdDump()" style="background:#0070e0; color:#fff;">PULL FROM SD CARD (BLE)</button>
+        <button class="btn-ctrl" onclick="switchToAdvancedFromRecall()" style="background:#7b2cbf; color:#fff;">ADVANCED RECALL ➔</button>
+        <button class="btn-ctrl" onclick="closeBasicRecallModal()" style="background:#441a1a; border-color:#662222;">CLOSE ✕</button>
+      </div>
+    </div>
+
+    <!-- STRAVA HERO METRICS -->
+    <div class="strava-hero">
+      <div class="strava-stat"><div class="strava-val" id="stTime">--:--</div><div class="strava-lbl">Total Time</div></div>
+      <div class="strava-stat"><div class="strava-val" id="stDist">0m</div><div class="strava-lbl">Total Distance</div></div>
+      <div class="strava-stat"><div class="strava-val" id="stSplit">--:--</div><div class="strava-lbl">Avg /500m Split</div></div>
+      <div class="strava-stat"><div class="strava-val" id="stSPM">--</div><div class="strava-lbl">Avg Stroke Rate</div></div>
+      <div class="strava-stat"><div class="strava-val" id="stStrokes">0</div><div class="strava-lbl">Total Strokes</div></div>
+      <div class="strava-stat"><div class="strava-val" id="stBalance" style="color:#ff66cc;">50 / 50</div><div class="strava-lbl">P1 / P2 Balance</div></div>
+    </div>
+
+    <!-- SATELLITE MAP & OVERVIEW CHARTS -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; height:260px; gap:8px;">
+      <div class="card"><div id="recallMap" style="width:100%; height:100%;"></div></div>
+      <div class="card"><canvas id="recallAveragesCanvas"></canvas></div>
+    </div>
+
+    <!-- CROP & EXPORT STRIP -->
+    <div class="crop-bar">
+      <div class="crop-slider-container">
+        <span style="font-weight:bold; color:#ffaa00; white-space:nowrap;">CROP WORKOUT:</span>
+        <input type="range" id="cropStart" min="0" max="100" value="0" style="flex:1;" oninput="updateCropWindow()" />
+        <input type="range" id="cropEnd" min="0" max="100" value="100" style="flex:1;" oninput="updateCropWindow()" />
+        <span id="cropDisplay" style="font-family:monospace; min-width:130px; color:#00ffcc;">0% → 100%</span>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-ctrl" onclick="exportCroppedCSV()" style="background:#009944; color:#fff;">EXPORT CROPPED (CSV)</button>
+        <button class="btn-ctrl" onclick="exportFullSessionCSV()">EXPORT FULL (CSV)</button>
+      </div>
+    </div>
   </div>
-</div>
 
-<div class="grid">
-  <!-- DYNAMIC 3D FORCE PLATE (CANVAS PROJECTION) -->
-  <div class="card">
-    <div class="card-title">3D Attitude Force Plate</div>
-    <canvas id="plateCanvas"></canvas>
+  <!-- ========================================================================
+       VIEW 4: EXACT 4-CHART STROKE ANALYZER MODAL
+       ======================================================================== -->
+  <div id="analyzerModal">
+    <div id="analyzerHeader">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:13px; font-weight:900; color:#ffaa00; letter-spacing:0.5px;">⚡ STROKE ANALYSIS SUITE</span>
+        <span id="analyzerStrokeBadge" style="font-size:11px; background:#241d11; border:1px solid #4a3818; color:#ffcc55; padding:2px 8px; border-radius:3px;">0 STROKES FOUND</span>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-ctrl" onclick="exportStrokeAnalyticsCSV()" style="background:#009955; color:#fff;">EXPORT STROKE CSV</button>
+        <button class="btn-ctrl" onclick="closeStrokeAnalyzer()" style="background:#552222; border-color:#883333;">CLOSE ✕</button>
+      </div>
+    </div>
+
+    <div id="analyzerContent">
+      <!-- LEFT SIDEBAR -->
+      <aside class="analyzer-sidebar">
+        <div class="control-box">
+          <label><span>Analysis Region:</span><span id="lblRegionMode" style="color:#00ffcc;">ZOOM VIEW</span></label>
+          <div style="display:flex; gap:4px;">
+            <button class="btn-ctrl active" id="btnRegZoom" onclick="setAnalyzerRegion('zoom')" style="flex:1;">CURRENT ZOOM</button>
+            <button class="btn-ctrl" id="btnRegAll" onclick="setAnalyzerRegion('all')" style="flex:1;">ENTIRE SESSION</button>
+          </div>
+        </div>
+
+        <div class="control-box">
+          <label><span>Drive Delta Threshold (ΔF):</span><span id="lblDeltaThresh" style="color:#ffaa00;">180</span></label>
+          <input type="range" id="deltaThreshSlider" min="30" max="600" value="180" step="5" oninput="onThresholdChange(this.value)" />
+          <div style="font-size:9px; color:#778899;">*Relative jump from recovery baseline to peak drive</div>
+        </div>
+
+        <div class="control-box">
+          <label><span>Min Stroke Period (s):</span><span id="lblMinPeriod" style="color:#00e5ff;">1.2s</span></label>
+          <input type="range" id="minPeriodSlider" min="0.8" max="3.5" value="1.2" step="0.1" oninput="onMinPeriodChange(this.value)" />
+        </div>
+
+        <div class="control-box" id="strokeScorecard" style="background:#11151e; border-color:#2a364e;">
+          <div style="font-weight:bold; color:#00ffcc; border-bottom:1px solid #202b3f; padding-bottom:3px;">STROKE SCORECARD</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:2px;">
+            <div><span style="color:#8899aa;">Stroke Rate:</span> <b id="scRate" style="color:#fff;">--</b> SPM</div>
+            <div><span style="color:#8899aa;">Drive Time:</span> <b id="scDriveT" style="color:#ffaa00;">--</b> s</div>
+            <div><span style="color:#8899aa;">Recovery:</span> <b id="scRecovT" style="color:#00ffcc;">--</b> s</div>
+            <div><span style="color:#8899aa;">Rhythm:</span> <b id="scRatio" style="color:#ffea00;">--</b></div>
+            <div><span style="color:#8899aa;">Peak Force:</span> <b id="scPeakF" style="color:#ff4444;">--</b></div>
+            <div><span style="color:#8899aa;">Dist / Stroke:</span> <b id="scDPS" style="color:#3399ff;">--</b> m</div>
+            <div><span style="color:#8899aa;">Avg Speed:</span> <b id="scSpd" style="color:#ffff00;">--</b> km/h</div>
+            <div><span style="color:#8899aa;">Peak Surge:</span> <b id="scSurge" style="color:#00ff66;">--</b> m/s²</div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+          <span style="font-weight:bold; color:#88a0cc; font-size:10px;">DETECTED STROKES</span>
+          <button class="btn-ctrl" onclick="selectAllStrokes(true)">SELECT ALL</button>
+        </div>
+        <div id="strokeListContainer" style="display:flex; flex-direction:column; gap:4px; max-height:280px; overflow-y:auto;"></div>
+      </aside>
+
+      <!-- RIGHT MAIN: 4 CHARTS -->
+      <section class="analyzer-main">
+        <!-- CHART 1: CATCH-ALIGNED FORCE OVERLAY + 6-AXIS IMU LINES (ZOOMABLE) -->
+        <div class="analyzer-panel">
+          <div class="card-title">Chart 1: Catch-Aligned Force Overlay (All Humps + Bold Average + 6-Axis Lines)</div>
+          <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
+            <span class="legend-pill" id="tog_c1_force" onclick="toggleC1('force')" style="color:#ffd700;">● Force Avg</span>
+            <span class="legend-pill" id="tog_c1_allforce" onclick="toggleC1('allforce')" style="color:#00e5ff;">● All Humps</span>
+            <span class="legend-pill" id="tog_c1_ax" onclick="toggleC1('ax')" style="color:#ff4444;">● Ax</span>
+            <span class="legend-pill" id="tog_c1_ay" onclick="toggleC1('ay')" style="color:#22cc88;">● Ay</span>
+            <span class="legend-pill" id="tog_c1_az" onclick="toggleC1('az')" style="color:#3399ff;">● Az</span>
+            <span class="legend-pill" id="tog_c1_gyro" onclick="toggleC1('gyro')" style="color:#ffaa00;">● Gyro</span>
+            <button class="btn-ctrl" onclick="resetZoomC1()" style="padding:1px 5px; font-size:9px;">FIT</button>
+          </div>
+          <div id="c1Tooltip" class="chart-tooltip-box"></div>
+          <canvas id="overlayForceCanvas"></canvas>
+        </div>
+
+        <!-- CHART 2: REVERSE-ALIGNED (RIGHT-ALIGNED AT PRE-CATCH / FINISH) -->
+        <div class="analyzer-panel">
+          <div class="card-title" id="c2Title">Chart 2: Pre-Catch / End-Aligned Overlay (Aligned on Right Side)</div>
+          <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:4px;">
+            <button class="btn-ctrl active" id="btnC2AlignToggle" onclick="toggleC2Alignment()">ALIGN: PRE-CATCH (END)</button>
+            <span class="legend-pill" id="tog_c2_force" onclick="toggleC2('force')" style="color:#ffd700;">● Force Avg</span>
+            <span class="legend-pill" id="tog_c2_allforce" onclick="toggleC2('allforce')" style="color:#00e5ff;">● All Humps</span>
+            <span class="legend-pill" id="tog_c2_ax" onclick="toggleC2('ax')" style="color:#ff4444;">● Ax</span>
+            <span class="legend-pill" id="tog_c2_az" onclick="toggleC2('az')" style="color:#3399ff;">● Az</span>
+            <button class="btn-ctrl" onclick="resetZoomC2()" style="padding:1px 5px; font-size:9px;">FIT</button>
+          </div>
+          <div id="c2Tooltip" class="chart-tooltip-box"></div>
+          <canvas id="overlayRightAlignedCanvas"></canvas>
+        </div>
+
+        <!-- CHART 3: SELECTION STRETCH: BOW SURGE ACCEL (GREEN - FLIPPED) OVERLAID ON FORCE (ZOOMABLE) -->
+        <div class="analyzer-panel">
+          <div class="card-title">Chart 3: Selection Stretch — Bow Surge Accel (Green, Flipped) Overlaid on Force Plate</div>
+          <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
+            <span style="font-size:9px; background:#082218; border:1px solid #124d35; color:#00ff88; padding:2px 6px; border-radius:3px; font-weight:bold;">● BOW SURGE ACCEL (m/s²)</span>
+            <span style="font-size:9px; background:#0f1d24; border:1px solid #1c3b4a; color:#00e5ff; padding:2px 6px; border-radius:3px; font-weight:bold;">● FORCE PLATE MEASUREMENT</span>
+            <button class="btn-ctrl" onclick="resetZoomC3()" style="padding:1px 5px; font-size:9px;">FIT</button>
+          </div>
+          <div id="c3Tooltip" class="chart-tooltip-box"></div>
+          <canvas id="overlaySelectionCanvas"></canvas>
+        </div>
+
+        <!-- CHART 4: SPLIT-ALIGNED BREAKDOWN (MID-DRIVE SPLIT WITH FLIPPED GREEN BOW SURGE) -->
+        <div class="analyzer-panel">
+          <div class="card-title">Chart 4: Split-Aligned Breakdown (Catch Aligned Left, Finish Aligned Right)</div>
+          <div style="position:absolute; top:6px; right:8px; z-index:20; display:flex; gap:6px;">
+            <span class="legend-pill" id="tog_c4_surge" onclick="toggleC4('surge')" style="color:#00ff88;">● Bow Surge (Green)</span>
+            <span class="legend-pill" id="tog_c4_force" onclick="toggleC4('force')" style="color:#ffd700;">● Force</span>
+            <span class="legend-pill" id="tog_c4_ax" onclick="toggleC4('ax')" style="color:#ff4444;">● Ax</span>
+            <span class="legend-pill" id="tog_c4_az" onclick="toggleC4('az')" style="color:#3399ff;">● Az</span>
+          </div>
+          <div id="c4Tooltip" class="chart-tooltip-box"></div>
+          <canvas id="overlaySplitCanvas"></canvas>
+        </div>
+      </section>
+    </div>
   </div>
 
-  <!-- GPS SATELLITE MAP -->
-  <div class="card">
-    <div class="card-title" id="mapTitle">GPS Satellite Track</div>
-    <div id="map"></div>
-  </div>
+  <!-- ========================================================================
+       MASTER JAVASCRIPT LOGIC
+       ======================================================================== -->
+  <script>
+    "use strict";
 
-  <!-- LOAD CELL STRIP CHART -->
-  <div class="card">
-    <div class="card-title">Dynamic Drive Force (kg)</div>
-    <canvas id="chartForce"></canvas>
-  </div>
+    // ==========================================================================
+    // 1. STATE VARIABLES, DATA STORAGE & AUDIO ENGINE
+    // ==========================================================================
+    let inMemoryLog = [];
+    let chartData = [];
+    let flatlines = [];
+    let isFlatlineSelecting = false;
+    let flatlineDragStart = null;
+    let invertLoad = true;
 
-  <!-- PLANAR SURGE ACCEL CHART -->
-  <div class="card">
-    <div class="card-title">Planar Surge Accel (m/s²)</div>
-    <canvas id="chartAccel"></canvas>
-  </div>
+    // Session Workout Recording State
+    let sessionActive = false;
+    let sessionPaused = false;
+    let activeElapsedSec = 0;
+    let totalDistanceMeters = 0;
+    let workoutTimerInterval = null;
 
-  <!-- 7 METRIC BADGES -->
-  <div id="hud">
-    <div class="badge"><div class="badge-val" id="valRaw" style="color: #ffaa00;">--</div><div class="badge-lbl">Raw Load (kg)</div></div>
-    <div class="badge"><div class="badge-val" id="valNet" style="color: #00ffcc;">--</div><div class="badge-lbl">Drive Force (kg)</div></div>
-    <div class="badge"><div class="badge-val" id="valSurge" style="color: #00e5ff;">--</div><div class="badge-lbl">Surge (m/s²)</div></div>
-    <div class="badge"><div class="badge-val" id="valSpd" style="color: #ffff00;">--</div><div class="badge-lbl">Speed (km/h)</div></div>
-    <div class="badge"><div class="badge-val" id="valPitch" style="color: #ff66cc;">--</div><div class="badge-lbl">Pitch</div></div>
-    <div class="badge"><div class="badge-val" id="valRoll" style="color: #cc66ff;">--</div><div class="badge-lbl">Roll</div></div>
-    <div class="badge"><div class="badge-val" id="valSats" style="color: #aaa;">--</div><div class="badge-lbl">GPS Sats</div></div>
-  </div>
-
-  <!-- RAW BLE PACKET MONITOR -->
-  <div id="debugBar">Awaiting BLE Connection...</div>
-</div>
-
-<script>
-// ==============================================================================
-// 1. INDEXEDDB PERSISTENT STORAGE
-// ==============================================================================
-let db;
-const DB_NAME = "IndaBoatTelemetryDB";
-const STORE_NAME = "records";
-
-const dbReq = indexedDB.open(DB_NAME, 1);
-dbReq.onupgradeneeded = (e) => {
-  const d = e.target.result;
-  if (!d.objectStoreNames.contains(STORE_NAME)) {
-    d.createObjectStore(STORE_NAME, { autoIncrement: true });
-  }
-};
-dbReq.onsuccess = (e) => {
-  db = e.target.result;
-  updateRecordCountDisplay();
-};
-
-function saveRowToDB(rowStr) {
-  if (!db) return;
-  const tx = db.transaction([STORE_NAME], "readwrite");
-  tx.objectStore(STORE_NAME).add(rowStr);
-}
-
-function updateRecordCountDisplay() {
-  if (!db) return;
-  const tx = db.transaction([STORE_NAME], "readonly");
-  const countReq = tx.objectStore(STORE_NAME).count();
-  countReq.onsuccess = () => {
-    document.getElementById('dbCount').innerText = countReq.result;
-  };
-}
-
-function exportDatabase() {
-  if (!db) return;
-  const tx = db.transaction([STORE_NAME], "readonly");
-  const req = tx.objectStore(STORE_NAME).getAll();
-  req.onsuccess = () => {
-    const rows = req.result;
-    if (rows.length === 0) {
-      alert("No data recorded yet.");
-      return;
+    // Web Audio Synthesizer for Stroke Auditory Feedback
+    let audioCtx = null;
+    function playStrokeBeep() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 Crystal Tone
+        gain.gain.setValueAtTime(0.28, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+      } catch(e) {
+        console.warn("Audio Context notice:", e);
+      }
     }
-    const blob = new Blob([rows.join('\n') + '\n'], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `indaboat_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
-    a.click();
-  };
-}
 
-function clearDatabase() {
-  if (!confirm("Clear all recorded session data?")) return;
-  const tx = db.transaction([STORE_NAME], "readwrite");
-  tx.objectStore(STORE_NAME).clear().onsuccess = () => {
-    updateRecordCountDisplay();
-  };
-}
+    // Top View Switcher
+    function switchView(target) {
+      document.getElementById('tabLive').classList.toggle('active', target === 'live');
+      document.getElementById('tabAdvanced').classList.toggle('active', target === 'advanced');
+      document.getElementById('liveHomepageView').classList.toggle('active', target === 'live');
+      document.getElementById('advancedSuiteView').classList.toggle('active', target === 'advanced');
 
-// ==============================================================================
-// 2. BLE PACKET STREAM REASSEMBLER
-// ==============================================================================
-const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+      setTimeout(() => {
+        if (target === 'live') {
+          mapLive.invalidateSize();
+        } else {
+          map.invalidateSize();
+          redrawInteractiveChart();
+          renderPlateCanvas();
+        }
+      }, 100);
+    }
 
-let device = null;
-let txChar = null;
-let streamBuffer = "";
+    function switchToAdvancedFromRecall() {
+      closeBasicRecallModal();
+      switchView('advanced');
+    }
 
-async function toggleConnect() {
-  if (device && device.gatt.connected) {
-    device.gatt.disconnect();
-    return;
-  }
-  try {
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ name: "indaboat" }],
-      optionalServices: [SERVICE_UUID]
+    // ==========================================================================
+    // 2. DUAL-IMU DRONE KINEMATICS & 3D INTERACTIVE ORIENTATION
+    // ==========================================================================
+    class DualIMUKinematics {
+      constructor() {
+        this.pitch = 0;
+        this.roll = 0;
+        this.yaw = 0;
+        this.zeroP = 0;
+        this.zeroR = 0;
+
+        // Individual Sensor Trackers for Interactive Manipulation
+        this.oar1 = { pitch: 0, roll: 0, yaw: 0, ax: 0, ay: 0, az: 0 };
+        this.oar2 = { pitch: 0, roll: 0, yaw: 0, ax: 0, ay: 0, az: 0 };
+      }
+
+      update(p1, p2, dt) {
+        this.oar1.ax = p1.ax; this.oar1.ay = p1.ay; this.oar1.az = p1.az;
+        this.oar2.ax = p2.ax; this.oar2.ay = p2.ay; this.oar2.az = p2.az;
+
+        // Complementary Attitude Calculation for Oar 1
+        const accP1 = Math.atan2(p1.ax, Math.sqrt(p1.az * p1.az + p1.ay * p1.ay));
+        const accR1 = Math.atan2(p1.az, Math.max(0.05, -p1.ay));
+        this.oar1.pitch = 0.92 * (this.oar1.pitch + p1.gz * dt) + 0.08 * accP1;
+        this.oar1.roll  = 0.92 * (this.oar1.roll  + p1.gx * dt) + 0.08 * accR1;
+
+        // Complementary Attitude Calculation for Oar 2
+        const accP2 = Math.atan2(p2.ax, Math.sqrt(p2.az * p2.az + p2.ay * p2.ay));
+        const accR2 = Math.atan2(p2.az, Math.max(0.05, -p2.ay));
+        this.oar2.pitch = 0.92 * (this.oar2.pitch + p2.gz * dt) + 0.08 * accP2;
+        this.oar2.roll  = 0.92 * (this.oar2.roll  + p2.gx * dt) + 0.08 * accR2;
+
+        // Multi-IMU Boat Kinematic Fusion (Lever-arm & vibration rejection)
+        const fusedAccP = (accP1 + accP2) / 2.0;
+        const fusedAccR = (accR1 + accR2) / 2.0;
+        const fusedGz = (p1.gz + p2.gz) / 2.0;
+        const fusedGx = (p1.gx + p2.gx) / 2.0;
+
+        this.pitch = 0.95 * (this.pitch + fusedGz * dt) + 0.05 * fusedAccP;
+        this.roll  = 0.95 * (this.roll  + fusedGx * dt) + 0.05 * fusedAccR;
+      }
+    }
+    const boatKinematics = new DualIMUKinematics();
+
+    function zeroDualImuNow() {
+      boatKinematics.zeroP = boatKinematics.pitch;
+      boatKinematics.zeroR = boatKinematics.roll;
+    }
+
+    // ==========================================================================
+    // 3. ZERO-TARE AUTOMATIC RECOVERY EQUALIZATION & COHERENT LIVE SPM
+    // ==========================================================================
+    let oar1RecoveryBaseline = 0;
+    let oar2RecoveryBaseline = 0;
+    let recoverySamples1 = [];
+    let recoverySamples2 = [];
+    let isCurrentlyInDrive = false;
+
+    let strokeDetectionHistory = [];
+    let lastValidStrokeTimestamp = 0;
+
+    // Stroke Buffers for Individual Overlays
+    let currentStrokeP1 = [];
+    let currentStrokeP2 = [];
+    let ghostLastStrokeP1 = [];
+    let ghostLastStrokeP2 = [];
+    let runningAverageStrokeP1 = [];
+    let runningAverageStrokeP2 = [];
+
+    function parseCsvRow(row) {
+      const parts = [];
+      let inQuotes = false;
+      let token = '';
+      for (let i = 0; i < row.length; i++) {
+        const c = row[i];
+        if (c === '"') inQuotes = !inQuotes;
+        else if (c === ',' && !inQuotes) { parts.push(token.trim()); token = ''; }
+        else token += c;
+      }
+      parts.push(token.trim());
+      return parts;
+    }
+
+    function ingestTelemetry(row, updateLiveStreams = true) {
+      const parts = parseCsvRow(row);
+      if (parts.length < 10) return null;
+
+      const ms    = parseInt(parts[0], 10);
+      const timeS = parts[1] ? parts[1].replace(/"/g, '') : '';
+      const w1    = parseFloat(parts[2]) || 0;
+      const ax1   = parseFloat(parts[3]) || 0;
+      const ay1   = parseFloat(parts[4]) || 0;
+      const az1   = parseFloat(parts[5]) || 0;
+      const gx1   = parseFloat(parts[6]) || 0;
+      const gy1   = parseFloat(parts[7]) || 0;
+      const gz1   = parseFloat(parts[8]) || 0;
+      const lat   = parseFloat(parts[9]) || 0;
+      const lng   = parseFloat(parts[10]) || 0;
+      const alt   = parseFloat(parts[11]) || 0;
+      const spd   = parts[12] !== undefined ? parseFloat(parts[12]) : 0;
+      const sats  = parts[13] !== undefined ? parseInt(parts[13], 10) : 0;
+
+      // Dual Oar Channel Extractor (Cols 14-20)
+      const w2    = parts.length >= 15 ? (parseFloat(parts[14]) || 0) : 0;
+      const ax2   = parts.length >= 18 ? (parseFloat(parts[15]) || 0) : ax1;
+      const ay2   = parts.length >= 18 ? (parseFloat(parts[16]) || 0) : ay1;
+      const az2   = parts.length >= 18 ? (parseFloat(parts[17]) || 0) : az1;
+      const gx2   = parts.length >= 21 ? (parseFloat(parts[18]) || 0) : gx1;
+      const gy2   = parts.length >= 21 ? (parseFloat(parts[19]) || 0) : gy1;
+      const gz2   = parts.length >= 21 ? (parseFloat(parts[20]) || 0) : gz1;
+
+      if (isNaN(w1) || isNaN(ax1)) return null;
+
+      const t_sec = ms / 1000.0;
+      const dt = 0.1;
+
+      // 1. Dual-IMU Drone Fusion Update
+      boatKinematics.update(
+        { ax: ax1, ay: ay1, az: az1, gx: gx1, gy: gy1, gz: gz1 },
+        { ax: ax2, ay: ay2, az: az2, gx: gx2, gy: gy2, gz: gz2 },
+        dt
+      );
+
+      // 2. Clean Forward Bow Surge (True inertial acceleration compensated for gravity & pitch)
+      const u_up = Math.sin(boatKinematics.pitch);
+      const surge1 = -(ax1 - (9.80665 * u_up));
+      const surge2 = -(ax2 - (9.80665 * u_up));
+      const cleanSurge = (surge1 + surge2) / 2.0;
+
+      // 3. ZERO-TARE AUTOMATIC RECOVERY EQUALIZATION (Strictly no manual tare buttons)
+      // When boat is recovering (negative/low surge and settled load), update rolling baseline
+      if (!isCurrentlyInDrive) {
+        recoverySamples1.push(w1);
+        recoverySamples2.push(w2);
+        if (recoverySamples1.length > 30) recoverySamples1.shift();
+        if (recoverySamples2.length > 30) recoverySamples2.shift();
+
+        // Robust low-percentile median tracking
+        const s1 = [...recoverySamples1].sort((a,b)=>a-b);
+        const s2 = [...recoverySamples2].sort((a,b)=>a-b);
+        oar1RecoveryBaseline = s1[Math.floor(s1.length * 0.4)] || 0;
+        oar2RecoveryBaseline = s2[Math.floor(s2.length * 0.4)] || 0;
+      }
+
+      // Net dynamic force calculations (Flipped/Standardized, zeroed during recovery)
+      const netF1 = Math.max(0, (invertLoad ? -1 : 1) * (w1 - oar1RecoveryBaseline));
+      const netF2 = Math.max(0, (invertLoad ? -1 : 1) * (w2 - oar2RecoveryBaseline));
+
+      // 4. COHERENT LIVE SPM ENGINE (Accelerometers + GPS + Force coherence - No Overestimation)
+      // A true catch requires: (a) Sharp forward surge rise, (b) GPS velocity coherence, (c) Refractory period
+      const surgeJerk = cleanSurge > 1.35;
+      const gpsMovement = spd > 1.4; // At least moving > 1.4 km/h to prevent dock tapping triggers
+      const refractoryLockout = 1.35; // Max 44.4 SPM ceiling to reject water slaps and chop
+
+      if (surgeJerk && gpsMovement && (t_sec - lastValidStrokeTimestamp > refractoryLockout) && !isCurrentlyInDrive) {
+        isCurrentlyInDrive = true;
+        lastValidStrokeTimestamp = t_sec;
+
+        // Auditory cue on every genuine catch
+        playStrokeBeep();
+
+        // Store ghost strokes and update moving average stroke profiles
+        if (currentStrokeP1.length > 3) {
+          ghostLastStrokeP1 = [...currentStrokeP1];
+          ghostLastStrokeP2 = [...currentStrokeP2];
+          updateNormalizedStrokeAverages();
+        }
+        currentStrokeP1 = [];
+        currentStrokeP2 = [];
+
+        // Compute Live SPM
+        if (strokeDetectionHistory.length > 0) {
+          const deltaT = t_sec - strokeDetectionHistory[strokeDetectionHistory.length - 1];
+          const rawSpm = 60.0 / deltaT;
+          const clampedSpm = Math.min(46, Math.max(12, rawSpm));
+          document.getElementById('liveSPM').innerText = clampedSpm.toFixed(0);
+        }
+        strokeDetectionHistory.push(t_sec);
+      }
+
+      if (isCurrentlyInDrive && cleanSurge < 0.25) {
+        isCurrentlyInDrive = false;
+      }
+
+      currentStrokeP1.push(netF1);
+      currentStrokeP2.push(netF2);
+
+      // Accumulate Active Session Stats
+      if (sessionActive && !sessionPaused) {
+        activeElapsedSec += dt;
+        totalDistanceMeters += (spd / 3.6) * dt;
+        updateLiveMetricsUI(spd);
+      }
+
+      const point = {
+        ms, timeStr: timeS,
+        raw_w: (invertLoad ? -1 : 1) * w1,
+        net_force: netF1,
+        w1: netF1, w2: netF2,
+        surge: cleanSurge,
+        ax: ax1, ay: ay1, az: az1, gx: gx1, gy: gy1, gz: gz1,
+        lat, lng, spd, sats,
+        pitch_deg: (boatKinematics.pitch - boatKinematics.zeroP) * (180.0 / Math.PI),
+        roll_deg: (boatKinematics.roll - boatKinematics.zeroR) * (180.0 / Math.PI)
+      };
+
+      if (updateLiveStreams) {
+        chartData.push(point);
+        if (chartData.length > 4500) chartData.shift();
+        updateHUD(point);
+        updateLiveGPS(lat, lng, spd);
+      }
+
+      return point;
+    }
+
+    function updateNormalizedStrokeAverages() {
+      const len1 = ghostLastStrokeP1.length;
+      const len2 = ghostLastStrokeP2.length;
+      if (len1 < 2) return;
+
+      if (runningAverageStrokeP1.length === 0) {
+        runningAverageStrokeP1 = [...ghostLastStrokeP1];
+        runningAverageStrokeP2 = [...ghostLastStrokeP2];
+      } else {
+        const targetLen = Math.max(len1, runningAverageStrokeP1.length);
+        for (let i = 0; i < targetLen; i++) {
+          const v1 = ghostLastStrokeP1[i] || 0;
+          const v2 = ghostLastStrokeP2[i] || 0;
+          runningAverageStrokeP1[i] = runningAverageStrokeP1[i] !== undefined 
+            ? (0.75 * runningAverageStrokeP1[i] + 0.25 * v1) : v1;
+          runningAverageStrokeP2[i] = runningAverageStrokeP2[i] !== undefined 
+            ? (0.75 * runningAverageStrokeP2[i] + 0.25 * v2) : v2;
+        }
+      }
+    }
+
+    function updateLiveMetricsUI(spdKmh) {
+      const mins = Math.floor(activeElapsedSec / 60);
+      const secs = Math.floor(activeElapsedSec % 60);
+      document.getElementById('liveTime').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+
+      document.getElementById('liveDistance').innerText = totalDistanceMeters > 1000 
+        ? `${(totalDistanceMeters / 1000).toFixed(2)}km` 
+        : `${totalDistanceMeters.toFixed(0)}m`;
+
+      const mps = spdKmh / 3.6;
+      if (mps > 0.6) {
+        const splitSec = 500.0 / mps;
+        const sMin = Math.floor(splitSec / 60);
+        const sSec = Math.floor(splitSec % 60);
+        document.getElementById('liveSplit').innerText = `${sMin}:${sSec.toString().padStart(2,'0')}`;
+      } else {
+        document.getElementById('liveSplit').innerText = `--:--`;
+      }
+
+      if (totalDistanceMeters > 40 && activeElapsedSec > 8) {
+        const avgMps = totalDistanceMeters / activeElapsedSec;
+        const avgSplitSec = 500.0 / avgMps;
+        const asMin = Math.floor(avgSplitSec / 60);
+        const asSec = Math.floor(avgSplitSec % 60);
+        document.getElementById('avgSplit').innerText = `${asMin}:${asSec.toString().padStart(2,'0')}`;
+
+        if (strokeDetectionHistory.length > 2) {
+          const totalT = strokeDetectionHistory[strokeDetectionHistory.length - 1] - strokeDetectionHistory[0];
+          const avgSpmVal = (strokeDetectionHistory.length / (totalT / 60.0));
+          document.getElementById('avgSPM').innerText = avgSpmVal.toFixed(1);
+        }
+      }
+    }
+
+    function updateHUD(d) {
+      document.getElementById('valRaw').innerText = d.raw_w.toFixed(1);
+      document.getElementById('valNet').innerText = (d.w1 >= 0 ? "+" : "") + d.w1.toFixed(1);
+      document.getElementById('valSurge').innerText = (d.surge >= 0 ? "+" : "") + d.surge.toFixed(2);
+      document.getElementById('valSpd').innerText   = d.spd.toFixed(1);
+      document.getElementById('valPitch').innerText = d.pitch_deg.toFixed(1) + "°";
+      document.getElementById('valRoll').innerText  = d.roll_deg.toFixed(1) + "°";
+      document.getElementById('valSats').innerText  = isNaN(d.sats) ? 0 : d.sats;
+
+      if (d.lat && d.lng && Math.abs(d.lat) > 0.001) {
+        const coord = [d.lat, d.lng];
+        marker.setLatLng(coord);
+        track.addLatLng(coord);
+        if (!isReplayMode && isAutoFollow) map.panTo(coord, { animate: true, duration: 0.1 });
+        document.getElementById('mapTitle').innerText = `GPS Track (${d.spd.toFixed(1)} km/h | ${d.sats} Sats)`;
+      }
+    }
+
+    // ==========================================================================
+    // 4. BLE STREAMING & SESSION SD RECORDING CONTROLS
+    // ==========================================================================
+    const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+    const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+    const RX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+
+    let device = null;
+    let txChar = null;
+    let rxChar = null;
+    let streamBuffer = "";
+
+    async function toggleConnect() {
+      if (device && device.gatt.connected) {
+        device.gatt.disconnect();
+        return;
+      }
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: "indaboat" }],
+          optionalServices: [SERVICE_UUID]
+        });
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        txChar = await service.getCharacteristic(TX_CHAR_UUID);
+        rxChar = await service.getCharacteristic(RX_CHAR_UUID);
+
+        await txChar.startNotifications();
+        txChar.addEventListener('characteristicvaluechanged', handleBleChunk);
+
+        document.getElementById('bleStatus').innerText = "CONNECTED";
+        document.getElementById('bleStatus').style.color = "#00ff88";
+        document.getElementById('bleDot').className = "status-dot green";
+        document.getElementById('btnConnect').innerText = "DISCONNECT";
+        document.getElementById('btnConnect').classList.add('connected');
+
+        if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
+      } catch (err) {
+        alert("Bluetooth Connection notice: " + err.message);
+      }
+    }
+
+    function onDisconnected() {
+      document.getElementById('bleStatus').innerText = "DISCONNECTED";
+      document.getElementById('bleStatus').style.color = "#ff4444";
+      document.getElementById('bleDot').className = "status-dot red";
+      document.getElementById('btnConnect').innerText = "CONNECT BLE";
+      document.getElementById('btnConnect').classList.remove('connected');
+    }
+
+    function sendBleCommand(cmd) {
+      if (rxChar) {
+        const enc = new TextEncoder().encode(cmd + "\n");
+        rxChar.writeValue(enc).catch(console.error);
+      }
+    }
+
+    function handleBleChunk(event) {
+      const text = new TextDecoder().decode(event.target.value);
+      streamBuffer += text;
+      const lines = streamBuffer.split(/\r?\n/);
+      streamBuffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed.startsWith("#")) {
+          handleBleSystemFeedback(trimmed);
+        } else {
+          document.getElementById('debugBar').innerText = `BLE RX [${trimmed.length}b]: ${trimmed}`;
+          saveRowToStorage(trimmed);
+          ingestTelemetry(trimmed, true);
+        }
+      }
+    }
+
+    function handleSessionAction(action) {
+      if (action === 'START') {
+        sessionActive = true;
+        sessionPaused = false;
+        document.getElementById('btnStart').classList.add('btn-active-rec');
+        document.getElementById('sdCardStatus').innerText = "SD: RECORDING";
+        document.getElementById('sdCardStatus').style.color = "#00ff88";
+        document.getElementById('sdDot').className = "status-dot green";
+        sendBleCommand("START");
+      } else if (action === 'PAUSE') {
+        sessionPaused = !sessionPaused;
+        document.getElementById('btnPause').innerText = sessionPaused ? "RESUME SESSION" : "PAUSE SESSION";
+        document.getElementById('sdCardStatus').innerText = sessionPaused ? "SD: PAUSED" : "SD: RECORDING";
+        document.getElementById('sdDot').className = sessionPaused ? "status-dot yellow" : "status-dot green";
+        sendBleCommand(sessionPaused ? "PAUSE" : "START");
+      } else if (action === 'END') {
+        sessionActive = false;
+        sessionPaused = false;
+        document.getElementById('btnStart').classList.remove('btn-active-rec');
+        document.getElementById('btnPause').innerText = "PAUSE SESSION";
+        document.getElementById('sdCardStatus').innerText = "SD: SAVED";
+        document.getElementById('sdDot').className = "status-dot green";
+        sendBleCommand("STOP");
+        openBasicRecallModal();
+      }
+    }
+
+    function triggerWirelessSdDump() {
+      if (!confirm("Pull complete raw session from ESP32 SD Card over Bluetooth?")) return;
+      sendBleCommand("RECOVER");
+    }
+
+    function handleBleSystemFeedback(msg) {
+      if (msg.includes("RECOVER_COMPLETE")) {
+        alert("SD Card file stream successfully retrieved!");
+        openBasicRecallModal();
+      }
+    }
+
+    // ==========================================================================
+    // 5. LIVE HOMEPAGE CANVAS RENDERERS (LAYERS 1, 3, 4)
+    // ==========================================================================
+    const dualCanvas = document.getElementById('dualImuCanvas');
+    const dualCtx = dualCanvas.getContext('2d');
+
+    function renderDualImuCanvas() {
+      const cn = dualCanvas;
+      const cx = dualCtx;
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
+
+      if (cn.width !== w * dpr || cn.height !== h * dpr) {
+        cn.width = w * dpr; cn.height = h * dpr;
+      }
+      cx.save();
+      cx.scale(dpr, dpr);
+      cx.clearRect(0, 0, w, h);
+
+      const pitch = (boatKinematics.pitch - boatKinematics.zeroP);
+      const roll  = (boatKinematics.roll - boatKinematics.zeroR);
+      const centerX = w / 2;
+      const centerY = h / 2 + 10;
+
+      // Horizon line
+      cx.strokeStyle = '#182230';
+      cx.lineWidth = 1;
+      cx.beginPath(); cx.moveTo(15, centerY); cx.lineTo(w - 15, centerY); cx.stroke();
+
+      cx.save();
+      cx.translate(centerX, centerY);
+      cx.rotate(roll * 0.85);
+
+      const pitchOffset = Math.sin(pitch) * 38;
+
+      // 3D Shell Silhouette
+      cx.fillStyle = '#161c28';
+      cx.strokeStyle = '#00ffcc';
+      cx.lineWidth = 2.2;
+      cx.beginPath();
+      cx.moveTo(-55, pitchOffset);
+      cx.lineTo(55, -pitchOffset);
+      cx.lineTo(0, -pitchOffset - 18);
+      cx.closePath();
+      cx.fill();
+      cx.stroke();
+
+      // Interactive Oar 1 (Port - Gold): Rotates with IMU 1
+      const o1Rot = boatKinematics.oar1.roll;
+      cx.save();
+      cx.translate(-15, -pitchOffset - 5);
+      cx.rotate(o1Rot);
+      cx.strokeStyle = '#ffd700';
+      cx.lineWidth = 3.0;
+      cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(-65, -15); cx.stroke();
+      // Oar Blade
+      cx.fillStyle = '#ffd700';
+      cx.fillRect(-68, -20, 10, 6);
+      cx.restore();
+
+      // Interactive Oar 2 (Starboard - Cyan): Rotates with IMU 2
+      const o2Rot = boatKinematics.oar2.roll;
+      cx.save();
+      cx.translate(15, -pitchOffset - 5);
+      cx.rotate(o2Rot);
+      cx.strokeStyle = '#00e5ff';
+      cx.lineWidth = 3.0;
+      cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(65, -15); cx.stroke();
+      // Oar Blade
+      cx.fillStyle = '#00e5ff';
+      cx.fillRect(58, -20, 10, 6);
+      cx.restore();
+
+      cx.restore();
+
+      // Readouts
+      cx.font = '10px monospace';
+      cx.fillStyle = '#00ffcc';
+      cx.fillText(`FUSED PITCH: ${((pitch * 180)/Math.PI).toFixed(1)}°`, 10, h - 8);
+      cx.fillStyle = '#ff66cc';
+      cx.fillText(`FUSED ROLL:  ${((roll * 180)/Math.PI).toFixed(1)}°`, w - 120, h - 8);
+
+      cx.restore();
+    }
+
+    // Layer 3: Live Telemetry Flow Chart (Scrolling)
+    const flowCanvas = document.getElementById('liveFlowCanvas');
+    const flowCtx = flowCanvas.getContext('2d');
+
+    function renderLiveFlowChart() {
+      const cn = flowCanvas;
+      const cx = flowCtx;
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
+
+      if (cn.width !== w * dpr || cn.height !== h * dpr) {
+        cn.width = w * dpr; cn.height = h * dpr;
+      }
+      cx.save();
+      cx.scale(dpr, dpr);
+      cx.clearRect(0, 0, w, h);
+
+      if (chartData.length < 2) { cx.restore(); return; }
+
+      const gutterL = 45, gutterR = 45, padTop = 26, padBottom = 18;
+      const plotW = w - gutterL - gutterR;
+      const plotH = h - padTop - padBottom;
+      const slice = chartData.slice(-140);
+
+      let maxF = 100;
+      for (const pt of slice) {
+        if (pt.w1 > maxF) maxF = pt.w1;
+        if (pt.w2 > maxF) maxF = pt.w2;
+      }
+      maxF *= 1.15;
+
+      cx.strokeStyle = '#141822';
+      cx.lineWidth = 1;
+      for (let i = 0; i <= 3; i++) {
+        const y = padTop + plotH - (i / 3) * plotH;
+        cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+        cx.fillStyle = '#667788';
+        cx.font = '9px monospace';
+        cx.textAlign = 'right';
+        cx.fillText(((i / 3) * maxF).toFixed(0), gutterL - 5, y + 3);
+      }
+
+      // Plate 1 Force (Cyan)
+      cx.strokeStyle = '#00ffcc';
+      cx.lineWidth = 1.8;
+      cx.beginPath();
+      for (let i = 0; i < slice.length; i++) {
+        const x = gutterL + (i / (slice.length - 1)) * plotW;
+        const y = padTop + plotH - (slice[i].w1 / maxF) * plotH;
+        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      cx.stroke();
+
+      // Plate 2 Force (Pink)
+      cx.strokeStyle = '#ff66cc';
+      cx.lineWidth = 1.8;
+      cx.beginPath();
+      for (let i = 0; i < slice.length; i++) {
+        const x = gutterL + (i / (slice.length - 1)) * plotW;
+        const y = padTop + plotH - (slice[i].w2 / maxF) * plotH;
+        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      cx.stroke();
+
+      // Clean Bow Surge (Green)
+      cx.strokeStyle = '#00ff88';
+      cx.lineWidth = 2.2;
+      cx.beginPath();
+      for (let i = 0; i < slice.length; i++) {
+        const x = gutterL + (i / (slice.length - 1)) * plotW;
+        const normSurge = (slice[i].surge - (-3)) / (8 - (-3));
+        const y = padTop + plotH - Math.max(0, Math.min(1, normSurge)) * plotH;
+        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      cx.stroke();
+
+      cx.restore();
+    }
+
+    // Layer 4: Dedicated Individual Stroke Overlay Charts (Plate 1 & Plate 2)
+    function renderIndividualStrokeCanvas(cn, currentStroke, ghostStroke, primaryAvg, secondaryAvg, isPlate1) {
+      const cx = cn.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
+
+      if (cn.width !== w * dpr || cn.height !== h * dpr) {
+        cn.width = w * dpr; cn.height = h * dpr;
+      }
+      cx.save();
+      cx.scale(dpr, dpr);
+      cx.clearRect(0, 0, w, h);
+
+      const gutterL = 40, gutterR = 25, padTop = 26, padBottom = 20;
+      const plotW = w - gutterL - gutterR;
+      const plotH = h - padTop - padBottom;
+
+      let maxF = 80;
+      const checkM = (arr) => arr.forEach(v => { if (v > maxF) maxF = v; });
+      checkM(currentStroke);
+      checkM(ghostStroke);
+      checkM(primaryAvg);
+      checkM(secondaryAvg);
+      maxF *= 1.15;
+
+      cx.strokeStyle = '#151b26';
+      cx.lineWidth = 1;
+      for (let i = 0; i <= 3; i++) {
+        const y = padTop + plotH - (i / 3) * plotH;
+        cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+        cx.fillStyle = '#667788';
+        cx.font = '9px monospace';
+        cx.textAlign = 'right';
+        cx.fillText(((i / 3) * maxF).toFixed(0), gutterL - 5, y + 3);
+      }
+
+      // 1. Ghost of Last Stroke (Grey)
+      if (ghostStroke.length > 2) {
+        cx.strokeStyle = 'rgba(125, 135, 155, 0.40)';
+        cx.lineWidth = 2.0;
+        cx.beginPath();
+        for (let i = 0; i < ghostStroke.length; i++) {
+          const x = gutterL + (i / (ghostStroke.length - 1)) * plotW;
+          const y = padTop + plotH - (ghostStroke[i] / maxF) * plotH;
+          if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+        }
+        cx.stroke();
+      }
+
+      // 2. Average Stroke Plate 1 (Gold)
+      if (runningAverageStrokeP1.length > 2) {
+        cx.strokeStyle = isPlate1 ? '#ffd700' : 'rgba(255, 215, 0, 0.45)';
+        cx.lineWidth = isPlate1 ? 3.0 : 1.5;
+        cx.beginPath();
+        for (let i = 0; i < runningAverageStrokeP1.length; i++) {
+          const x = gutterL + (i / (runningAverageStrokeP1.length - 1)) * plotW;
+          const y = padTop + plotH - (runningAverageStrokeP1[i] / maxF) * plotH;
+          if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+        }
+        cx.stroke();
+      }
+
+      // 3. Average Stroke Plate 2 (Cyan)
+      if (runningAverageStrokeP2.length > 2) {
+        cx.strokeStyle = !isPlate1 ? '#00e5ff' : 'rgba(0, 229, 255, 0.45)';
+        cx.lineWidth = !isPlate1 ? 3.0 : 1.5;
+        cx.beginPath();
+        for (let i = 0; i < runningAverageStrokeP2.length; i++) {
+          const x = gutterL + (i / (runningAverageStrokeP2.length - 1)) * plotW;
+          const y = padTop + plotH - (runningAverageStrokeP2[i] / maxF) * plotH;
+          if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+        }
+        cx.stroke();
+      }
+
+      // 4. Live Developing Stroke (Bright White)
+      if (currentStroke.length > 1) {
+        cx.strokeStyle = '#ffffff';
+        cx.lineWidth = 2.0;
+        cx.beginPath();
+        for (let i = 0; i < currentStroke.length; i++) {
+          const x = gutterL + (i / Math.max(currentStroke.length - 1, 28)) * plotW;
+          const y = padTop + plotH - (currentStroke[i] / maxF) * plotH;
+          if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+        }
+        cx.stroke();
+      }
+
+      cx.fillStyle = '#88a0cc';
+      cx.font = '9px monospace';
+      cx.textAlign = 'left';
+      cx.fillText("CATCH", gutterL, h - 5);
+      cx.textAlign = 'right';
+      cx.fillText("FINISH / RECOVERY", gutterL + plotW, h - 5);
+
+      cx.restore();
+    }
+
+    // Live Map (ArcGIS World Imagery Satellite)
+    const mapLive = L.map('liveMap', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true }).addTo(mapLive);
+    const liveTrack = L.polyline([], { color: '#00e5ff', weight: 3.5 }).addTo(mapLive);
+    const liveMarker = L.circleMarker([0,0], { radius: 6, color: '#fff', fillColor: '#ff0044', fillOpacity: 1 }).addTo(mapLive);
+
+    function updateLiveGPS(lat, lng, spd) {
+      if (lat && lng && Math.abs(lat) > 0.001) {
+        const c = [lat, lng];
+        liveMarker.setLatLng(c);
+        liveTrack.addLatLng(c);
+        mapLive.panTo(c, { animate: true, duration: 0.1 });
+        document.getElementById('liveMapTitle').innerText = `GPS Live (${spd.toFixed(1)} km/h)`;
+      }
+    }
+
+    function recenterLiveMap() {
+      const b = liveTrack.getLatLngs();
+      if (b.length > 0) mapLive.fitBounds(L.latLngBounds(b), { padding: [30,30] });
+    }
+
+    // ==========================================================================
+    // 6. STRAVA-STYLE BASIC RECALL MODAL & SEGMENT CROP TOOL
+    // ==========================================================================
+    let recallMap = null;
+    let recallTrack = null;
+
+    function openBasicRecallModal() {
+      document.getElementById('modalBasicRecall').style.display = 'flex';
+
+      const mins = Math.floor(activeElapsedSec / 60);
+      const secs = Math.floor(activeElapsedSec % 60);
+      document.getElementById('stTime').innerText = `${mins}:${secs.toString().padStart(2,'0')}`;
+      document.getElementById('stDist').innerText = `${totalDistanceMeters.toFixed(0)}m`;
+      document.getElementById('stStrokes').innerText = strokeDetectionHistory.length;
+      document.getElementById('stSPM').innerText = document.getElementById('avgSPM').innerText;
+      document.getElementById('stSplit').innerText = document.getElementById('avgSplit').innerText;
+
+      // Symmetry balance computation
+      const sumP1 = runningAverageStrokeP1.reduce((a,b)=>a+b, 0);
+      const sumP2 = runningAverageStrokeP2.reduce((a,b)=>a+b, 0);
+      const tot = sumP1 + sumP2 || 1;
+      const b1 = Math.round((sumP1 / tot) * 100);
+      const b2 = 100 - b1;
+      document.getElementById('stBalance').innerText = `${b1} / ${b2}`;
+
+      if (!recallMap) {
+        recallMap = L.map('recallMap', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 16);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(recallMap);
+        recallTrack = L.polyline([], { color: '#00ff88', weight: 4 }).addTo(recallMap);
+      }
+      setTimeout(() => {
+        recallMap.invalidateSize();
+        const pts = liveTrack.getLatLngs();
+        if (pts.length > 0) {
+          recallTrack.setLatLngs(pts);
+          recallMap.fitBounds(L.latLngBounds(pts), { padding: [20,20] });
+        }
+        renderRecallOverviewChart();
+      }, 150);
+    }
+
+    function closeBasicRecallModal() {
+      document.getElementById('modalBasicRecall').style.display = 'none';
+    }
+
+    function renderRecallOverviewChart() {
+      const cn = document.getElementById('recallAveragesCanvas');
+      const cx = cn.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
+
+      if (cn.width !== w * dpr || cn.height !== h * dpr) {
+        cn.width = w * dpr; cn.height = h * dpr;
+      }
+      cx.save(); cx.scale(dpr, dpr); cx.clearRect(0,0,w,h);
+
+      if (chartData.length < 2) { cx.restore(); return; }
+
+      const s = parseInt(document.getElementById('cropStart').value, 10) / 100.0;
+      const e = parseInt(document.getElementById('cropEnd').value, 10) / 100.0;
+      const sIdx = Math.floor(s * (chartData.length - 1));
+      const eIdx = Math.ceil(e * (chartData.length - 1));
+      const slice = chartData.slice(sIdx, eIdx + 1);
+
+      cx.strokeStyle = '#00ffcc'; cx.lineWidth = 1.8; cx.beginPath();
+      for (let i = 0; i < slice.length; i++) {
+        const x = (i / (slice.length - 1)) * w;
+        const y = h - (slice[i].w1 / 150) * h;
+        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      cx.stroke();
+
+      cx.strokeStyle = '#00ff88'; cx.lineWidth = 2.0; cx.beginPath();
+      for (let i = 0; i < slice.length; i++) {
+        const x = (i / (slice.length - 1)) * w;
+        const y = h - ((slice[i].spd || 0) / 25) * h;
+        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      cx.stroke();
+      cx.restore();
+    }
+
+    function updateCropWindow() {
+      const s = document.getElementById('cropStart').value;
+      const e = document.getElementById('cropEnd').value;
+      document.getElementById('cropDisplay').innerText = `${s}% → ${e}%`;
+      renderRecallOverviewChart();
+    }
+
+    function exportCroppedCSV() {
+      const s = parseInt(document.getElementById('cropStart').value, 10) / 100.0;
+      const e = parseInt(document.getElementById('cropEnd').value, 10) / 100.0;
+      const sIdx = Math.floor(s * inMemoryLog.length);
+      const eIdx = Math.ceil(e * inMemoryLog.length);
+      const cropped = inMemoryLog.slice(sIdx, eIdx + 1);
+
+      let csvContent = "ms,utc,w1,ax1,ay1,az1,gx1,gy1,gz1,lat,lng,alt,spd,sats,w2,ax2,ay2,az2,gx2,gy2,gz2\n" + cropped.join("\n") + "\n";
+      downloadCsvBlob(csvContent, "indaboat_cropped_workout.csv");
+    }
+
+    function exportFullSessionCSV() {
+      let csvContent = "ms,utc,w1,ax1,ay1,az1,gx1,gy1,gz1,lat,lng,alt,spd,sats,w2,ax2,ay2,az2,gx2,gy2,gz2\n" + inMemoryLog.join("\n") + "\n";
+      downloadCsvBlob(csvContent, "indaboat_full_session.csv");
+    }
+
+    function downloadCsvBlob(content, filename) {
+      const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+    }
+
+    // ==========================================================================
+    // 7. FULL ADVANCED ANALYSIS SUITE LOGIC
+    // ==========================================================================
+    function toggleLoadInversion() {
+      invertLoad = !invertLoad;
+      document.getElementById('btnInvertLoad').classList.toggle('active', invertLoad);
+      document.getElementById('btnInvertLoad').innerText = invertLoad ? "FLIP LOAD (+/-)" : "FLIP LOAD (OFF)";
+      if (chartData.length > 0) {
+        redrawInteractiveChart();
+        if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
+      }
+    }
+
+    function toggleFlatlineMode() {
+      isFlatlineSelecting = !isFlatlineSelecting;
+      document.getElementById('btnFlatlineTool').classList.toggle('active', isFlatlineSelecting);
+      document.getElementById('btnFlatlineTool').innerText = isFlatlineSelecting ? "CANCEL FLATLINE" : "✏️ FLATLINE SPIKE";
+    }
+
+    function applyFlatline(idx1, idx2) {
+      if (idx1 > idx2) { const t = idx1; idx1 = idx2; idx2 = t; }
+      idx1 = Math.max(0, idx1);
+      idx2 = Math.min(chartData.length - 1, idx2);
+      if (idx2 - idx1 < 1) return;
+
+      const backup = [];
+      for (let i = idx1; i <= idx2; i++) backup.push({ ...chartData[i] });
+      flatlines.push({ idx1, idx2, backup });
+
+      const pA = chartData[idx1];
+      const pB = chartData[idx2];
+      const count = idx2 - idx1;
+
+      for (let i = idx1; i <= idx2; i++) {
+        const alpha = (i - idx1) / count;
+        chartData[i].raw_w = pA.raw_w + alpha * (pB.raw_w - pA.raw_w);
+        chartData[i].ax = pA.ax + alpha * (pB.ax - pA.ax);
+        chartData[i].ay = pA.ay + alpha * (pB.ay - pA.ay);
+        chartData[i].az = pA.az + alpha * (pB.az - pA.az);
+        chartData[i].gx = pA.gx + alpha * (pB.gx - pA.gx);
+        chartData[i].gy = pA.gy + alpha * (pB.gy - pA.gy);
+        chartData[i].gz = pA.gz + alpha * (pB.gz - pA.gz);
+        chartData[i].surge = pA.surge + alpha * (pB.surge - pA.surge);
+      }
+
+      isFlatlineSelecting = false;
+      document.getElementById('btnFlatlineTool').classList.remove('active');
+      document.getElementById('btnFlatlineTool').innerText = "✏️ FLATLINE SPIKE";
+
+      redrawInteractiveChart();
+      if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
+    }
+
+    function resetFlatlines() {
+      if (flatlines.length === 0) return;
+      for (let f = flatlines.length - 1; f >= 0; f--) {
+        const { idx1, backup } = flatlines[f];
+        for (let k = 0; k < backup.length; k++) chartData[idx1 + k] = backup[k];
+      }
+      flatlines = [];
+      redrawInteractiveChart();
+      if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
+    }
+
+    function saveRowToStorage(rowStr) {
+      inMemoryLog.push(rowStr);
+      document.getElementById('dbCount').innerText = inMemoryLog.length;
+      document.getElementById('lblMemCount').innerText = inMemoryLog.length;
+    }
+
+    function exportDatabase() {
+      if (inMemoryLog.length === 0) {
+        alert("No data recorded to export.");
+        return;
+      }
+      let csvContent = "ms,utc,w1,ax1,ay1,az1,gx1,gy1,gz1,lat,lng,alt,spd,sats,w2,ax2,ay2,az2,gx2,gy2,gz2\n" + inMemoryLog.join("\n") + "\n";
+      downloadCsvBlob(csvContent, `indaboat_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
+    }
+
+    function clearDatabase() {
+      if (!confirm("Clear all recorded session data?")) return;
+      inMemoryLog = [];
+      chartData = [];
+      flatlines = [];
+      detectedStrokes = [];
+      document.getElementById('dbCount').innerText = "0";
+      document.getElementById('lblMemCount').innerText = "0";
+      track.setLatLngs([]);
+      marker.setLatLng([0, 0]);
+      exitReplayMode();
+      redrawInteractiveChart();
+    }
+
+    // --------------------------------------------------------------------------
+    // 2.5D ISOMETRIC ATTITUDE CANVAS (ADVANCED SUITE)
+    // --------------------------------------------------------------------------
+    let showForceArrow = false;
+    let mountPitchTrim = 0;
+    let mountRollTrim = 0;
+    let zeroPitchOffset = 0;
+    let zeroRollOffset = 0;
+
+    const plateCanvas = document.getElementById('plateCanvas');
+
+    function toggleForceArrow() {
+      showForceArrow = !showForceArrow;
+      document.getElementById('btnToggleForceArrow').classList.toggle('active', showForceArrow);
+      document.getElementById('btnToggleForceArrow').innerText = showForceArrow ? "FORCE ARROW: ON" : "FORCE ARROW: OFF";
+      renderPlateCanvas();
+    }
+
+    function toggleAlignDrawer() {
+      const d = document.getElementById('alignDrawer');
+      d.style.display = d.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    function zeroAttitudeNow() {
+      zeroPitchOffset = (chartData[chartData.length - 1]?.pitch_deg || 0);
+      zeroRollOffset  = (chartData[chartData.length - 1]?.roll_deg || 0);
+      renderPlateCanvas();
+    }
+
+    function renderPlateCanvas() {
+      const cn = plateCanvas;
+      const cx = cn.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
+
+      if (cn.width !== w * dpr || cn.height !== h * dpr) {
+        cn.width = w * dpr; cn.height = h * dpr;
+      }
+      cx.save();
+      cx.scale(dpr, dpr);
+      cx.fillStyle = '#101010';
+      cx.fillRect(0, 0, w, h);
+
+      const curP = chartData[chartData.length - 1]?.pitch_deg || 0;
+      const curR = chartData[chartData.length - 1]?.roll_deg || 0;
+
+      const pitch = ((curP - zeroPitchOffset + mountPitchTrim) * Math.PI) / 180.0;
+      const roll  = ((curR - zeroRollOffset + mountRollTrim) * Math.PI) / 180.0;
+
+      const pw = w * 0.22, pl = h * 0.20, pth = 10;
+      const corners = [
+        [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth],
+        [-pw, -pl, pth],  [pw, -pl, pth],  [pw, pl, pth],  [-pw, pl, pth]
+      ];
+
+      const cosR = Math.cos(roll),  sinR = Math.sin(roll);
+      const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+
+      const rot = corners.map(c => {
+        const x1 = c[0];
+        const y1 = c[1] * cosR - c[2] * sinR;
+        const z1 = c[1] * sinR + c[2] * cosR;
+
+        const x2 = x1 * cosP + z1 * sinP;
+        const y2 = y1;
+        const z2 = -x1 * sinP + z1 * cosP;
+        return [x2, y2, z2];
+      });
+
+      const centerX = w / 2, centerY = h / 2 + 10;
+      const pts = rot.map(p => [
+        centerX + p[0] * 0.85 - p[1] * 0.40,
+        centerY + p[1] * 0.45 + p[2]
+      ]);
+
+      function drawPoly(indices, fillColor, strokeColor) {
+        cx.beginPath();
+        cx.moveTo(pts[indices[0]][0], pts[indices[0]][1]);
+        for (let i = 1; i < indices.length; i++) cx.lineTo(pts[indices[i]][0], pts[indices[i]][1]);
+        cx.closePath();
+        cx.fillStyle = fillColor;
+        cx.fill();
+        cx.strokeStyle = strokeColor;
+        cx.lineWidth = 1;
+        cx.stroke();
+      }
+
+      drawPoly([3, 2, 6, 7], '#414141', '#828282');
+      drawPoly([1, 2, 6, 5], '#5a5a5a', '#828282');
+      drawPoly([0, 1, 2, 3], '#114466', '#00ffcc');
+
+      if (showForceArrow) {
+        const plate_cx = (pts[0][0] + pts[2][0]) / 2;
+        const plate_cy = (pts[0][1] + pts[2][1]) / 2;
+        const effLoad = chartData[chartData.length - 1]?.raw_w || 0;
+        const arrow_len = Math.max(10, Math.min(65, Math.abs(effLoad) * 0.15));
+
+        cx.beginPath(); cx.moveTo(plate_cx, plate_cy); cx.lineTo(plate_cx, plate_cy + arrow_len);
+        cx.strokeStyle = '#00ffcc'; cx.lineWidth = 3; cx.stroke();
+      }
+
+      cx.font = '10px monospace';
+      cx.fillStyle = '#00e6ff';
+      cx.fillText(`PITCH: ${(curP >= 0 ? '+' : '') + curP.toFixed(1)}°`, 10, h - 10);
+      cx.fillStyle = '#ff64ff';
+      cx.fillText(`ROLL:  ${(curR >= 0 ? '+' : '') + curR.toFixed(1)}°`, 120, h - 10);
+
+      cx.restore();
+    }
+
+    // Advanced Map
+    const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true }).addTo(map);
+    const track = L.polyline([], { color: '#00e5ff', weight: 3.5, opacity: 0.9 }).addTo(map);
+    const marker = L.circleMarker([0, 0], { radius: 6, color: '#ffffff', fillColor: '#ff0044', fillOpacity: 1, weight: 2 }).addTo(map);
+
+    function recenterMap() {
+      const latLngs = track.getLatLngs();
+      if (latLngs && latLngs.length > 0) map.fitBounds(L.latLngBounds(latLngs), { padding: [25, 25], maxZoom: 18 });
+    }
+
+    // --------------------------------------------------------------------------
+    // MAIN INTERACTIVE TELEMETRY CHART
+    // --------------------------------------------------------------------------
+    const chartCanvas = document.getElementById('interactiveCanvas');
+    const chartCtx = chartCanvas.getContext('2d');
+    const chartTooltip = document.getElementById('chartTooltip');
+
+    let seriesVisible = {
+      load: true, surge: true,
+      ax: true, ay: true, az: true,
+      gx: true, gy: true, gz: true,
+      gpsSpd: true
+    };
+    let viewStart = 0.0, viewEnd = 1.0;
+    let isAutoFollow = true;
+    let chartHoverIndex = null;
+    let replayMarkerIndex = null;
+
+    function toggleSeries(key) {
+      seriesVisible[key] = !seriesVisible[key];
+      document.getElementById(`leg_${key}`).classList.toggle('off', !seriesVisible[key]);
+      redrawInteractiveChart();
+    }
+
+    function toggleAutoFollow() {
+      isAutoFollow = !isAutoFollow;
+      document.getElementById('btnFollow').classList.toggle('active', isAutoFollow);
+      if (isAutoFollow) { viewEnd = 1.0; viewStart = Math.max(0, 1.0 - 0.25); }
+      redrawInteractiveChart();
+    }
+
+    function zoomChart(scaleFactor) {
+      isAutoFollow = false;
+      document.getElementById('btnFollow').classList.remove('active');
+      const mid = (viewStart + viewEnd) / 2;
+      const halfSpan = ((viewEnd - viewStart) * scaleFactor) / 2;
+      viewStart = Math.max(0, mid - halfSpan);
+      viewEnd = Math.min(1.0, mid + halfSpan);
+      if (viewEnd <= viewStart) viewEnd = Math.min(1.0, viewStart + 0.05);
+      redrawInteractiveChart();
+      if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
+    }
+
+    function resetChartZoom() {
+      viewStart = 0.0; viewEnd = 1.0;
+      redrawInteractiveChart();
+      if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
+    }
+
+    chartCanvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      isAutoFollow = false;
+      document.getElementById('btnFollow').classList.remove('active');
+      zoomChart(e.deltaY < 0 ? 0.85 : 1.15);
+    }, { passive: false });
+
+    let isDragging = false, dragStartX = 0, dragStartRange = [0, 1];
+
+    chartCanvas.addEventListener('mousedown', (e) => {
+      const rect = chartCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      if (isFlatlineSelecting) { flatlineDragStart = mouseX; return; }
+      isDragging = true; dragStartX = e.clientX; dragStartRange = [viewStart, viewEnd];
+      isAutoFollow = false; document.getElementById('btnFollow').classList.remove('active');
     });
 
-    device.addEventListener('gattserverdisconnected', onDisconnected);
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(SERVICE_UUID);
-    txChar = await service.getCharacteristic(TX_CHAR_UUID);
-    await txChar.startNotifications();
-    txChar.addEventListener('characteristicvaluechanged', handleChunk);
+    window.addEventListener('mouseup', (e) => {
+      const rect = chartCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const gutterL = 60, gutterR = 55;
+      const plotW = rect.width - gutterL - gutterR;
+      const sIdx = Math.floor(viewStart * (chartData.length - 1));
+      const eIdx = Math.ceil(viewEnd * (chartData.length - 1));
+      const count = eIdx - sIdx;
 
-    document.getElementById('bleStatus').innerText = "CONNECTED";
-    document.getElementById('bleStatus').style.color = "#00ff88";
-    document.getElementById('btnConnect').innerText = "DISCONNECT";
+      if (isFlatlineSelecting && flatlineDragStart !== null) {
+        const r1 = Math.max(0, Math.min(1, (flatlineDragStart - gutterL) / plotW));
+        const r2 = Math.max(0, Math.min(1, (mouseX - gutterL) / plotW));
+        const idxA = Math.round(sIdx + r1 * count);
+        const idxB = Math.round(sIdx + r2 * count);
+        flatlineDragStart = null;
+        applyFlatline(idxA, idxB);
+        return;
+      }
+      isDragging = false;
+    });
 
-    if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').catch(() => {});
+    chartCanvas.addEventListener('mousemove', (e) => {
+      const rect = chartCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      if (isDragging) {
+        const dx = e.clientX - dragStartX;
+        const span = dragStartRange[1] - dragStartRange[0];
+        const shift = -(dx / rect.width) * span;
+        viewStart = Math.max(0, dragStartRange[0] + shift);
+        viewEnd = Math.min(1.0, dragStartRange[1] + shift);
+        if (viewStart === 0) viewEnd = span;
+        if (viewEnd === 1.0) viewStart = 1.0 - span;
+        redrawInteractiveChart();
+        if (document.getElementById('analyzerModal').style.display === 'flex') runStrokeAnalysis();
+        return;
+      }
+      handleChartHover(mouseX, mouseY, rect.width, rect.height);
+    });
+
+    chartCanvas.addEventListener('mouseleave', () => {
+      chartHoverIndex = null;
+      chartTooltip.style.display = 'none';
+      redrawInteractiveChart();
+    });
+
+    chartCanvas.addEventListener('click', () => {
+      if (chartHoverIndex !== null && isReplayMode) jumpToReplayIndex(chartHoverIndex);
+    });
+
+    function handleChartHover(mouseX, mouseY, w, h) {
+      if (chartData.length === 0) return;
+      const gutterL = 60, gutterR = 55;
+      const plotW = w - gutterL - gutterR;
+
+      if (mouseX < gutterL || mouseX > w - gutterR) {
+        chartHoverIndex = null; chartTooltip.style.display = 'none'; redrawInteractiveChart(); return;
+      }
+
+      const sIdx = Math.floor(viewStart * (chartData.length - 1));
+      const eIdx = Math.ceil(viewEnd * (chartData.length - 1));
+      const count = eIdx - sIdx;
+      if (count <= 0) return;
+
+      const ratio = (mouseX - gutterL) / plotW;
+      const idx = Math.min(chartData.length - 1, Math.max(0, Math.round(sIdx + ratio * count)));
+      chartHoverIndex = idx;
+
+      const d = chartData[idx];
+      chartTooltip.style.display = 'block';
+      chartTooltip.style.left = `${Math.min(w - 240, Math.max(10, mouseX + 15))}px`;
+      chartTooltip.style.top = `${Math.min(h - 150, Math.max(30, mouseY - 50))}px`;
+
+      chartTooltip.innerHTML = `
+        <div style="color:#88aacc; font-weight:bold; margin-bottom:2px;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
+        <div style="color:#00ffcc;">FORCE: ${d.raw_w.toFixed(1)}</div>
+        <div style="color:#00ff88; font-weight:bold;">BOW SURGE: ${d.surge.toFixed(2)} m/s²</div>
+        <div style="color:#ff4444;">Ax: ${d.ax.toFixed(2)} | Ay: ${d.ay.toFixed(2)} | Az: ${d.az.toFixed(2)}</div>
+        <div style="color:#ffaa00;">Gx: ${d.gx.toFixed(2)} | Gy: ${d.gy.toFixed(2)} | Gz: ${d.gz.toFixed(2)}</div>
+        <div style="color:#ffff00;">GPS SPD: ${d.spd.toFixed(1)} km/h</div>
+      `;
+      redrawInteractiveChart();
     }
-  } catch (err) {
-    console.error(err);
-    alert("Connection failed: " + err.message);
-  }
-}
 
-function onDisconnected() {
-  document.getElementById('bleStatus').innerText = "RECONNECTING...";
-  document.getElementById('bleStatus').style.color = "#ff9900";
-  document.getElementById('btnConnect').innerText = "CONNECT";
-  setTimeout(attemptAutoReconnect, 2000);
-}
+    function redrawInteractiveChart() {
+      const cn = chartCanvas;
+      const cx = chartCtx;
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
 
-async function attemptAutoReconnect() {
-  if (!device || device.gatt.connected) return;
-  try {
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(SERVICE_UUID);
-    txChar = await service.getCharacteristic(TX_CHAR_UUID);
-    await txChar.startNotifications();
-    txChar.addEventListener('characteristicvaluechanged', handleChunk);
+      if (cn.width !== w * dpr || cn.height !== h * dpr) {
+        cn.width = w * dpr; cn.height = h * dpr;
+      }
 
-    document.getElementById('bleStatus').innerText = "CONNECTED";
-    document.getElementById('bleStatus').style.color = "#00ff88";
-    document.getElementById('btnConnect').innerText = "DISCONNECT";
-  } catch (e) {
-    setTimeout(attemptAutoReconnect, 2500);
-  }
-}
+      cx.save();
+      cx.scale(dpr, dpr);
+      cx.clearRect(0, 0, w, h);
 
-function handleChunk(event) {
-  const text = new TextDecoder().decode(event.target.value);
-  streamBuffer += text;
+      const gutterL = 60, gutterR = 55, padTop = 32, padBottom = 22;
+      const plotW = w - gutterL - gutterR;
+      const plotH = h - padTop - padBottom;
 
-  const lines = streamBuffer.split(/\r?\n/);
-  streamBuffer = lines.pop();
+      if (chartData.length < 2) {
+        cx.fillStyle = "#444"; cx.font = "12px monospace"; cx.textAlign = "center";
+        cx.fillText("Awaiting sensor data or loaded file...", w / 2, h / 2);
+        cx.restore(); return;
+      }
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    document.getElementById('debugBar').innerText = `RX [${trimmed.length}b]: ${trimmed}`;
-    saveRowToDB(trimmed);
-    parseTelemetry(trimmed);
-  }
-  updateRecordCountDisplay();
-}
+      if (isAutoFollow && !isReplayMode) {
+        const windowSpan = 150;
+        const total = chartData.length;
+        if (total > windowSpan) {
+          viewStart = (total - windowSpan) / total; viewEnd = 1.0;
+        } else {
+          viewStart = 0; viewEnd = 1.0;
+        }
+      }
 
-// ==============================================================================
-// 3. TELEMETRY MATH (IDENTICAL TO PYTHON SECTION 1 & 2)
-// ==============================================================================
-let baselineWeight = null;
-let pitch_est = 0.0, roll_est = 0.0;
-let lastTimeSec = null;
-let current_d = { pitch_deg: 0, roll_deg: 0, force_net: 0, a_surge: 0 };
+      const sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
+      const eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
+      const slice = chartData.slice(sIdx, eIdx + 1);
 
-const HIST_SIZE = 120;
-let forceHistory = new Array(HIST_SIZE).fill(0);
-let surgeHistory = new Array(HIST_SIZE).fill(0);
+      let fMin = Infinity, fMax = -Infinity;
+      let mMin = Infinity, mMax = -Infinity;
 
-function parseTelemetry(row) {
-  const parts = [];
-  let inQuotes = false;
-  let currentToken = '';
+      for (let i = 0; i < slice.length; i++) {
+        const p = slice[i];
+        if (seriesVisible.load) {
+          if (p.raw_w < fMin) fMin = p.raw_w;
+          if (p.raw_w > fMax) fMax = p.raw_w;
+        }
+        const chk = (v, en) => { if (en && !isNaN(v)) { if (v < mMin) mMin = v; if (v > mMax) mMax = v; }};
+        chk(p.surge, seriesVisible.surge); chk(p.ax, seriesVisible.ax); chk(p.ay, seriesVisible.ay);
+        chk(p.az, seriesVisible.az); chk(p.gx, seriesVisible.gx); chk(p.gy, seriesVisible.gy);
+        chk(p.gz, seriesVisible.gz); chk(p.spd, seriesVisible.gpsSpd);
+      }
 
-  for (let i = 0; i < row.length; i++) {
-    const c = row[i];
-    if (c === '"') {
-      inQuotes = !inQuotes;
-    } else if (c === ',' && !inQuotes) {
-      parts.push(currentToken.trim());
-      currentToken = '';
-    } else {
-      currentToken += c;
+      if (!isFinite(fMin) || !isFinite(fMax)) { fMin = -100; fMax = 100; }
+      if (!isFinite(mMin) || !isFinite(mMax)) { mMin = -12; mMax = 12; }
+      fMin -= Math.max(2.0, (fMax - fMin) * 0.1); fMax += Math.max(2.0, (fMax - fMin) * 0.1);
+      mMin -= Math.max(1.0, (mMax - mMin) * 0.15); mMax += Math.max(1.0, (mMax - mMin) * 0.15);
+
+      // Grid & Ticks
+      const ticks = 4;
+      cx.font = "10px monospace"; cx.lineWidth = 1;
+      for (let i = 0; i <= ticks; i++) {
+        const y = padTop + plotH - (i / ticks) * plotH;
+        cx.strokeStyle = "#161b24";
+        cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+
+        const valF = fMin + (i / ticks) * (fMax - fMin);
+        cx.fillStyle = "#00ffcc"; cx.textAlign = "right"; cx.fillText(`${valF.toFixed(0)}`, gutterL - 6, y + 3);
+
+        const valM = mMin + (i / ticks) * (mMax - mMin);
+        cx.fillStyle = "#8899aa"; cx.textAlign = "left"; cx.fillText(`${valM.toFixed(1)}`, gutterL + plotW + 6, y + 3);
+      }
+
+      function drawLine(key, color, minV, maxV, isRawLoad = false, lw = 1.4) {
+        if (!seriesVisible[key]) return;
+        cx.strokeStyle = color; cx.lineWidth = lw; cx.beginPath();
+        for (let i = 0; i < slice.length; i++) {
+          const p = slice[i];
+          const val = isRawLoad ? p.raw_w : p[key];
+          const normX = i / (slice.length - 1);
+          const normY = (val - minV) / (maxV - minV);
+          const x = gutterL + normX * plotW;
+          const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
+          if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+        }
+        cx.stroke();
+      }
+
+      drawLine('load', '#00ffcc', fMin, fMax, true, 2.0);
+      drawLine('surge', '#00ff88', mMin, mMax, false, 2.2);
+      drawLine('ax', '#ff4444', mMin, mMax);
+      drawLine('ay', '#22cc88', mMin, mMax);
+      drawLine('az', '#3399ff', mMin, mMax);
+      drawLine('gx', '#ffaa00', mMin, mMax);
+      drawLine('gy', '#d044ff', mMin, mMax);
+      drawLine('gz', '#ffea00', mMin, mMax);
+      drawLine('gpsSpd', '#ffff00', mMin, mMax, false, 1.8);
+
+      // Scrolling Scrubber Line
+      if (isReplayMode && replayMarkerIndex !== null && replayMarkerIndex >= sIdx && replayMarkerIndex <= eIdx) {
+        const rx = gutterL + ((replayMarkerIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
+        cx.strokeStyle = '#ffffff'; cx.lineWidth = 2.5; cx.beginPath(); cx.moveTo(rx, padTop); cx.lineTo(rx, padTop + plotH); cx.stroke();
+        cx.fillStyle = '#ffff00'; cx.beginPath(); cx.arc(rx, padTop + 3, 4.5, 0, Math.PI * 2); cx.fill();
+      }
+
+      if (isFlatlineSelecting && flatlineDragStart !== null && chartHoverIndex !== null) {
+        const curX = gutterL + ((chartHoverIndex - sIdx) / (eIdx - sIdx || 1)) * plotW;
+        cx.fillStyle = 'rgba(255, 68, 0, 0.25)'; cx.fillRect(flatlineDragStart, padTop, curX - flatlineDragStart, plotH);
+      }
+
+      cx.fillStyle = "#667788"; cx.textAlign = "left"; cx.fillText(slice[0].timeStr || `${slice[0].ms}ms`, gutterL, h - 6);
+      cx.textAlign = "right"; cx.fillText(slice[slice.length - 1].timeStr || `${slice[slice.length - 1].ms}ms`, gutterL + plotW, h - 6);
+      cx.restore();
     }
-  }
-  parts.push(currentToken.trim());
 
-  if (parts.length < 14) return;
+    // --------------------------------------------------------------------------
+    // FILE IMPORT & TIMED REPLAY ENGINE
+    // --------------------------------------------------------------------------
+    let isReplayMode = false, replayData = [], replayIndex = 0;
+    let isReplayPlaying = false, replaySpeed = 1.0, replayStartPerf = 0, replayStartDataMs = 0, replayAnimId = null;
 
-  const ms    = parseInt(parts[0], 10);
-  const raw_w = parseFloat(parts[2]);
-  const ax    = parseFloat(parts[3]);
-  const ay    = parseFloat(parts[4]);
-  const az    = parseFloat(parts[5]);
-  const gx    = parseFloat(parts[6]); // rad/s from Nano
-  const gy    = parseFloat(parts[7]); // rad/s from Nano
-  const gz    = parseFloat(parts[8]); // rad/s from Nano
-  const lat   = parseFloat(parts[9]);
-  const lng   = parseFloat(parts[10]);
-  const spd   = parseFloat(parts[12]);
-  const sats  = parseInt(parts[13], 10);
-
-  if (isNaN(raw_w) || isNaN(ax)) return;
-
-  // Asymmetric baseline (Python exact)
-  if (baselineWeight === null) {
-    baselineWeight = raw_w;
-  }
-  const rate = raw_w > baselineWeight ? 0.003 : 0.04;
-  baselineWeight = (1.0 - rate) * baselineWeight + rate * raw_w;
-  const net_force = raw_w - baselineWeight;
-
-  const t_sec = ms / 1000.0;
-  const dt = lastTimeSec === null ? 0.033 : Math.min(0.2, Math.max(0.001, t_sec - lastTimeSec));
-  lastTimeSec = t_sec;
-
-  // Python axis mapping:
-  // FORWARD = X, LATERAL = Z, UP = -Y
-  const a_fwd = ax;
-  const a_lat = az;
-  const a_up  = -ay;
-
-  // Python:
-  // wx = math.radians(resolve_axis(r, LATERAL_AXIS, 'g')) -> 'Z' -> gz
-  // wy = math.radians(resolve_axis(r, FORWARD_AXIS, 'g')) -> 'X' -> gx
-  const wx = gz;
-  const wy = gx;
-
-  const acc_pitch = Math.atan2(a_fwd, Math.sqrt(a_lat * a_lat + a_up * a_up));
-  const acc_roll  = Math.atan2(a_lat, Math.max(0.05, a_up));
-
-  pitch_est = 0.93 * (pitch_est + wx * dt) + 0.07 * acc_pitch;
-  roll_est  = 0.93 * (roll_est  + wy * dt) + 0.07 * acc_roll;
-
-  const u_up_x = Math.sin(pitch_est);
-  const u_up_y = Math.sin(roll_est);
-  const u_up_z = Math.cos(pitch_est) * Math.cos(roll_est);
-  const norm_u = Math.hypot(u_up_x, u_up_y, u_up_z) || 1.0;
-
-  const surge = a_fwd - (9.80665 * (u_up_x / norm_u));
-
-  current_d = {
-    pitch_deg: pitch_est * (180.0 / Math.PI),
-    roll_deg:  roll_est  * (180.0 / Math.PI),
-    force_net: net_force,
-    a_surge:   surge
-  };
-
-  forceHistory.push(net_force);
-  forceHistory.shift();
-  surgeHistory.push(surge);
-  surgeHistory.shift();
-
-  // Update HUD
-  document.getElementById('valRaw').innerText   = raw_w.toFixed(1);
-  document.getElementById('valNet').innerText   = (net_force >= 0 ? "+" : "") + net_force.toFixed(1);
-  document.getElementById('valSurge').innerText = (surge >= 0 ? "+" : "") + surge.toFixed(2);
-  document.getElementById('valSpd').innerText   = spd.toFixed(1);
-  document.getElementById('valPitch').innerText = current_d.pitch_deg.toFixed(1) + "°";
-  document.getElementById('valRoll').innerText  = current_d.roll_deg.toFixed(1) + "°";
-  document.getElementById('valSats').innerText  = isNaN(sats) ? 0 : sats;
-
-  // GPS Map updates
-  if (lat !== 0.0 && lng !== 0.0) {
-    const coord = [lat, lng];
-    marker.setLatLng(coord);
-    track.addLatLng(coord);
-    map.panTo(coord, { animate: true, duration: 0.1 });
-    document.getElementById('mapTitle').innerText = `GPS Track (${spd.toFixed(1)} km/h | ${sats} Sats)`;
-  }
-}
-
-// ==============================================================================
-// 4. DYNAMIC 3D MOVING FORCE PLATE (LINE-FOR-LINE PYTHON SECTION 5 PORT)
-// ==============================================================================
-function renderPlateCanvas() {
-  const cn = document.getElementById('plateCanvas');
-  const cx = cn.getContext('2d');
-
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth;
-  const h = cn.clientHeight;
-
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr;
-    cn.height = h * dpr;
-  }
-
-  cx.save();
-  cx.scale(dpr, dpr);
-  cx.fillStyle = '#101010';
-  cx.fillRect(0, 0, w, h);
-
-  const pitch = current_d.pitch_deg * (Math.PI / 180.0);
-  const roll  = current_d.roll_deg  * (Math.PI / 180.0);
-
-  // Scaled dimensions matching canvas size
-  const pw = w * 0.22;
-  const pl = h * 0.20;
-  const pth = 10;
-
-  const corners = [
-    [-pw, -pl, -pth], [pw, -pl, -pth], [pw, pl, -pth], [-pw, pl, -pth],
-    [-pw, -pl, pth],  [pw, -pl, pth],  [pw, pl, pth],  [-pw, pl, pth]
-  ];
-
-  // Rotation Matrix: Ry @ Rx
-  const cosR = Math.cos(roll),  sinR = Math.sin(roll);
-  const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
-
-  const rot = corners.map(c => {
-    // 1. Rx
-    const x1 = c[0];
-    const y1 = c[1] * cosR - c[2] * sinR;
-    const z1 = c[1] * sinR + c[2] * cosR;
-    // 2. Ry
-    const x2 = x1 * cosP + z1 * sinP;
-    const y2 = y1;
-    const z2 = -x1 * sinP + z1 * cosP;
-    return [x2, y2, z2];
-  });
-
-  const centerX = w / 2;
-  const centerY = h / 2 + 10;
-  const vert_shift = Math.max(-45, Math.min(45, (current_d.force_net * -0.65) + (current_d.a_surge * 2.0)));
-
-  // Exact Python screen projection:
-  // (cx + p[0]*0.85 - p[1]*0.40, cy + p[1]*0.45 + p[2] + vert_shift)
-  const pts = rot.map(p => [
-    centerX + p[0] * 0.85 - p[1] * 0.40,
-    centerY + p[1] * 0.45 + p[2] + vert_shift
-  ]);
-
-  function drawPoly(indices, fillColor, strokeColor) {
-    cx.beginPath();
-    cx.moveTo(pts[indices[0]][0], pts[indices[0]][1]);
-    for (let i = 1; i < indices.length; i++) {
-      cx.lineTo(pts[indices[i]][0], pts[indices[i]][1]);
+    function handleFileSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) { parseAndLoadFile(evt.target.result); };
+      reader.readAsText(file);
+      e.target.value = '';
     }
-    cx.closePath();
-    cx.fillStyle = fillColor;
-    cx.fill();
-    cx.strokeStyle = strokeColor;
-    cx.lineWidth = 1;
-    cx.stroke();
-  }
 
-  // Draw Faces
-  drawPoly([3, 2, 6, 7], '#414141', '#828282'); // Front face
-  drawPoly([1, 2, 6, 5], '#5a5a5a', '#828282'); // Side face
-  drawPoly([0, 1, 2, 3], '#b4961e', '#ffffff'); // Top face (gold)
+    function parseAndLoadFile(content) {
+      const lines = content.split(/\r?\n/);
+      const rows = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        if (line.includes(',')) {
+          const tokens = line.split(',');
+          if (tokens.length >= 10 && !isNaN(parseFloat(tokens[0]))) rows.push(line);
+        }
+      }
+      if (rows.length === 0) { alert("Could not extract valid telemetry rows."); return; }
 
-  // Top plate center
-  const plate_cx = (pts[0][0] + pts[2][0]) / 2;
-  const plate_cy = (pts[0][1] + pts[2][1]) / 2;
+      replayData = []; chartData = []; flatlines = []; track.setLatLngs([]);
+      const gpsCoords = [];
+      for (const r of rows) {
+        saveRowToStorage(r);
+        const pt = ingestTelemetry(r, false);
+        if (pt) {
+          replayData.push(pt); chartData.push(pt);
+          if (pt.lat && pt.lng && Math.abs(pt.lat) > 0.001) gpsCoords.push([pt.lat, pt.lng]);
+        }
+      }
+      if (gpsCoords.length > 0) {
+        track.setLatLngs(gpsCoords); marker.setLatLng(gpsCoords[0]);
+        setTimeout(() => { map.invalidateSize(); map.fitBounds(L.latLngBounds(gpsCoords), { padding: [30,30] }); }, 150);
+      }
+      enterReplayMode();
+    }
 
-  // Force vector arrow (points straight down from plate center, length proportional to load)
-  const arrow_len = Math.max(10, Math.min(75, Math.abs(current_d.force_net) * 1.5));
-  cx.beginPath();
-  cx.moveTo(plate_cx, plate_cy);
-  cx.lineTo(plate_cx, plate_cy + arrow_len);
-  cx.strokeStyle = '#00ff00';
-  cx.lineWidth = 3;
-  cx.stroke();
+    function enterReplayMode() {
+      isReplayMode = true;
+      document.getElementById('replayBar').style.display = "flex";
+      document.getElementById('replaySlider').max = replayData.length - 1;
+      resetChartZoom();
+      jumpToReplayIndex(0);
+    }
 
-  // Arrowhead
-  cx.beginPath();
-  cx.moveTo(plate_cx - 5, plate_cy + arrow_len - 8);
-  cx.lineTo(plate_cx, plate_cy + arrow_len);
-  cx.lineTo(plate_cx + 5, plate_cy + arrow_len - 8);
-  cx.fillStyle = '#00ff00';
-  cx.fill();
+    function exitReplayMode() {
+      pauseReplay(); isReplayMode = false;
+      document.getElementById('replayBar').style.display = "none";
+      isAutoFollow = true; document.getElementById('btnFollow').classList.add('active');
+      replayMarkerIndex = null; redrawInteractiveChart();
+    }
 
-  // Corner readouts matching Python
-  cx.font = '10px monospace';
-  cx.fillStyle = '#00e6ff';
-  cx.fillText(`PITCH: ${(current_d.pitch_deg >= 0 ? '+' : '') + current_d.pitch_deg.toFixed(1)}°`, 10, h - 10);
-  cx.fillStyle = '#ff64ff';
-  cx.fillText(`ROLL:  ${(current_d.roll_deg >= 0 ? '+' : '') + current_d.roll_deg.toFixed(1)}°`, 120, h - 10);
+    function changeReplaySpeed(val) {
+      replaySpeed = parseFloat(val);
+      if (isReplayPlaying) { replayStartPerf = performance.now(); replayStartDataMs = replayData[replayIndex].ms; }
+    }
 
-  cx.restore();
-}
+    function toggleReplayPlay() {
+      if (isReplayPlaying) pauseReplay(); else startReplay();
+    }
 
-// ==============================================================================
-// 5. LEAFLET SATELLITE MAP
-// ==============================================================================
-const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19
-}).addTo(map);
+    function startReplay() {
+      if (replayIndex >= replayData.length - 1) replayIndex = 0;
+      isReplayPlaying = true;
+      document.getElementById('btnPlay').innerText = "PAUSE";
+      document.getElementById('btnPlay').style.background = "#e67300";
+      replayStartPerf = performance.now(); replayStartDataMs = replayData[replayIndex].ms;
 
-const track = L.polyline([], { color: '#00e5ff', weight: 3 }).addTo(map);
-const marker = L.circleMarker([0, 0], { radius: 6, color: '#ff1100', fillColor: '#ffff00', fillOpacity: 1 }).addTo(map);
+      function loop() {
+        if (!isReplayPlaying) return;
+        const now = performance.now();
+        const targetDataMs = replayStartDataMs + (now - replayStartPerf) * replaySpeed;
+        while (replayIndex < replayData.length - 1 && replayData[replayIndex + 1].ms <= targetDataMs) replayIndex++;
+        jumpToReplayIndex(replayIndex, false);
+        if (replayIndex >= replayData.length - 1) { pauseReplay(); return; }
+        replayAnimId = requestAnimationFrame(loop);
+      }
+      replayAnimId = requestAnimationFrame(loop);
+    }
 
-// ==============================================================================
-// 6. AUTO-SCALING STRIP CHARTS
-// ==============================================================================
-function renderLoop() {
-  renderPlateCanvas();
-  drawAutoScaledChart('chartForce', forceHistory, '#00ffcc', 'kg', 5.0);
-  drawAutoScaledChart('chartAccel', surgeHistory, '#ffaa00', 'm/s²', 1.0);
-  requestAnimationFrame(renderLoop);
-}
+    function pauseReplay() {
+      isReplayPlaying = false;
+      if (replayAnimId) { cancelAnimationFrame(replayAnimId); replayAnimId = null; }
+      document.getElementById('btnPlay').innerText = "PLAY";
+      document.getElementById('btnPlay').style.background = "#009955";
+    }
 
-function drawAutoScaledChart(id, arr, col, unit, minSpan) {
-  const cn = document.getElementById(id);
-  const cx = cn.getContext('2d');
+    function stepReplay(step) {
+      pauseReplay(); jumpToReplayIndex(Math.max(0, Math.min(replayData.length - 1, replayIndex + step)));
+    }
 
-  const dpr = window.devicePixelRatio || 1;
-  const w = cn.clientWidth;
-  const h = cn.clientHeight;
+    function onReplaySliderInput(val) {
+      pauseReplay(); jumpToReplayIndex(parseInt(val, 10));
+    }
 
-  if (cn.width !== w * dpr || cn.height !== h * dpr) {
-    cn.width = w * dpr;
-    cn.height = h * dpr;
-  }
+    function jumpToReplayIndex(idx, resetClock = true) {
+      if (idx < 0 || idx >= replayData.length) return;
+      replayIndex = idx; replayMarkerIndex = idx;
+      document.getElementById('replaySlider').value = idx;
+      const pt = replayData[idx];
+      const totalSec = ((replayData[replayData.length - 1].ms - replayData[0].ms) / 1000).toFixed(1);
+      const curSec = ((pt.ms - replayData[0].ms) / 1000).toFixed(1);
+      document.getElementById('replayTimeDisplay').innerText = `${idx + 1}/${replayData.length} (${curSec}s / ${totalSec}s)`;
 
-  cx.save();
-  cx.scale(dpr, dpr);
-  cx.clearRect(0, 0, w, h);
+      updateHUD(pt);
 
-  const gutter = 48;
-  const chartW = w - gutter - 10;
-  const chartH = h - 24;
-  const topPad = 16;
+      const curFrac = idx / (replayData.length - 1 || 1);
+      const span = viewEnd - viewStart;
+      if (curFrac < viewStart || curFrac > viewEnd) {
+        viewStart = Math.max(0, curFrac - span * 0.2);
+        viewEnd = Math.min(1.0, viewStart + span);
+      }
 
-  let vMin = Infinity, vMax = -Infinity;
-  for (let i = 0; i < arr.length; i++) {
-    if (arr[i] < vMin) vMin = arr[i];
-    if (arr[i] > vMax) vMax = arr[i];
-  }
-  if (!isFinite(vMin) || !isFinite(vMax)) { vMin = -1; vMax = 1; }
+      if (resetClock && isReplayPlaying) {
+        replayStartPerf = performance.now(); replayStartDataMs = pt.ms;
+      }
+      redrawInteractiveChart();
+      renderPlateCanvas();
+    }
 
-  let span = vMax - vMin;
-  if (span < minSpan) {
-    const mid = (vMax + vMin) / 2.0;
-    vMin = mid - (minSpan / 2.0);
-    vMax = mid + (minSpan / 2.0);
-  } else {
-    vMin -= span * 0.15;
-    vMax += span * 0.15;
-  }
+    // --------------------------------------------------------------------------
+    // 4-CHART STROKE ANALYZER SUITE ENGINE
+    // --------------------------------------------------------------------------
+    let detectedStrokes = [], selectedStrokeId = null;
+    let analyzerRegionMode = 'zoom', driveDeltaThreshold = 180, minStrokePeriodSec = 1.2;
 
-  const ticks = 4;
-  cx.font = '10px monospace';
-  cx.textAlign = 'right';
-  cx.textBaseline = 'middle';
+    let c1Toggles = { force: true, allforce: true, ax: false, ay: false, az: false, gyro: false };
+    let c2Toggles = { force: true, allforce: true, ax: false, az: false };
+    let c2AlignMode = 'end';
+    let c4Toggles = { surge: true, force: true, ax: false, az: false };
 
-  for (let i = 0; i <= ticks; i++) {
-    const val = vMin + (i / ticks) * (vMax - vMin);
-    const y = topPad + chartH - (i / ticks) * chartH;
+    let c1Zoom = { start: 0, end: 1 }, c2Zoom = { start: 0, end: 1 }, c3Zoom = { start: 0, end: 1 };
 
-    cx.strokeStyle = (Math.abs(val) < (vMax - vMin) / 20.0) ? '#384050' : '#1a1f28';
-    cx.lineWidth = (Math.abs(val) < (vMax - vMin) / 20.0) ? 1.5 : 1;
-    cx.beginPath();
-    cx.moveTo(gutter, y);
-    cx.lineTo(gutter + chartW, y);
-    cx.stroke();
+    function toggleC1(key) { c1Toggles[key] = !c1Toggles[key]; document.getElementById(`tog_c1_${key}`).classList.toggle('off', !c1Toggles[key]); renderEnsembleForceChart(); }
+    function toggleC2(key) { c2Toggles[key] = !c2Toggles[key]; document.getElementById(`tog_c2_${key}`).classList.toggle('off', !c2Toggles[key]); renderRightAlignedChart(); }
+    function toggleC2Alignment() {
+      c2AlignMode = c2AlignMode === 'end' ? 'finish' : 'end';
+      document.getElementById('btnC2AlignToggle').innerText = c2AlignMode === 'end' ? 'ALIGN: PRE-CATCH (END)' : 'ALIGN: FINISH';
+      document.getElementById('c2Title').innerText = c2AlignMode === 'end' ? 'Chart 2: Pre-Catch / End-Aligned Overlay (Aligned on Right Side)' : 'Chart 2: Finish-Aligned Overlay (Aligned on Finish Line)';
+      renderRightAlignedChart();
+    }
+    function toggleC4(key) { c4Toggles[key] = !c4Toggles[key]; document.getElementById(`tog_c4_${key}`).classList.toggle('off', !c4Toggles[key]); renderSplitAlignedChart(); }
 
-    cx.fillStyle = '#778899';
-    cx.fillText((val >= 0 ? '+' : '') + val.toFixed(1), gutter - 6, y);
-  }
+    function resetZoomC1() { c1Zoom = { start: 0, end: 1 }; renderEnsembleForceChart(); }
+    function resetZoomC2() { c2Zoom = { start: 0, end: 1 }; renderRightAlignedChart(); }
+    function resetZoomC3() { c3Zoom = { start: 0, end: 1 }; renderSelectionOverviewChart(); }
 
-  cx.strokeStyle = col;
-  cx.lineWidth = 2;
-  cx.beginPath();
-  const step = chartW / (arr.length - 1);
+    function openStrokeAnalyzer() {
+      if (chartData.length < 10) { alert("Load a CSV file or record telemetry before running Stroke Analysis."); return; }
+      document.getElementById('analyzerModal').style.display = 'flex';
+      runStrokeAnalysis();
+    }
 
-  for (let i = 0; i < arr.length; i++) {
-    const norm = (arr[i] - vMin) / (vMax - vMin);
-    const x = gutter + i * step;
-    const y = topPad + chartH - Math.max(0, Math.min(1, norm)) * chartH;
+    function closeStrokeAnalyzer() {
+      document.getElementById('analyzerModal').style.display = 'none';
+      redrawInteractiveChart();
+    }
 
-    if (i === 0) cx.moveTo(x, y);
-    else cx.lineTo(x, y);
-  }
-  cx.stroke();
+    function setAnalyzerRegion(mode) {
+      analyzerRegionMode = mode;
+      document.getElementById('btnRegZoom').classList.toggle('active', mode === 'zoom');
+      document.getElementById('btnRegAll').classList.toggle('active', mode === 'all');
+      document.getElementById('lblRegionMode').innerText = mode === 'zoom' ? 'ZOOM VIEW' : 'ENTIRE SESSION';
+      runStrokeAnalysis();
+    }
 
-  cx.fillStyle = '#556677';
-  cx.textAlign = 'left';
-  cx.fillText(unit, gutter + 4, topPad + 10);
+    function onThresholdChange(val) {
+      driveDeltaThreshold = parseFloat(val); document.getElementById('lblDeltaThresh').innerText = driveDeltaThreshold; runStrokeAnalysis();
+    }
+    function onMinPeriodChange(val) {
+      minStrokePeriodSec = parseFloat(val); document.getElementById('lblMinPeriod').innerText = minStrokePeriodSec + "s"; runStrokeAnalysis();
+    }
 
-  cx.restore();
-}
+    function runStrokeAnalysis() {
+      let sIdx = 0, eIdx = chartData.length - 1;
+      if (analyzerRegionMode === 'zoom') {
+        sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
+        eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
+      }
 
-requestAnimationFrame(renderLoop);
-</script>
+      const rawSubset = chartData.slice(sIdx, eIdx + 1);
+      if (rawSubset.length < 20) return;
+
+      const fArr = rawSubset.map(d => d.raw_w);
+      const sorted = [...fArr].sort((a,b) => a - b);
+      const baseline = sorted[Math.floor(sorted.length * 0.25)];
+
+      const peaks = [];
+      const minSamplesBetween = Math.max(8, Math.floor(minStrokePeriodSec / 0.1));
+
+      for (let i = 2; i < fArr.length - 2; i++) {
+        const val = fArr[i];
+        const deflection = val - baseline;
+        if (deflection > driveDeltaThreshold) {
+          if (val >= fArr[i-1] && val >= fArr[i-2] && val > fArr[i+1] && val >= fArr[i+2]) {
+            if (peaks.length === 0 || (i - peaks[peaks.length - 1]) >= minSamplesBetween) {
+              peaks.push(i);
+            } else if (val > fArr[peaks[peaks.length - 1]]) {
+              peaks[peaks.length - 1] = i;
+            }
+          }
+        }
+      }
+
+      detectedStrokes = [];
+      for (let p = 0; p < peaks.length - 1; p++) {
+        const pIdx = peaks[p];
+        const nextPIdx = peaks[p+1];
+
+        const peakDeflection = fArr[pIdx] - baseline;
+        const catchCutoff = baseline + peakDeflection * 0.15;
+        let catchRel = pIdx;
+        while (catchRel > (p === 0 ? 0 : peaks[p-1]) && fArr[catchRel] > catchCutoff) catchRel--;
+
+        let finishRel = pIdx;
+        while (finishRel < nextPIdx && fArr[finishRel] > catchCutoff) finishRel++;
+
+        let nextCatchRel = nextPIdx;
+        const nextPeakDeflection = fArr[nextPIdx] - baseline;
+        const nextCutoff = baseline + nextPeakDeflection * 0.15;
+        while (nextCatchRel > finishRel && fArr[nextCatchRel] > nextCutoff) nextCatchRel--;
+
+        const strokeGlobalCatch = sIdx + catchRel;
+        const strokeGlobalFinish = sIdx + finishRel;
+        const strokeGlobalNextCatch = sIdx + nextCatchRel;
+
+        const strokePts = chartData.slice(strokeGlobalCatch, strokeGlobalNextCatch + 1);
+        if (strokePts.length < 5) continue;
+
+        const t0 = strokePts[0].ms / 1000.0;
+        const tDrive = (chartData[strokeGlobalFinish].ms - chartData[strokeGlobalCatch].ms) / 1000.0;
+        const tTotal = (strokePts[strokePts.length - 1].ms - strokePts[0].ms) / 1000.0;
+        const tRecov = Math.max(0.1, tTotal - tDrive);
+
+        const times = [], forceVals = [], bowSurgeVals = [];
+        const axVals = [], ayVals = [], azVals = [];
+        const gxVals = [], gyVals = [], gzVals = [];
+        const spdVals = [];
+        let cumDist = 0;
+
+        for (let k = 0; k < strokePts.length; k++) {
+          const pt = strokePts[k];
+          const dtK = k === 0 ? 0.033 : (pt.ms - strokePts[k-1].ms) / 1000.0;
+          times.push((pt.ms / 1000.0) - t0);
+          forceVals.push(pt.raw_w - baseline);
+          bowSurgeVals.push(pt.surge);
+          axVals.push(pt.ax); ayVals.push(pt.ay); azVals.push(pt.az);
+          gxVals.push(pt.gx); gyVals.push(pt.gy); gzVals.push(pt.gz);
+          const spdKmh = pt.spd || 0;
+          spdVals.push(spdKmh);
+          cumDist += (spdKmh / 3.6) * dtK;
+        }
+
+        detectedStrokes.push({
+          id: p + 1, enabled: true,
+          catchIdx: strokeGlobalCatch, finishIdx: strokeGlobalFinish, nextCatchIdx: strokeGlobalNextCatch,
+          tTotal, tDrive, tRecov,
+          rhythmRatio: tDrive > 0 ? (tRecov / tDrive) : 1.8,
+          peakF: Math.max(...forceVals),
+          spm: tTotal > 0 ? (60.0 / tTotal) : 0,
+          avgSpd: spdVals.reduce((a,b)=>a+b, 0) / spdVals.length,
+          distTotal: cumDist,
+          peakSurge: Math.max(...bowSurgeVals),
+          times, forceVals, bowSurgeVals, axVals, ayVals, azVals, gxVals, gyVals, gzVals, spdVals
+        });
+      }
+
+      document.getElementById('analyzerStrokeBadge').innerText = `${detectedStrokes.length} STROKES DETECTED`;
+      populateStrokeListUI();
+      updateScorecard();
+      renderAllAnalyzerCharts();
+    }
+
+    function populateStrokeListUI() {
+      const container = document.getElementById('strokeListContainer');
+      container.innerHTML = '';
+
+      const allItem = document.createElement('div');
+      allItem.className = `stroke-list-item ${selectedStrokeId === null ? 'selected' : ''}`;
+      allItem.innerHTML = `<span style="font-weight:bold; color:#ffaa00;">★ ENSEMBLE AVERAGE (${detectedStrokes.filter(s=>s.enabled).length})</span>`;
+      allItem.onclick = () => { selectedStrokeId = null; populateStrokeListUI(); updateScorecard(); renderAllAnalyzerCharts(); };
+      container.appendChild(allItem);
+
+      detectedStrokes.forEach(s => {
+        const it = document.createElement('div');
+        it.className = `stroke-list-item ${selectedStrokeId === s.id ? 'selected' : ''} ${!s.enabled ? 'dimmed' : ''}`;
+        it.innerHTML = `
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" ${s.enabled ? 'checked' : ''} onclick="event.stopPropagation(); toggleStrokeEnabled(${s.id})" />
+            <b>#${s.id}</b> 
+            <span style="color:#aaa;">${s.spm.toFixed(0)} SPM | ${s.distTotal.toFixed(1)}m</span>
+          </div>
+          <b style="color:#ffaa00;">${s.peakF.toFixed(0)}</b>
+        `;
+        it.onclick = () => { selectedStrokeId = s.id; populateStrokeListUI(); updateScorecard(); renderAllAnalyzerCharts(); };
+        container.appendChild(it);
+      });
+    }
+
+    function toggleStrokeEnabled(id) {
+      const st = detectedStrokes.find(s => s.id === id);
+      if (st) st.enabled = !st.enabled;
+      populateStrokeListUI(); updateScorecard(); renderAllAnalyzerCharts();
+    }
+
+    function selectAllStrokes(val) {
+      detectedStrokes.forEach(s => s.enabled = val);
+      populateStrokeListUI(); updateScorecard(); renderAllAnalyzerCharts();
+    }
+
+    function updateScorecard() {
+      const active = detectedStrokes.filter(s => s.enabled);
+      if (active.length === 0) return;
+      let target = selectedStrokeId !== null ? detectedStrokes.find(s => s.id === selectedStrokeId) : null;
+
+      if (target) {
+        document.getElementById('scRate').innerText   = target.spm.toFixed(1);
+        document.getElementById('scDriveT').innerText  = target.tDrive.toFixed(2);
+        document.getElementById('scRecovT').innerText  = target.tRecov.toFixed(2);
+        document.getElementById('scRatio').innerText   = `1 : ${target.rhythmRatio.toFixed(1)}`;
+        document.getElementById('scPeakF').innerText   = target.peakF.toFixed(1);
+        document.getElementById('scDPS').innerText     = target.distTotal.toFixed(2);
+        document.getElementById('scSpd').innerText     = target.avgSpd.toFixed(1);
+        document.getElementById('scSurge').innerText   = target.peakSurge.toFixed(2);
+      } else {
+        const avg = (fn) => (active.reduce((acc, s) => acc + fn(s), 0) / active.length);
+        document.getElementById('scRate').innerText   = avg(s=>s.spm).toFixed(1);
+        document.getElementById('scDriveT').innerText  = avg(s=>s.tDrive).toFixed(2);
+        document.getElementById('scRecovT').innerText  = avg(s=>s.tRecov).toFixed(2);
+        document.getElementById('scRatio').innerText   = `1 : ${avg(s=>s.rhythmRatio).toFixed(1)}`;
+        document.getElementById('scPeakF').innerText   = avg(s=>s.peakF).toFixed(1);
+        document.getElementById('scDPS').innerText     = avg(s=>s.distTotal).toFixed(2);
+        document.getElementById('scSpd').innerText     = avg(s=>s.avgSpd).toFixed(1);
+        document.getElementById('scSurge').innerText   = avg(s=>s.peakSurge).toFixed(2);
+      }
+    }
+
+    function renderAllAnalyzerCharts() {
+      renderEnsembleForceChart();
+      renderRightAlignedChart();
+      renderSelectionOverviewChart();
+      renderSplitAlignedChart();
+    }
+
+    function computeResampledAverage(key, maxTime, numSteps = 120) {
+      const active = detectedStrokes.filter(s => s.enabled);
+      if (active.length === 0) return { times: [], mean: [], stdDevUpper: [], stdDevLower: [] };
+
+      const timeGrid = [], mean = [], stdDevUpper = [], stdDevLower = [];
+
+      for (let step = 0; step <= numSteps; step++) {
+        const t = (step / numSteps) * maxTime;
+        timeGrid.push(t);
+        const values = [];
+        for (const st of active) {
+          if (t > st.tTotal) continue;
+          const tArr = st.times, vArr = st[key];
+          let vInterp = vArr[0];
+          for (let i = 0; i < tArr.length - 1; i++) {
+            if (t >= tArr[i] && t <= tArr[i+1]) {
+              const frac = (t - tArr[i]) / (tArr[i+1] - tArr[i] || 1);
+              vInterp = vArr[i] + frac * (vArr[i+1] - vArr[i]);
+              break;
+            }
+          }
+          values.push(vInterp);
+        }
+        if (values.length > 0) {
+          const avg = values.reduce((a, b) => a + b, 0) / values.length;
+          const variance = values.reduce((acc, v) => acc + Math.pow(v - avg, 2), 0) / values.length;
+          const sd = Math.sqrt(variance);
+          mean.push(avg); stdDevUpper.push(avg + sd); stdDevLower.push(avg - sd);
+        } else {
+          mean.push(0); stdDevUpper.push(0); stdDevLower.push(0);
+        }
+      }
+      return { times: timeGrid, mean, stdDevUpper, stdDevLower };
+    }
+
+    function renderEnsembleForceChart() {
+      const cn = document.getElementById('overlayForceCanvas');
+      const cx = cn.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
+
+      if (cn.width !== w * dpr || cn.height !== h * dpr) { cn.width = w * dpr; cn.height = h * dpr; }
+      cx.save(); cx.scale(dpr, dpr); cx.clearRect(0, 0, w, h);
+
+      const active = detectedStrokes.filter(s => s.enabled);
+      if (active.length === 0) { cx.restore(); return; }
+
+      const fullMaxT = Math.max(...active.map(s => s.tTotal));
+      const tMin = c1Zoom.start * fullMaxT, tMax = c1Zoom.end * fullMaxT, tSpan = tMax - tMin || 1;
+      const maxF = Math.max(10, Math.max(...active.map(s => s.peakF)) * 1.15);
+      const avgDriveT = active.reduce((a,s)=>a+s.tDrive,0) / active.length;
+
+      const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
+      const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
+
+      const driveX = gutterL + ((avgDriveT - tMin) / tSpan) * plotW;
+      if (driveX > gutterL && driveX < gutterL + plotW) {
+        cx.fillStyle = 'rgba(0, 255, 204, 0.05)'; cx.fillRect(gutterL, padTop, driveX - gutterL, plotH);
+        cx.fillStyle = 'rgba(255, 170, 0, 0.03)'; cx.fillRect(driveX, padTop, plotW - (driveX - gutterL), plotH);
+        cx.strokeStyle = '#00ffcc'; cx.lineWidth = 1; cx.setLineDash([3, 3]);
+        cx.beginPath(); cx.moveTo(driveX, padTop); cx.lineTo(driveX, padTop + plotH); cx.stroke(); cx.setLineDash([]);
+        cx.font = '9px monospace'; cx.fillStyle = '#00ffcc'; cx.fillText("AVG FINISH", driveX - 30, padTop + 10);
+      }
+
+      cx.strokeStyle = '#1a2230'; cx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = padTop + plotH - (i / 4) * plotH;
+        cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+        cx.fillStyle = '#778899'; cx.textAlign = 'right'; cx.fillText(((i / 4) * maxF).toFixed(0), gutterL - 6, y + 3);
+
+        const valM = -12 + (i / 4) * 24;
+        cx.fillStyle = '#8899aa'; cx.textAlign = 'left'; cx.fillText(`${valM.toFixed(0)}`, gutterL + plotW + 6, y + 3);
+      }
+
+      if (c1Toggles.allforce) {
+        for (const st of active) {
+          const isTarget = selectedStrokeId === st.id;
+          cx.strokeStyle = isTarget ? '#ff0055' : 'rgba(0, 229, 255, 0.28)';
+          cx.lineWidth = isTarget ? 2.8 : 1.2; cx.beginPath();
+          let started = false;
+          for (let k = 0; k < st.times.length; k++) {
+            const tK = st.times[k];
+            if (tK < tMin || tK > tMax) continue;
+            const x = gutterL + ((tK - tMin) / tSpan) * plotW;
+            const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
+            if (!started) { cx.moveTo(x, y); started = true; } else cx.lineTo(x, y);
+          }
+          cx.stroke();
+        }
+      }
+
+      function drawAuxSeries(key, col, minV, maxV) {
+        for (const st of active) {
+          const arr = st[key];
+          cx.strokeStyle = col; cx.lineWidth = selectedStrokeId === st.id ? 1.8 : 0.8; cx.beginPath();
+          let started = false;
+          for (let k = 0; k < st.times.length; k++) {
+            const tK = st.times[k];
+            if (tK < tMin || tK > tMax) continue;
+            const x = gutterL + ((tK - tMin) / tSpan) * plotW;
+            const normY = (arr[k] - minV) / (maxV - minV);
+            const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
+            if (!started) { cx.moveTo(x, y); started = true; } else cx.lineTo(x, y);
+          }
+          cx.stroke();
+        }
+      }
+
+      if (c1Toggles.ax) drawAuxSeries('axVals', 'rgba(255, 68, 68, 0.55)', -12, 12);
+      if (c1Toggles.ay) drawAuxSeries('ayVals', 'rgba(34, 204, 136, 0.55)', -12, 12);
+      if (c1Toggles.az) drawAuxSeries('azVals', 'rgba(51, 153, 255, 0.55)', -12, 12);
+      if (c1Toggles.gyro) {
+        drawAuxSeries('gxVals', 'rgba(255, 170, 0, 0.5)', -5, 5);
+        drawAuxSeries('gyVals', 'rgba(208, 68, 255, 0.5)', -5, 5);
+        drawAuxSeries('gzVals', 'rgba(255, 234, 0, 0.5)', -5, 5);
+      }
+
+      if (c1Toggles.force) {
+        const avgCurve = computeResampledAverage('forceVals', fullMaxT);
+        cx.fillStyle = 'rgba(255, 215, 0, 0.12)'; cx.beginPath();
+        let started = false;
+        for (let i = 0; i < avgCurve.times.length; i++) {
+          const tK = avgCurve.times[i];
+          if (tK < tMin || tK > tMax) continue;
+          const x = gutterL + ((tK - tMin) / tSpan) * plotW;
+          const y = padTop + plotH - (Math.max(0, avgCurve.stdDevUpper[i]) / maxF) * plotH;
+          if (!started) { cx.moveTo(x, y); started = true; } else cx.lineTo(x, y);
+        }
+        for (let i = avgCurve.times.length - 1; i >= 0; i--) {
+          const tK = avgCurve.times[i];
+          if (tK < tMin || tK > tMax) continue;
+          const x = gutterL + ((tK - tMin) / tSpan) * plotW;
+          const y = padTop + plotH - (Math.max(0, avgCurve.stdDevLower[i]) / maxF) * plotH;
+          cx.lineTo(x, y);
+        }
+        cx.closePath(); cx.fill();
+
+        cx.strokeStyle = '#ffd700'; cx.lineWidth = 3.2; cx.beginPath(); started = false;
+        for (let i = 0; i < avgCurve.times.length; i++) {
+          const tK = avgCurve.times[i];
+          if (tK < tMin || tK > tMax) continue;
+          const x = gutterL + ((tK - tMin) / tSpan) * plotW;
+          const y = padTop + plotH - (avgCurve.mean[i] / maxF) * plotH;
+          if (!started) { cx.moveTo(x, y); started = true; } else cx.lineTo(x, y);
+        }
+        cx.stroke();
+      }
+
+      cx.fillStyle = '#88a0cc'; cx.textAlign = 'left'; cx.fillText(`+${tMin.toFixed(2)}s`, gutterL, h - 6);
+      cx.textAlign = 'right'; cx.fillText(`+${tMax.toFixed(2)}s`, gutterL + plotW, h - 6);
+      cx.restore();
+    }
+
+    const c1Canvas = document.getElementById('overlayForceCanvas');
+    c1Canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 0.85 : 1.15;
+      const mid = (c1Zoom.start + c1Zoom.end) / 2;
+      const half = ((c1Zoom.end - c1Zoom.start) * factor) / 2;
+      c1Zoom.start = Math.max(0, mid - half); c1Zoom.end = Math.min(1, mid + half);
+      renderEnsembleForceChart();
+    }, { passive: false });
+
+    c1Canvas.addEventListener('mousemove', (e) => {
+      const active = detectedStrokes.filter(s => s.enabled);
+      if (active.length === 0) return;
+      const rect = c1Canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const gutterL = 50, gutterR = 50, plotW = rect.width - gutterL - gutterR;
+      if (mx < gutterL || mx > rect.width - gutterR) { document.getElementById('c1Tooltip').style.display = 'none'; return; }
+      const fullMaxT = Math.max(...active.map(s => s.tTotal));
+      const tMin = c1Zoom.start * fullMaxT, tMax = c1Zoom.end * fullMaxT;
+      const tCur = tMin + ((mx - gutterL) / plotW) * (tMax - tMin);
+
+      const avgCurve = computeResampledAverage('forceVals', fullMaxT);
+      const idx = Math.min(avgCurve.times.length - 1, Math.max(0, Math.round((tCur / fullMaxT) * (avgCurve.times.length - 1))));
+      const fVal = avgCurve.mean[idx] || 0;
+
+      const tip = document.getElementById('c1Tooltip');
+      tip.style.display = 'block';
+      tip.style.left = `${Math.min(rect.width - 150, mx + 15)}px`;
+      tip.style.top = `${Math.min(rect.height - 60, e.clientY - rect.top)}px`;
+      tip.innerHTML = `<div>Time: <b>+${tCur.toFixed(2)}s</b></div><div>Avg Force: <b style="color:#ffd700;">${fVal.toFixed(1)}</b></div>`;
+    });
+    c1Canvas.addEventListener('mouseleave', () => { document.getElementById('c1Tooltip').style.display = 'none'; });
+
+    function renderRightAlignedChart() {
+      const cn = document.getElementById('overlayRightAlignedCanvas');
+      const cx = cn.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
+
+      if (cn.width !== w * dpr || cn.height !== h * dpr) { cn.width = w * dpr; cn.height = h * dpr; }
+      cx.save(); cx.scale(dpr, dpr); cx.clearRect(0, 0, w, h);
+
+      const active = detectedStrokes.filter(s => s.enabled);
+      if (active.length === 0) { cx.restore(); return; }
+
+      const fullMaxT = Math.max(...active.map(s => s.tTotal));
+      const maxF = Math.max(10, Math.max(...active.map(s => s.peakF)) * 1.15);
+
+      const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
+      const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
+
+      cx.strokeStyle = '#1a2230'; cx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = padTop + plotH - (i / 4) * plotH;
+        cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+        cx.fillStyle = '#778899'; cx.textAlign = 'right'; cx.fillText(((i / 4) * maxF).toFixed(0), gutterL - 6, y + 3);
+      }
+
+      for (const st of active) {
+        const isTarget = selectedStrokeId === st.id;
+        cx.strokeStyle = isTarget ? '#ff0055' : 'rgba(0, 229, 255, 0.28)';
+        cx.lineWidth = isTarget ? 2.8 : 1.2; cx.beginPath();
+        const anchorT = c2AlignMode === 'end' ? st.tTotal : st.tDrive;
+        let started = false;
+        for (let k = 0; k < st.times.length; k++) {
+          const tRel = st.times[k] - anchorT;
+          const normX = (tRel + fullMaxT) / fullMaxT;
+          const x = gutterL + normX * plotW;
+          const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
+          if (!started) { cx.moveTo(x, y); started = true; } else cx.lineTo(x, y);
+        }
+        cx.stroke();
+      }
+
+      cx.strokeStyle = c2AlignMode === 'end' ? '#00e5ff' : '#00ff88';
+      cx.lineWidth = 2; cx.setLineDash([3, 3]);
+      cx.beginPath(); cx.moveTo(gutterL + plotW, padTop); cx.lineTo(gutterL + plotW, padTop + plotH); cx.stroke(); cx.setLineDash([]);
+
+      cx.fillStyle = '#88a0cc'; cx.textAlign = 'left'; cx.fillText(`-${fullMaxT.toFixed(2)}s`, gutterL, h - 6);
+      cx.textAlign = 'right'; cx.fillText(c2AlignMode === 'end' ? '0.00s (PRE-CATCH / END)' : '0.00s (FINISH)', gutterL + plotW, h - 6);
+      cx.restore();
+    }
+
+    const c2Canvas = document.getElementById('overlayRightAlignedCanvas');
+    c2Canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 0.85 : 1.15;
+      const mid = (c2Zoom.start + c2Zoom.end) / 2;
+      const half = ((c2Zoom.end - c2Zoom.start) * factor) / 2;
+      c2Zoom.start = Math.max(0, mid - half); c2Zoom.end = Math.min(1, mid + half);
+      renderRightAlignedChart();
+    }, { passive: false });
+
+    function renderSelectionOverviewChart() {
+      const cn = document.getElementById('overlaySelectionCanvas');
+      const cx = cn.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
+
+      if (cn.width !== w * dpr || cn.height !== h * dpr) { cn.width = w * dpr; cn.height = h * dpr; }
+      cx.save(); cx.scale(dpr, dpr); cx.clearRect(0, 0, w, h);
+
+      let sIdx = 0, eIdx = chartData.length - 1;
+      if (analyzerRegionMode === 'zoom') {
+        sIdx = Math.max(0, Math.floor(viewStart * (chartData.length - 1)));
+        eIdx = Math.min(chartData.length - 1, Math.ceil(viewEnd * (chartData.length - 1)));
+      }
+
+      const span = eIdx - sIdx;
+      const subStart = Math.round(sIdx + c3Zoom.start * span);
+      const subEnd = Math.round(sIdx + c3Zoom.end * span);
+      const slice = chartData.slice(subStart, subEnd + 1);
+
+      if (slice.length < 2) { cx.restore(); return; }
+
+      const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
+      const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
+
+      let fMin = Infinity, fMax = -Infinity;
+      let sMin = Infinity, sMax = -Infinity;
+
+      for (let i = 0; i < slice.length; i++) {
+        const p = slice[i];
+        if (p.raw_w < fMin) fMin = p.raw_w;
+        if (p.raw_w > fMax) fMax = p.raw_w;
+        if (p.surge < sMin) sMin = p.surge;
+        if (p.surge > sMax) sMax = p.surge;
+      }
+      fMin -= 10; fMax += 10;
+      sMin = Math.min(-2, sMin - 0.5); sMax = Math.max(3, sMax + 0.5);
+
+      for (let i = 0; i <= 4; i++) {
+        const y = padTop + plotH - (i / 4) * plotH;
+        cx.strokeStyle = "#161b24"; cx.beginPath(); cx.moveTo(gutterL, y); cx.lineTo(gutterL + plotW, y); cx.stroke();
+        cx.fillStyle = '#00e5ff'; cx.textAlign = 'right'; cx.fillText(`${(fMin + (i / 4) * (fMax - fMin)).toFixed(0)}`, gutterL - 6, y + 3);
+        cx.fillStyle = '#00ff88'; cx.textAlign = 'left'; cx.fillText(`${(sMin + (i / 4) * (sMax - sMin)).toFixed(1)}m/s²`, gutterL + plotW + 6, y + 3);
+      }
+
+      // Force Plate (Cyan)
+      cx.strokeStyle = '#00e5ff'; cx.lineWidth = 1.8; cx.beginPath();
+      for (let i = 0; i < slice.length; i++) {
+        const x = gutterL + (i / (slice.length - 1)) * plotW;
+        const y = padTop + plotH - ((slice[i].raw_w - fMin) / (fMax - fMin)) * plotH;
+        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      cx.stroke();
+
+      // Bow Surge Accel (Green, Flipped)
+      cx.strokeStyle = '#00ff88'; cx.lineWidth = 2.4; cx.beginPath();
+      for (let i = 0; i < slice.length; i++) {
+        const x = gutterL + (i / (slice.length - 1)) * plotW;
+        const y = padTop + plotH - ((slice[i].surge - sMin) / (sMax - sMin)) * plotH;
+        if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      cx.stroke();
+
+      cx.fillStyle = "#88a0cc"; cx.textAlign = "left"; cx.fillText(slice[0].timeStr || `${slice[0].ms}ms`, gutterL, h - 6);
+      cx.textAlign = "right"; cx.fillText(slice[slice.length - 1].timeStr || `${slice[slice.length - 1].ms}ms`, gutterL + plotW, h - 6);
+      cx.restore();
+    }
+
+    const c3Canvas = document.getElementById('overlaySelectionCanvas');
+    c3Canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 0.85 : 1.15;
+      const mid = (c3Zoom.start + c3Zoom.end) / 2;
+      const half = ((c3Zoom.end - c3Zoom.start) * factor) / 2;
+      c3Zoom.start = Math.max(0, mid - half); c3Zoom.end = Math.min(1, mid + half);
+      renderSelectionOverviewChart();
+    }, { passive: false });
+
+    function renderSplitAlignedChart() {
+      const cn = document.getElementById('overlaySplitCanvas');
+      const cx = cn.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const w = cn.clientWidth, h = cn.clientHeight;
+
+      if (cn.width !== w * dpr || cn.height !== h * dpr) { cn.width = w * dpr; cn.height = h * dpr; }
+      cx.save(); cx.scale(dpr, dpr); cx.clearRect(0, 0, w, h);
+
+      const active = detectedStrokes.filter(s => s.enabled);
+      if (active.length === 0) { cx.restore(); return; }
+
+      const gutterL = 50, gutterR = 50, padTop = 28, padBottom = 22;
+      const plotW = w - gutterL - gutterR, plotH = h - padTop - padBottom;
+      const splitX = gutterL + 0.5 * plotW;
+
+      cx.strokeStyle = '#ffaa00'; cx.lineWidth = 1.5; cx.setLineDash([4, 3]);
+      cx.beginPath(); cx.moveTo(splitX, padTop); cx.lineTo(splitX, padTop + plotH); cx.stroke(); cx.setLineDash([]);
+      cx.font = '9px monospace'; cx.fillStyle = '#ffaa00'; cx.textAlign = 'center';
+      cx.fillText("MID-DRIVE TRANSITION", splitX, padTop - 6);
+
+      const maxF = Math.max(...active.map(s => s.peakF)) * 1.15;
+      const sMin = -4, sMax = 10;
+
+      for (const st of active) {
+        const driveCount = Math.max(2, st.finishIdx - st.catchIdx);
+        const halfK = Math.max(1, Math.round(driveCount / 2));
+
+        // Left Side
+        if (c4Toggles.force) {
+          cx.strokeStyle = 'rgba(255, 215, 0, 0.35)'; cx.lineWidth = 1.2; cx.beginPath();
+          for (let k = 0; k <= halfK && k < st.forceVals.length; k++) {
+            const x = gutterL + (k / halfK) * (0.5 * plotW);
+            const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
+            if (k === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+          }
+          cx.stroke();
+        }
+        if (c4Toggles.surge) {
+          cx.strokeStyle = 'rgba(0, 255, 136, 0.45)'; cx.lineWidth = 1.3; cx.beginPath();
+          for (let k = 0; k <= halfK && k < st.bowSurgeVals.length; k++) {
+            const x = gutterL + (k / halfK) * (0.5 * plotW);
+            const normY = (st.bowSurgeVals[k] - sMin) / (sMax - sMin);
+            const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
+            if (k === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+          }
+          cx.stroke();
+        }
+
+        // Right Side
+        const startLateK = halfK;
+        const endLateK = Math.min(st.forceVals.length - 1, driveCount + 8);
+        const countLate = Math.max(1, endLateK - startLateK);
+
+        if (c4Toggles.force) {
+          cx.strokeStyle = 'rgba(255, 215, 0, 0.35)'; cx.lineWidth = 1.2; cx.beginPath();
+          for (let k = startLateK; k <= endLateK; k++) {
+            const x = splitX + ((k - startLateK) / countLate) * (0.5 * plotW);
+            const y = padTop + plotH - (st.forceVals[k] / maxF) * plotH;
+            if (k === startLateK) cx.moveTo(x, y); else cx.lineTo(x, y);
+          }
+          cx.stroke();
+        }
+        if (c4Toggles.surge) {
+          cx.strokeStyle = 'rgba(0, 255, 136, 0.45)'; cx.lineWidth = 1.3; cx.beginPath();
+          for (let k = startLateK; k <= endLateK; k++) {
+            const x = splitX + ((k - startLateK) / countLate) * (0.5 * plotW);
+            const normY = (st.bowSurgeVals[k] - sMin) / (sMax - sMin);
+            const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
+            if (k === startLateK) cx.moveTo(x, y); else cx.lineTo(x, y);
+          }
+          cx.stroke();
+        }
+      }
+
+      // Draw Bold Averages
+      const numSteps = 50;
+      if (c4Toggles.force) {
+        cx.strokeStyle = '#ffd700'; cx.lineWidth = 3.0; cx.beginPath();
+        for (let s = 0; s <= numSteps; s++) {
+          const frac = s / numSteps; const vals = [];
+          for (const st of active) {
+            const halfK = Math.max(1, Math.round((st.finishIdx - st.catchIdx) / 2));
+            vals.push(st.forceVals[Math.min(st.forceVals.length - 1, Math.round(frac * halfK))]);
+          }
+          const x = gutterL + frac * (0.5 * plotW);
+          const y = padTop + plotH - ((vals.reduce((a,b)=>a+b,0)/vals.length) / maxF) * plotH;
+          if (s === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+        }
+        cx.stroke();
+      }
+
+      if (c4Toggles.surge) {
+        cx.strokeStyle = '#00ff88'; cx.lineWidth = 3.0; cx.beginPath();
+        for (let s = 0; s <= numSteps; s++) {
+          const frac = s / numSteps; const vals = [];
+          for (const st of active) {
+            const halfK = Math.max(1, Math.round((st.finishIdx - st.catchIdx) / 2));
+            vals.push(st.bowSurgeVals[Math.min(st.bowSurgeVals.length - 1, Math.round(frac * halfK))]);
+          }
+          const x = gutterL + frac * (0.5 * plotW);
+          const normY = ((vals.reduce((a,b)=>a+b,0)/vals.length) - sMin) / (sMax - sMin);
+          const y = padTop + plotH - Math.max(0, Math.min(1, normY)) * plotH;
+          if (s === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+        }
+        cx.stroke();
+      }
+
+      cx.fillStyle = '#88a0cc'; cx.textAlign = 'left'; cx.fillText("← CATCH ENTRY & INITIAL DRIVE", gutterL, h - 6);
+      cx.textAlign = 'right'; cx.fillText("FINISH EXIT & RECOVERY GLIDE →", gutterL + plotW, h - 6);
+      cx.restore();
+    }
+
+    function exportStrokeAnalyticsCSV() {
+      const active = detectedStrokes.filter(s => s.enabled);
+      if (active.length === 0) { alert("No strokes available to export."); return; }
+      let csv = "stroke_id,duration_s,drive_time_s,recovery_time_s,drive_recovery_ratio,spm,peak_force,distance_m,avg_spd_kmh,peak_surge_mps2\n";
+      active.forEach(s => {
+        csv += `${s.id},${s.tTotal.toFixed(3)},${s.tDrive.toFixed(3)},${s.tRecov.toFixed(3)},1:${s.rhythmRatio.toFixed(2)},${s.spm.toFixed(1)},${s.peakF.toFixed(2)},${s.distTotal.toFixed(2)},${s.avgSpd.toFixed(2)},${s.peakSurge.toFixed(2)}\n`;
+      });
+      downloadCsvBlob(csv, `indaboat_strokes_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
+    }
+
+    // ==========================================================================
+    // 8. MASTER REQUESTANIMATIONFRAME RENDER LOOP
+    // ==========================================================================
+    const cnP1 = document.getElementById('strokeBeepCanvasP1');
+    const cnP2 = document.getElementById('strokeBeepCanvasP2');
+
+    function masterRenderLoop() {
+      renderDualImuCanvas();
+      renderLiveFlowChart();
+
+      // Render individual stroke overlay charts
+      renderIndividualStrokeCanvas(cnP1, currentStrokeP1, ghostLastStrokeP1, runningAverageStrokeP1, runningAverageStrokeP2, true);
+      renderIndividualStrokeCanvas(cnP2, currentStrokeP2, ghostLastStrokeP2, runningAverageStrokeP2, runningAverageStrokeP1, false);
+
+      if (document.getElementById('advancedSuiteView').classList.contains('active')) {
+        renderPlateCanvas();
+        if (isAutoFollow && !isReplayMode) redrawInteractiveChart();
+      }
+
+      requestAnimationFrame(masterRenderLoop);
+    }
+    requestAnimationFrame(masterRenderLoop);
+
+    window.addEventListener('resize', () => {
+      mapLive.invalidateSize();
+      map.invalidateSize();
+      if (recallMap) recallMap.invalidateSize();
+    });
+  </script>
 </body>
 </html>
