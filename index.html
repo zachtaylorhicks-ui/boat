@@ -66,7 +66,7 @@
     .btn-tare { background: #c25e00; border: 1px solid #ff7700; color: #fff; font-weight: bold; }
     .btn-tare:hover { background: #e06d00; }
     .btn-rec { background: #cc2200; border: 1px solid #ff4422; color: #fff; font-weight: bold; }
-    .btn-rec.recording { background: #444; border-color: #666; }
+    .btn-rec.recording { background: #444; border-color: #888; }
 
     #bleStatus { font-size: 11px; font-weight: bold; letter-spacing: 0.5px; color: #ff4444; }
 
@@ -395,7 +395,7 @@
 
 <script>
 // ==============================================================================
-// 1. DATA STORAGE & EXPORT
+// 1. DATA STORAGE & EXPORT (iOS / BLUEFY COMPATIBLE)
 // ==============================================================================
 let inMemoryLog = [];
 let db;
@@ -429,20 +429,45 @@ function updateRecordCountDisplay() {
   document.getElementById('dbCount').innerText = inMemoryLog.length;
 }
 
-function exportDatabase() {
+// Fixed for iOS, Bluefy, Safari, and Desktop Chrome
+async function exportDatabase() {
   if (inMemoryLog.length === 0) {
     alert("No data recorded to export. Connect to device or load a CSV first.");
     return;
   }
-  let csvContent = "ms,timestamp,o1_w,o1_ax,o1_ay,o1_az,o1_gx,o1_gy,o1_gz,lat,lng,alt,spd,sats,o2_w,o2_ax,o2_ay,o2_az,o2_gx,o2_gy,o2_gz\n" + inMemoryLog.join("\n") + "\n";
+
+  const filename = `indaboat_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  const csvContent = "ms,timestamp,o1_w,o1_ax,o1_ay,o1_az,o1_gx,o1_gy,o1_gz,lat,lng,alt,spd,sats,o2_w,o2_ax,o2_ay,o2_az,o2_gx,o2_gy,o2_gz,boat_ax,boat_ay,boat_az\n" + inMemoryLog.join("\n") + "\n";
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+
+  // 1. Try iOS Web Share API (Triggers native "Save to Files" in Bluefy)
+  if (navigator.share && navigator.canShare) {
+    try {
+      const file = new File([blob], filename, { type: "text/csv" });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: filename,
+        });
+        return;
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.warn("Share failed, falling back to download link", err);
+      } else {
+        return; // User canceled share sheet
+      }
+    }
+  }
+
+  // 2. Desktop Browser Download fallback
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `indaboat_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
 }
 
 function clearDatabase() {
@@ -465,8 +490,8 @@ function clearDatabase() {
 // 2. TWO-WAY BLE ENGINE (NOTIFY RX + WRITE TX)
 // ==============================================================================
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // Hub -> Browser (Notify)
-const RX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // Browser -> Hub (Write)
+const TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; 
+const RX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; 
 
 let device = null;
 let txChar = null;
@@ -530,11 +555,15 @@ async function sendBleCommand(cmd) {
   }
 }
 
-// StrokeCoach Piece Controls
+// Immediate optimistic toggle so the STOP button is ALWAYS available
 function togglePieceRecord() {
   if (!isPieceRecording) {
+    isPieceRecording = true;
+    updateRecButtonUI(true, "ACTIVE");
     sendBleCommand("START");
   } else {
+    isPieceRecording = false;
+    updateRecButtonUI(false, "");
     sendBleCommand("STOP");
   }
 }
@@ -545,7 +574,7 @@ function recallSelectedPiece() {
     alert("Select a piece from the dropdown first. Click 'LIST MEMORY' to fetch pieces.");
     return;
   }
-  dataset = []; // Clear current chart view for clean historical playback
+  dataset = [];
   track.setLatLngs([]);
   sendBleCommand("READ:" + sel);
 }
@@ -558,7 +587,7 @@ function clearSdMemory() {
 function updateRecButtonUI(recording, fileName) {
   const btn = document.getElementById('btnRecPiece');
   if (recording) {
-    btn.innerText = `■ STOP (${fileName})`;
+    btn.innerText = fileName ? `■ STOP (${fileName})` : "■ STOP PIECE";
     btn.classList.add('recording');
   } else {
     btn.innerText = "● START PIECE";
@@ -576,7 +605,7 @@ function handleLoggerResponse(str) {
     const fName = str.substring(9);
     isPieceRecording = false;
     updateRecButtonUI(false, fName);
-    sendBleCommand("LIST"); // Auto-refresh stored pieces
+    sendBleCommand("LIST");
   } 
   else if (str === "!LIST_START") {
     const dd = document.getElementById('pieceDropdown');
@@ -633,7 +662,6 @@ function handleChunk(event) {
 
     document.getElementById('debugBar').innerText = `RX [${trimmed.length}b]: ${trimmed}`;
 
-    // Intercept Logger responses (prefixed with '!' or '#')
     if (trimmed.startsWith("!") || trimmed.startsWith("#")) {
       handleLoggerResponse(trimmed);
       continue;
@@ -687,7 +715,7 @@ class OarKinematics {
     this.baseline_w = (1.0 - rate) * this.baseline_w + rate * raw_w;
     this.net_force = raw_w - this.baseline_w;
 
-    // Pure 3-Axis Orientation
+    // Orientation
     const acc_pitch = Math.atan2(ax, Math.sqrt(az * az + ay * ay));
     const acc_roll  = Math.atan2(az, Math.max(0.05, -ay));
 
@@ -700,7 +728,6 @@ class OarKinematics {
     const gy_comp = -9.80665 * Math.cos(this.pitch) * Math.cos(this.roll);
     const gz_comp = 9.80665 * Math.cos(this.pitch) * Math.sin(this.roll);
 
-    // Non-Rotational Linear Dynamic Acceleration
     this.lin_ax = ax - gx_comp;
     this.lin_ay = ay - gy_comp;
     this.lin_az = az - gz_comp;
@@ -813,7 +840,7 @@ function ingestTelemetryLine(line) {
     o2_gz = parseFloat(parts[20]) || 0;
   }
 
-  // BOAT HULL Telemetry (From Central Hub MPU)
+  // BOAT HULL Telemetry (Central Hub)
   let boat_ax = 0, boat_ay = 0, boat_az = 9.80665;
   if (parts.length >= 24) {
     boat_ax = parseFloat(parts[21]) || 0;
