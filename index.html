@@ -70,6 +70,34 @@
 
     #bleStatus { font-size: 11px; font-weight: bold; letter-spacing: 0.5px; color: #ff4444; }
 
+    /* REPLAY CONTROLLER BAR */
+    #replayBar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: #141720;
+      border-bottom: 1px solid #252b38;
+      position: sticky;
+      top: 44px;
+      z-index: 990;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .replay-slider-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 220px;
+    }
+    #replayScrubber {
+      flex: 1;
+      cursor: pointer;
+      accent-color: #00e5ff;
+      height: 6px;
+    }
+
     /* WORKSPACE CONTAINER */
     .dashboard-container {
       display: flex;
@@ -208,6 +236,11 @@
       text-overflow: ellipsis;
       line-height: 20px;
     }
+
+    @media (max-width: 1024px) {
+      .grid-top { grid-template-columns: 1fr 1fr; height: 500px; }
+      .grid-strips { grid-template-columns: 1fr; grid-template-rows: repeat(4, 130px); }
+    }
   </style>
 </head>
 <body>
@@ -222,7 +255,7 @@
     <button class="btn-tare" onclick="liveTareAll()">TARE (0.00)</button>
   </div>
 
-  <!-- STROKECOACH SD MEMORY CONTROLS -->
+  <!-- SD MEMORY CONTROLS -->
   <div class="topbar-group" style="background:#181c24; padding:3px 8px; border-radius:4px; border:1px solid #2a3140;">
     <button id="btnRecPiece" class="btn-rec" onclick="togglePieceRecord()">● START PIECE</button>
     <button class="btn-ctrl" onclick="sendBleCommand('LIST')">LIST MEMORY</button>
@@ -236,9 +269,38 @@
 
   <div class="topbar-group">
     <input type="file" id="fileInput" accept=".csv,.txt,.log,.tsv" style="display:none;" onchange="handleFileSelected(event)">
-    <button class="btn-import" onclick="document.getElementById('fileInput').click()">LOAD CSV</button>
+    <button class="btn-import" onclick="document.getElementById('fileInput').click()">LOAD CSV / LOG</button>
     <button class="btn-export" onclick="exportDatabase()">EXPORT (<span id="dbCount">0</span>)</button>
     <button class="btn-clear" onclick="clearDatabase()">CLEAR</button>
+  </div>
+</div>
+
+<!-- DEDICATED REPLAY CONTROLLER -->
+<div id="replayBar">
+  <div class="topbar-group">
+    <button id="btnReplayPlay" onclick="toggleReplayPlay()" style="background:#00aa55;">▶ PLAY</button>
+    <button class="btn-ctrl" onclick="stepReplay(-1)">◀ STEP</button>
+    <button class="btn-ctrl" onclick="stepReplay(1)">STEP ▶</button>
+    <button class="btn-ctrl" onclick="seekReplayTo(0)">⏮ REWIND</button>
+    <span id="replayTimecode" style="color:#00ffcc; font-size:11px; font-family:monospace; margin-left:4px;">00:00.0 / 00:00.0</span>
+  </div>
+
+  <div class="replay-slider-wrap">
+    <input type="range" id="replayScrubber" min="0" max="0" value="0" step="1" oninput="onScrubberInput(this.value)">
+    <span id="replayFrameText" style="color:#8899aa; font-size:10px; font-family:monospace; white-space:nowrap;">0 / 0</span>
+  </div>
+
+  <div class="topbar-group">
+    <span style="font-size:10px; color:#888;">SPEED:</span>
+    <select id="replaySpeed" onchange="setReplaySpeed(this.value)" style="background:#0f1116; color:#00ffcc; border:1px solid #333; font-size:10px; padding:2px 4px; border-radius:3px;">
+      <option value="0.25">0.25x</option>
+      <option value="0.5">0.5x</option>
+      <option value="1.0" selected>1.0x (Realtime)</option>
+      <option value="2.0">2.0x</option>
+      <option value="5.0">5.0x</option>
+      <option value="10.0">10.0x</option>
+    </select>
+    <span id="sysModeBadge" style="font-size:10px; font-weight:bold; color:#ffbb00; background:#221b0a; border:1px solid #554400; padding:2px 6px; border-radius:3px;">MODE: LIVE</span>
   </div>
 </div>
 
@@ -326,7 +388,7 @@
         <button class="btn-ctrl" onclick="zoomInteractive(1, 0.7)">+ ZOOM IN</button>
         <button class="btn-ctrl" onclick="zoomInteractive(1, 1.4)">- ZOOM OUT</button>
         <button class="btn-ctrl" onclick="resetInteractiveZoom(1)">FIT ALL</button>
-        <button class="btn-ctrl active" id="btnFollow1" onclick="toggleFollow(1)">LIVE FOLLOW</button>
+        <button class="btn-ctrl active" id="btnFollow1" onclick="toggleFollow(1)">FOLLOW</button>
       </div>
     </div>
     <div class="chart-tooltip" id="tooltip1"></div>
@@ -350,7 +412,7 @@
         <button class="btn-ctrl" onclick="zoomInteractive(2, 0.7)">+ ZOOM IN</button>
         <button class="btn-ctrl" onclick="zoomInteractive(2, 1.4)">- ZOOM OUT</button>
         <button class="btn-ctrl" onclick="resetInteractiveZoom(2)">FIT ALL</button>
-        <button class="btn-ctrl active" id="btnFollow2" onclick="toggleFollow(2)">LIVE FOLLOW</button>
+        <button class="btn-ctrl active" id="btnFollow2" onclick="toggleFollow(2)">FOLLOW</button>
       </div>
     </div>
     <div class="chart-tooltip" id="tooltip2"></div>
@@ -382,7 +444,7 @@
         <button class="btn-ctrl" onclick="zoomInteractive('master', 0.7)">+ ZOOM IN</button>
         <button class="btn-ctrl" onclick="zoomInteractive('master', 1.4)">- ZOOM OUT</button>
         <button class="btn-ctrl" onclick="resetInteractiveZoom('master')">FIT ALL</button>
-        <button class="btn-ctrl active" id="btnFollowMaster" onclick="toggleFollow('master')">LIVE FOLLOW</button>
+        <button class="btn-ctrl active" id="btnFollowMaster" onclick="toggleFollow('master')">FOLLOW</button>
       </div>
     </div>
     <div class="chart-tooltip" id="tooltipMaster"></div>
@@ -429,7 +491,6 @@ function updateRecordCountDisplay() {
   document.getElementById('dbCount').innerText = inMemoryLog.length;
 }
 
-// Fixed for iOS, Bluefy, Safari, and Desktop Chrome
 async function exportDatabase() {
   if (inMemoryLog.length === 0) {
     alert("No data recorded to export. Connect to device or load a CSV first.");
@@ -440,27 +501,19 @@ async function exportDatabase() {
   const csvContent = "ms,timestamp,o1_w,o1_ax,o1_ay,o1_az,o1_gx,o1_gy,o1_gz,lat,lng,alt,spd,sats,o2_w,o2_ax,o2_ay,o2_az,o2_gx,o2_gy,o2_gz,boat_ax,boat_ay,boat_az\n" + inMemoryLog.join("\n") + "\n";
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
 
-  // 1. Try iOS Web Share API (Triggers native "Save to Files" in Bluefy)
   if (navigator.share && navigator.canShare) {
     try {
       const file = new File([blob], filename, { type: "text/csv" });
       if (navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: filename,
-        });
+        await navigator.share({ files: [file], title: filename });
         return;
       }
     } catch (err) {
-      if (err.name !== "AbortError") {
-        console.warn("Share failed, falling back to download link", err);
-      } else {
-        return; // User canceled share sheet
-      }
+      if (err.name !== "AbortError") console.warn("Share fallback:", err);
+      else return;
     }
   }
 
-  // 2. Desktop Browser Download fallback
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -472,8 +525,10 @@ async function exportDatabase() {
 
 function clearDatabase() {
   if (!confirm("Clear all recorded session data?")) return;
+  stopReplay();
   inMemoryLog = [];
   dataset = [];
+  currentReplayIdx = 0;
   forceHistory1.fill(0); surgeHistory1.fill(0);
   forceHistory2.fill(0); surgeHistory2.fill(0);
   if (db) {
@@ -481,9 +536,11 @@ function clearDatabase() {
     tx.objectStore(STORE_NAME).clear();
   }
   updateRecordCountDisplay();
+  updateReplayScrubberUI();
   track.setLatLngs([]);
   marker.setLatLng([0, 0]);
   redrawAllCharts();
+  setSystemMode("LIVE");
 }
 
 // ==============================================================================
@@ -499,7 +556,6 @@ let rxChar = null;
 let streamBuffer = "";
 let pktCount = 0;
 let lastPktCalcTime = performance.now();
-
 let isPieceRecording = false;
 
 async function toggleConnect() {
@@ -516,7 +572,7 @@ async function toggleConnect() {
     const server = await device.gatt.connect();
     const service = await server.getPrimaryService(SERVICE_UUID);
     
-    txChar = await service.getCharacteristic(TX_CHAR_UUID);
+    txChar = await service.getPrimaryService ? await service.getCharacteristic(TX_CHAR_UUID) : null;
     rxChar = await service.getCharacteristic(RX_CHAR_UUID);
 
     await txChar.startNotifications();
@@ -525,6 +581,7 @@ async function toggleConnect() {
     document.getElementById('bleStatus').innerText = "CONNECTED";
     document.getElementById('bleStatus').style.color = "#00ff88";
     document.getElementById('btnConnect').innerText = "DISCONNECT";
+    setSystemMode("LIVE");
 
     if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
   } catch (err) {
@@ -555,7 +612,6 @@ async function sendBleCommand(cmd) {
   }
 }
 
-// Immediate optimistic toggle so the STOP button is ALWAYS available
 function togglePieceRecord() {
   if (!isPieceRecording) {
     isPieceRecording = true;
@@ -597,35 +653,25 @@ function updateRecButtonUI(recording, fileName) {
 
 function handleLoggerResponse(str) {
   if (str.startsWith("!STARTED:")) {
-    const fName = str.substring(9);
     isPieceRecording = true;
-    updateRecButtonUI(true, fName);
+    updateRecButtonUI(true, str.substring(9));
   } 
   else if (str.startsWith("!STOPPED:")) {
-    const fName = str.substring(9);
     isPieceRecording = false;
-    updateRecButtonUI(false, fName);
+    updateRecButtonUI(false, str.substring(9));
     sendBleCommand("LIST");
   } 
   else if (str === "!LIST_START") {
-    const dd = document.getElementById('pieceDropdown');
-    dd.innerHTML = '<option value="">(Select Stored Piece)</option>';
+    document.getElementById('pieceDropdown').innerHTML = '<option value="">(Select Stored Piece)</option>';
   } 
   else if (str.startsWith("!ITEM:")) {
     const payload = str.substring(6);
     const [fName, fBytes] = payload.split(',');
     const kb = fBytes ? Math.round(parseInt(fBytes, 10) / 1024) : 0;
-    const dd = document.getElementById('pieceDropdown');
     const opt = document.createElement('option');
     opt.value = fName;
     opt.innerText = `${fName} (${kb} KB)`;
-    dd.appendChild(opt);
-  } 
-  else if (str === "!LIST_END") {
-    console.log("[SD] File list updated.");
-  } 
-  else if (str === "!READ_START") {
-    console.log("[SD] Commencing playback...");
+    document.getElementById('pieceDropdown').appendChild(opt);
   } 
   else if (str.startsWith("!ROW:")) {
     const rowData = str.substring(5);
@@ -634,19 +680,18 @@ function handleLoggerResponse(str) {
   } 
   else if (str === "!END" || str === "#RECOVER_COMPLETE") {
     recenterMap();
-    redrawAllCharts();
-    alert("Piece download complete! Loaded into charts.");
+    initSessionAfterLoad();
+    alert("Piece download complete! Ready for replay.");
   } 
   else if (str === "!CLEARED_ALL") {
     document.getElementById('pieceDropdown').innerHTML = '<option value="">(Memory Empty)</option>';
     alert("All SD card sessions erased.");
   } 
   else if (str.startsWith("!OTA_READY:")) {
-    const ip = str.substring(11);
-    alert(`Logger in Web OTA Mode!\nConnect to Wi-Fi 'IndaBoat-Logger-OTA' (pass: indaboat123) and visit http://${ip} to upload firmware.`);
+    alert(`Logger Web OTA Active!\nConnect Wi-Fi 'IndaBoat-Logger-OTA' (pass: indaboat123) and visit http://${str.substring(11)}`);
   } 
   else if (str.startsWith("!ERR:")) {
-    alert("SD Card Logger: " + str);
+    alert("SD Card: " + str);
   }
 }
 
@@ -659,14 +704,11 @@ function handleChunk(event) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-
-    document.getElementById('debugBar').innerText = `RX [${trimmed.length}b]: ${trimmed}`;
-
+    document.getElementById('debugBar').innerText = `RX: ${trimmed}`;
     if (trimmed.startsWith("!") || trimmed.startsWith("#")) {
       handleLoggerResponse(trimmed);
       continue;
     }
-
     pktCount++;
     saveRowToStorage(trimmed);
     ingestTelemetryLine(trimmed);
@@ -715,7 +757,7 @@ class OarKinematics {
     this.baseline_w = (1.0 - rate) * this.baseline_w + rate * raw_w;
     this.net_force = raw_w - this.baseline_w;
 
-    // Orientation
+    // Orientation complementary filter
     const acc_pitch = Math.atan2(ax, Math.sqrt(az * az + ay * ay));
     const acc_roll  = Math.atan2(az, Math.max(0.05, -ay));
 
@@ -732,7 +774,7 @@ class OarKinematics {
     this.lin_ay = ay - gy_comp;
     this.lin_az = az - gz_comp;
 
-    this.planar_surge = ax - (9.80665 * Math.sin(this.pitch));
+    this.planar_surge = ax - gx_comp;
   }
 }
 
@@ -759,16 +801,31 @@ function toggleFlipLoad(oarNum) {
 }
 
 function liveTareAll() {
-  oar1.tareOffset = oar1.raw_w;
-  oar2.tareOffset = oar2.raw_w;
-  oar1.baseline_w = oar1.raw_w;
-  oar2.baseline_w = oar2.raw_w;
+  if (dataset.length > 0) {
+    const cur = dataset[currentReplayIdx] || dataset[dataset.length - 1];
+    oar1.tareOffset = cur.o1_w;
+    oar2.tareOffset = cur.o2_w;
+    oar1.baseline_w = cur.o1_w;
+    oar2.baseline_w = cur.o2_w;
+  } else {
+    oar1.tareOffset = oar1.raw_w;
+    oar2.tareOffset = oar2.raw_w;
+  }
+  // Recompute effForces across dataset
+  for (let i = 0; i < dataset.length; i++) {
+    dataset[i].effForce1 = (flipLoad1 ? -1 : 1) * (dataset[i].o1_w - oar1.tareOffset);
+    dataset[i].effForce2 = (flipLoad2 ? -1 : 1) * (dataset[i].o2_w - oar2.tareOffset);
+  }
+  redrawAllCharts();
 }
 
 function liveTareAlignment() {
-  const f1 = (flipLoad1 ? -1 : 1) * (oar1.raw_w - oar1.tareOffset);
-  const f2 = (flipLoad2 ? -1 : 1) * (oar2.raw_w - oar2.tareOffset);
+  if (dataset.length === 0) return;
+  const cur = dataset[currentReplayIdx] || dataset[dataset.length - 1];
+  const f1 = (flipLoad1 ? -1 : 1) * (cur.o1_w - oar1.tareOffset);
+  const f2 = (flipLoad2 ? -1 : 1) * (cur.o2_w - oar2.tareOffset);
   tareAlignmentDelta = f2 - f1;
+  redrawInteractiveChart('master');
 }
 
 function toggleRelativeDeltaView() {
@@ -786,107 +843,346 @@ let surgeHistory2 = new Array(STRIP_SIZE).fill(0);
 let dataset = [];
 let lastGlobalTime = null;
 
-function parseCsvTokens(row) {
-  const parts = [];
-  let inQuotes = false;
-  let token = '';
-  for (let i = 0; i < row.length; i++) {
-    const c = row[i];
-    if (c === '"') inQuotes = !inQuotes;
-    else if (c === ',' && !inQuotes) { parts.push(token.trim()); token = ''; }
-    else token += c;
+// ==============================================================================
+// 4. RESILIENT TOKEN & FLOAT PARSER (HANDLES DIRTY/SPLICED CSV & LOGS)
+// ==============================================================================
+function sanitizeFloat(val, fallback = 0) {
+  if (val === undefined || val === null) return fallback;
+  if (typeof val === 'number') return isNaN(val) ? fallback : val;
+  const s = String(val).trim();
+  if (!s) return fallback;
+
+  // Clean double-dots like 4..0 -> 4.0
+  const normalized = s.replace(/\.+/g, '.');
+  const m = normalized.match(/^[+-]?\d+(?:\.\d+)?/);
+  if (m) {
+    const num = parseFloat(m[0]);
+    return isNaN(num) ? fallback : num;
   }
-  parts.push(token.trim());
-  return parts;
+  const m2 = normalized.match(/[+-]?\d+(?:\.\d+)?/);
+  if (m2) {
+    const num2 = parseFloat(m2[0]);
+    return isNaN(num2) ? fallback : num2;
+  }
+  return fallback;
+}
+
+function extractTokensFromLine(line) {
+  let raw = [];
+  if (line.includes('\t')) {
+    raw = line.split('\t');
+  } else if (line.includes(',')) {
+    raw = line.split(',');
+  } else {
+    raw = line.trim().split(/\s+/);
+  }
+  const tokens = [];
+  for (let i = 0; i < raw.length; i++) {
+    tokens.push(raw[i].trim());
+  }
+  while (tokens.length > 0 && tokens[tokens.length - 1] === '') {
+    tokens.pop();
+  }
+  return tokens;
+}
+
+function parseTokensToRecord(tokens, prevRec) {
+  if (tokens.length < 8) return null;
+
+  let ms = parseInt(tokens[0], 10);
+  let timeStr = tokens[1] ? tokens[1].replace(/["']/g, '') : '';
+  let shift = 0;
+
+  if (isNaN(ms)) {
+    if (tokens[0].includes('T') || tokens[0].includes(':')) {
+      timeStr = tokens[0].replace(/["']/g, '');
+      ms = prevRec ? prevRec.ms + 25 : 0;
+      shift = -1;
+    } else {
+      return null;
+    }
+  }
+
+  // Smooth anomalous ms jumps (e.g. 11117479 leap)
+  if (prevRec) {
+    if (ms > prevRec.ms + 10000 || ms < prevRec.ms - 5000) {
+      ms = prevRec.ms + 25;
+    }
+  }
+
+  const getF = (idx) => sanitizeFloat(tokens[idx + shift], 0);
+
+  const o1_w  = getF(2);
+  const o1_ax = getF(3);
+  const o1_ay = getF(4);
+  const o1_az = getF(5);
+  const o1_gx = getF(6);
+  const o1_gy = getF(7);
+  const o1_gz = getF(8);
+
+  const lat  = getF(9);
+  const lng  = getF(10);
+  const alt  = getF(11);
+  const spd  = getF(12);
+  const sats = Math.round(getF(13));
+
+  let o2_w = 0, o2_ax = 0, o2_ay = 0, o2_az = 0, o2_gx = 0, o2_gy = 0, o2_gz = 0;
+  if (tokens.length + shift >= 15) o2_w  = getF(14);
+  if (tokens.length + shift >= 16) o2_ax = getF(15);
+  if (tokens.length + shift >= 17) o2_ay = getF(16);
+  if (tokens.length + shift >= 18) o2_az = getF(17);
+  if (tokens.length + shift >= 19) o2_gx = getF(18);
+  if (tokens.length + shift >= 20) o2_gy = getF(19);
+  if (tokens.length + shift >= 21) o2_gz = getF(20);
+
+  let boat_ax = 0, boat_ay = 0, boat_az = 9.80665;
+  if (tokens.length + shift >= 22) boat_ax = getF(21);
+  if (tokens.length + shift >= 23) boat_ay = getF(22);
+  if (tokens.length + shift >= 24) boat_az = getF(23);
+
+  return {
+    ms, timeStr,
+    o1_w, o1_ax, o1_ay, o1_az, o1_gx, o1_gy, o1_gz,
+    lat, lng, alt, spd, sats,
+    o2_w, o2_ax, o2_ay, o2_az, o2_gx, o2_gy, o2_gz,
+    boat_ax, boat_ay, boat_az
+  };
 }
 
 function ingestTelemetryLine(line) {
-  const parts = parseCsvTokens(line);
-  if (parts.length < 9) return;
+  const tokens = extractTokensFromLine(line);
+  const prev = dataset.length > 0 ? dataset[dataset.length - 1] : null;
+  const rec = parseTokensToRecord(tokens, prev);
+  if (!rec) return;
 
-  const ms = parseInt(parts[0], 10);
-  const timeStr = parts[1] ? parts[1].replace(/"/g, '') : '';
-  if (isNaN(ms)) return;
-
-  const t_sec = ms / 1000.0;
+  const t_sec = rec.ms / 1000.0;
   const dt = lastGlobalTime === null ? 0.025 : Math.min(0.2, Math.max(0.001, t_sec - lastGlobalTime));
   lastGlobalTime = t_sec;
 
-  // OAR 1 Telemetry
-  const o1_w  = parseFloat(parts[2]) || 0;
-  const o1_ax = parseFloat(parts[3]) || 0;
-  const o1_ay = parseFloat(parts[4]) || 0;
-  const o1_az = parseFloat(parts[5]) || 0;
-  const o1_gx = parseFloat(parts[6]) || 0;
-  const o1_gy = parseFloat(parts[7]) || 0;
-  const o1_gz = parseFloat(parts[8]) || 0;
-
-  // GPS Telemetry
-  const lat  = parseFloat(parts[9])  || 0;
-  const lng  = parseFloat(parts[10]) || 0;
-  const alt  = parseFloat(parts[11]) || 0;
-  const spd  = parseFloat(parts[12]) || 0;
-  const sats = parseInt(parts[13], 10) || 0;
-
-  // OAR 2 Telemetry
-  let o2_w = 0, o2_ax = 0, o2_ay = 0, o2_az = 0, o2_gx = 0, o2_gy = 0, o2_gz = 0;
-  if (parts.length >= 21) {
-    o2_w  = parseFloat(parts[14]) || 0;
-    o2_ax = parseFloat(parts[15]) || 0;
-    o2_ay = parseFloat(parts[16]) || 0;
-    o2_az = parseFloat(parts[17]) || 0;
-    o2_gx = parseFloat(parts[18]) || 0;
-    o2_gy = parseFloat(parts[19]) || 0;
-    o2_gz = parseFloat(parts[20]) || 0;
+  // Initialize tare offset on the very first row
+  if (dataset.length === 0) {
+    oar1.tareOffset = rec.o1_w;
+    oar2.tareOffset = rec.o2_w;
   }
 
-  // BOAT HULL Telemetry (Central Hub)
-  let boat_ax = 0, boat_ay = 0, boat_az = 9.80665;
-  if (parts.length >= 24) {
-    boat_ax = parseFloat(parts[21]) || 0;
-    boat_ay = parseFloat(parts[22]) || 0;
-    boat_az = parseFloat(parts[23]) || 9.80665;
-  }
+  oar1.update(rec.o1_w, rec.o1_ax, rec.o1_ay, rec.o1_az, rec.o1_gx, rec.o1_gy, rec.o1_gz, dt);
+  oar2.update(rec.o2_w, rec.o2_ax, rec.o2_ay, rec.o2_az, rec.o2_gx, rec.o2_gy, rec.o2_gz, dt);
+  boat.update(0, rec.boat_ax, rec.boat_ay, rec.boat_az, 0, 0, 0, dt);
 
-  oar1.update(o1_w, o1_ax, o1_ay, o1_az, o1_gx, o1_gy, o1_gz, dt);
-  oar2.update(o2_w, o2_ax, o2_ay, o2_az, o2_gx, o2_gy, o2_gz, dt);
-  boat.update(0, boat_ax, boat_ay, boat_az, 0, 0, 0, dt);
-
-  const effForce1 = (flipLoad1 ? -1 : 1) * (o1_w - oar1.tareOffset);
-  const effForce2 = (flipLoad2 ? -1 : 1) * (o2_w - oar2.tareOffset);
+  const effForce1 = (flipLoad1 ? -1 : 1) * (rec.o1_w - oar1.tareOffset);
+  const effForce2 = (flipLoad2 ? -1 : 1) * (rec.o2_w - oar2.tareOffset);
 
   forceHistory1.push(effForce1); forceHistory1.shift();
   surgeHistory1.push(oar1.planar_surge); surgeHistory1.shift();
-
   forceHistory2.push(effForce2); forceHistory2.shift();
   surgeHistory2.push(oar2.planar_surge); surgeHistory2.shift();
 
-  const record = {
-    ms, timeStr,
-    o1_w, o1_ax, o1_ay, o1_az, o1_gx, o1_gy, o1_gz,
-    o2_w, o2_ax, o2_ay, o2_az, o2_gx, o2_gy, o2_gz,
-    boat_ax, boat_ay, boat_az,
+  const fullRec = {
+    ...rec,
     effForce1, effForce2,
+    o1_pitch: oar1.pitch, o1_roll: oar1.roll, o1_yaw: oar1.yaw,
+    o1_lin_ax: oar1.lin_ax, o1_lin_ay: oar1.lin_ay, o1_lin_az: oar1.lin_az,
     o1_surge: oar1.planar_surge,
+    o2_pitch: oar2.pitch, o2_roll: oar2.roll, o2_yaw: oar2.yaw,
+    o2_lin_ax: oar2.lin_ax, o2_lin_ay: oar2.lin_ay, o2_lin_az: oar2.lin_az,
     o2_surge: oar2.planar_surge,
-    boat_surge: boat.planar_surge,
-    lat, lng, spd, sats
+    boat_pitch: boat.pitch, boat_roll: boat.roll, boat_yaw: boat.yaw,
+    boat_lin_ax: boat.lin_ax, boat_lin_ay: boat.lin_ay, boat_lin_az: boat.lin_az,
+    boat_surge: boat.planar_surge
   };
 
-  dataset.push(record);
-  if (dataset.length > 5000) dataset.shift();
+  dataset.push(fullRec);
+  if (dataset.length > 50000) dataset.shift();
 
-  if (lat !== 0 && lng !== 0 && Math.abs(lat) > 0.001) {
-    const pos = [lat, lng];
+  if (currentSystemMode === "LIVE") {
+    currentReplayIdx = dataset.length - 1;
+    updateReplayScrubberUI();
+  }
+
+  if (rec.lat !== 0 && rec.lng !== 0 && Math.abs(rec.lat) > 0.001) {
+    const pos = [rec.lat, rec.lng];
     marker.setLatLng(pos);
     track.addLatLng(pos);
-    map.panTo(pos, { animate: true, duration: 0.1 });
-    document.getElementById('mapTitle').innerText = `GPS Track (${spd.toFixed(1)} km/h | ${sats} Sats)`;
+    if (currentSystemMode === "LIVE") {
+      map.panTo(pos, { animate: true, duration: 0.1 });
+    }
+    document.getElementById('mapTitle').innerText = `GPS Track (${rec.spd.toFixed(1)} km/h | ${rec.sats} Sats)`;
   }
 }
 
 // ==============================================================================
-// 4. TOP 3D IMU ATTITUDE & LINEAR ACCELERATION ANIMATIONS
+// 5. SESSION REPLAY ENGINE
+// ==============================================================================
+let currentSystemMode = "LIVE"; // "LIVE" or "REPLAY"
+let isReplaying = false;
+let replaySpeed = 1.0;
+let currentReplayIdx = 0;
+let lastReplayAnimTime = null;
+
+function setSystemMode(mode) {
+  currentSystemMode = mode;
+  const badge = document.getElementById('sysModeBadge');
+  badge.innerText = `MODE: ${mode}`;
+  badge.style.color = mode === "REPLAY" ? "#00ffcc" : "#ffbb00";
+  badge.style.borderColor = mode === "REPLAY" ? "#008877" : "#554400";
+  badge.style.background = mode === "REPLAY" ? "#05201d" : "#221b0a";
+}
+
+function setReplaySpeed(val) {
+  replaySpeed = parseFloat(val) || 1.0;
+}
+
+function toggleReplayPlay() {
+  if (dataset.length === 0) {
+    alert("Load a CSV session or record telemetry first.");
+    return;
+  }
+  if (!isReplaying) {
+    startReplay();
+  } else {
+    stopReplay();
+  }
+}
+
+function startReplay() {
+  if (dataset.length === 0) return;
+  setSystemMode("REPLAY");
+  isReplaying = true;
+  lastReplayAnimTime = performance.now();
+  document.getElementById('btnReplayPlay').innerText = "⏸ PAUSE";
+  document.getElementById('btnReplayPlay').style.background = "#cc7700";
+}
+
+function stopReplay() {
+  isReplaying = false;
+  document.getElementById('btnReplayPlay').innerText = "▶ PLAY";
+  document.getElementById('btnReplayPlay').style.background = "#00aa55";
+}
+
+function seekReplayTo(idx) {
+  if (dataset.length === 0) return;
+  currentReplayIdx = Math.max(0, Math.min(dataset.length - 1, parseInt(idx, 10)));
+  applyReplayFrame(currentReplayIdx);
+  updateReplayScrubberUI();
+}
+
+function stepReplay(step) {
+  seekReplayTo(currentReplayIdx + step);
+}
+
+function onScrubberInput(val) {
+  seekReplayTo(val);
+}
+
+function updateReplayScrubberUI() {
+  const scrubber = document.getElementById('replayScrubber');
+  const count = dataset.length;
+  scrubber.max = count > 0 ? count - 1 : 0;
+  scrubber.value = currentReplayIdx;
+
+  document.getElementById('replayFrameText').innerText = `${currentReplayIdx + 1} / ${count}`;
+
+  if (count > 0 && dataset[0] && dataset[currentReplayIdx]) {
+    const curMs = dataset[currentReplayIdx].ms - dataset[0].ms;
+    const totMs = dataset[count - 1].ms - dataset[0].ms;
+    document.getElementById('replayTimecode').innerText = `${formatMs(curMs)} / ${formatMs(totMs)}`;
+  } else {
+    document.getElementById('replayTimecode').innerText = "00:00.0 / 00:00.0";
+  }
+}
+
+function formatMs(ms) {
+  if (isNaN(ms) || ms < 0) ms = 0;
+  const totalSec = ms / 1000;
+  const mins = Math.floor(totalSec / 60);
+  const secs = (totalSec % 60).toFixed(1);
+  return `${String(mins).padStart(2, '0')}:${secs.padStart(4, '0')}`;
+}
+
+function applyReplayFrame(idx) {
+  if (idx < 0 || idx >= dataset.length) return;
+  const d = dataset[idx];
+
+  // Update kinematics objects
+  oar1.pitch = d.o1_pitch; oar1.roll = d.o1_roll; oar1.yaw = d.o1_yaw;
+  oar1.lin_ax = d.o1_lin_ax; oar1.lin_ay = d.o1_lin_ay; oar1.lin_az = d.o1_lin_az;
+
+  oar2.pitch = d.o2_pitch; oar2.roll = d.o2_roll; oar2.yaw = d.o2_yaw;
+  oar2.lin_ax = d.o2_lin_ax; oar2.lin_ay = d.o2_lin_ay; oar2.lin_az = d.o2_lin_az;
+
+  boat.pitch = d.boat_pitch; boat.roll = d.boat_roll; boat.yaw = d.boat_yaw;
+  boat.lin_ax = d.boat_lin_ax; boat.lin_ay = d.boat_lin_ay; boat.lin_az = d.boat_lin_az;
+
+  // Update strip charts with rolling historical window up to current frame
+  const win = STRIP_SIZE;
+  const sStart = Math.max(0, idx - win + 1);
+  const slice = dataset.slice(sStart, idx + 1);
+  const pad = win - slice.length;
+
+  forceHistory1.fill(0); surgeHistory1.fill(0);
+  forceHistory2.fill(0); surgeHistory2.fill(0);
+
+  for (let i = 0; i < slice.length; i++) {
+    forceHistory1[pad + i] = slice[i].effForce1;
+    surgeHistory1[pad + i] = slice[i].o1_surge;
+    forceHistory2[pad + i] = slice[i].effForce2;
+    surgeHistory2[pad + i] = slice[i].o2_surge;
+  }
+
+  // Update GPS
+  if (d.lat !== 0 && d.lng !== 0 && Math.abs(d.lat) > 0.001) {
+    marker.setLatLng([d.lat, d.lng]);
+  }
+
+  // Auto-follow playhead window on interactive charts if enabled
+  Object.keys(interConfigs).forEach(k => {
+    const cfg = interConfigs[k];
+    if (cfg.autoFollow && dataset.length > 10) {
+      const span = cfg.viewEnd - cfg.viewStart;
+      const curRatio = idx / (dataset.length - 1);
+      if (curRatio > cfg.viewEnd || curRatio < cfg.viewStart) {
+        cfg.viewStart = Math.max(0, curRatio - span * 0.3);
+        cfg.viewEnd = Math.min(1.0, cfg.viewStart + span);
+      }
+    }
+  });
+
+  renderPlateCanvas(1);
+  renderPlateCanvas(2);
+  renderPlateCanvas(3);
+  redrawAllCharts();
+}
+
+function updateReplayTick(now) {
+  if (!isReplaying || dataset.length === 0) return;
+  const elapsed = (now - lastReplayAnimTime) * replaySpeed;
+  lastReplayAnimTime = now;
+
+  let nextIdx = currentReplayIdx;
+  let accumulated = 0;
+
+  while (nextIdx < dataset.length - 1) {
+    const dt = Math.max(1, dataset[nextIdx + 1].ms - dataset[nextIdx].ms);
+    accumulated += dt;
+    nextIdx++;
+    if (accumulated >= elapsed) break;
+  }
+
+  if (nextIdx >= dataset.length - 1) {
+    currentReplayIdx = dataset.length - 1;
+    applyReplayFrame(currentReplayIdx);
+    updateReplayScrubberUI();
+    stopReplay();
+    return;
+  }
+
+  currentReplayIdx = nextIdx;
+  applyReplayFrame(currentReplayIdx);
+  updateReplayScrubberUI();
+}
+
+// ==============================================================================
+// 6. TOP 3D IMU ATTITUDE & LINEAR ACCELERATION ANIMATIONS
 // ==============================================================================
 let camYaw1 = -0.4, camPitch1 = 0.45;
 let camYaw2 = -0.4, camPitch2 = 0.45;
@@ -1035,7 +1331,7 @@ function renderPlateCanvas(oarNum) {
 
   const center2D = project([0, 0, chipZ - chipH]);
 
-  // Dynamic Linear Acceleration Vector
+  // Linear Acceleration Vector
   const linScale = 4.0;
   const tipVec = [
     oar.lin_ax * linScale,
@@ -1066,13 +1362,13 @@ function renderPlateCanvas(oarNum) {
 
   const linMag = Math.hypot(oar.lin_ax, oar.lin_ay, oar.lin_az);
   cx.fillStyle = '#00ff66';
-  cx.fillText(`DYNAMIC LINEAR ACCEL: ${linMag.toFixed(2)} m/s² (VECTOR: ${oar.lin_ax.toFixed(1)}, ${oar.lin_ay.toFixed(1)}, ${oar.lin_az.toFixed(1)})`, 10, h - 10);
+  cx.fillText(`LINEAR ACCEL: ${linMag.toFixed(2)} m/s² [${oar.lin_ax.toFixed(1)}, ${oar.lin_ay.toFixed(1)}, ${oar.lin_az.toFixed(1)}]`, 10, h - 10);
 
   cx.restore();
 }
 
 // ==============================================================================
-// 5. FOUR AUTO-SCALED STRIP CHARTS
+// 7. FOUR AUTO-SCALED STRIP CHARTS
 // ==============================================================================
 function drawScreenshotStripChart(canvasId, arr, col, unit, minSpan) {
   const cn = document.getElementById(canvasId);
@@ -1155,7 +1451,7 @@ function drawScreenshotStripChart(canvasId, arr, col, unit, minSpan) {
 }
 
 // ==============================================================================
-// 6. THREE INTERACTIVE MULTI-SERIES CHARTS
+// 8. THREE INTERACTIVE CHARTS WITH PLAYHEAD TRACKING
 // ==============================================================================
 const interConfigs = {
   1: {
@@ -1205,7 +1501,6 @@ function toggleFollow(key) {
   cfg.autoFollow = !cfg.autoFollow;
   const btnId = key === 'master' ? 'btnFollowMaster' : `btnFollow${key}`;
   document.getElementById(btnId).classList.toggle('active', cfg.autoFollow);
-  if (cfg.autoFollow) { cfg.viewEnd = 1.0; cfg.viewStart = Math.max(0, 1.0 - 0.25); }
   redrawInteractiveChart(key);
 }
 
@@ -1265,6 +1560,22 @@ Object.keys(interConfigs).forEach(key => {
     handleInteractiveHover(key, mouseX, mouseY, rect.width, rect.height);
   });
 
+  // Click-to-seek playback frame
+  cn.addEventListener('click', (e) => {
+    if (dataset.length === 0) return;
+    const rect = cn.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const gutterL = 60, gutterR = 55;
+    const plotW = rect.width - gutterL - gutterR;
+    if (mouseX >= gutterL && mouseX <= rect.width - gutterR) {
+      const ratio = (mouseX - gutterL) / plotW;
+      const sIdx = Math.floor(cfg.viewStart * (dataset.length - 1));
+      const eIdx = Math.ceil(cfg.viewEnd * (dataset.length - 1));
+      const targetIdx = Math.round(sIdx + ratio * (eIdx - sIdx));
+      seekReplayTo(targetIdx);
+    }
+  });
+
   cn.addEventListener('mouseleave', () => {
     cfg.hoverIdx = null;
     cfg.tooltip.style.display = 'none';
@@ -1301,10 +1612,10 @@ function handleInteractiveHover(key, mouseX, mouseY, w, h) {
 
   if (key === 1 || key === 2) {
     const pfx = key === 1 ? 'o1_' : 'o2_';
-    const effL = key === 1 ? (flipLoad1 ? -1 : 1) * d.o1_w : (flipLoad2 ? -1 : 1) * d.o2_w;
+    const effL = key === 1 ? d.effForce1 : d.effForce2;
     cfg.tooltip.innerHTML = `
-      <div style="color:#88aacc; font-weight:bold;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
-      <div style="color:#00ffcc;">LOAD: ${effL.toFixed(2)}</div>
+      <div style="color:#88aacc; font-weight:bold;">⏱ ${d.timeStr || (d.ms + ' ms')} [Frame ${idx}]</div>
+      <div style="color:#00ffcc;">LOAD: ${effL.toFixed(2)} kg</div>
       <div style="color:#ff4444;">Ax:   ${d[pfx+'ax'].toFixed(2)} m/s²</div>
       <div style="color:#00ff66;">Ay:   ${d[pfx+'ay'].toFixed(2)} m/s²</div>
       <div style="color:#3399ff;">Az:   ${d[pfx+'az'].toFixed(2)} m/s²</div>
@@ -1313,13 +1624,11 @@ function handleInteractiveHover(key, mouseX, mouseY, w, h) {
       <div style="color:#ffea00;">Gz:   ${d[pfx+'gz'].toFixed(3)} rad/s</div>
     `;
   } else {
-    const f1 = (flipLoad1 ? -1 : 1) * (d.o1_w - oar1.tareOffset);
-    const f2 = (flipLoad2 ? -1 : 1) * (d.o2_w - oar2.tareOffset) - tareAlignmentDelta;
     cfg.tooltip.innerHTML = `
-      <div style="color:#88aacc; font-weight:bold;">⏱ ${d.timeStr || (d.ms + ' ms')}</div>
-      <div style="color:#00ffcc;">O1 FORCE: ${f1.toFixed(1)} kg</div>
-      <div style="color:#ffbb00;">O2 FORCE: ${f2.toFixed(1)} kg</div>
-      <div style="color:#ff77aa;">DELTA (O2-O1): ${(f2 - f1).toFixed(1)} kg</div>
+      <div style="color:#88aacc; font-weight:bold;">⏱ ${d.timeStr || (d.ms + ' ms')} [Frame ${idx}]</div>
+      <div style="color:#00ffcc;">O1 FORCE: ${d.effForce1.toFixed(1)} kg</div>
+      <div style="color:#ffbb00;">O2 FORCE: ${(d.effForce2 - tareAlignmentDelta).toFixed(1)} kg</div>
+      <div style="color:#ff77aa;">DELTA (O2-O1): ${(d.effForce2 - d.effForce1 - tareAlignmentDelta).toFixed(1)} kg</div>
     `;
   }
   redrawInteractiveChart(key);
@@ -1355,8 +1664,8 @@ function redrawInteractiveChart(key) {
     return;
   }
 
-  if (cfg.autoFollow) {
-    const windowSpan = 160;
+  if (currentSystemMode === "LIVE" && cfg.autoFollow) {
+    const windowSpan = 200;
     const total = dataset.length;
     if (total > windowSpan) {
       cfg.viewStart = (total - windowSpan) / total;
@@ -1378,8 +1687,7 @@ function redrawInteractiveChart(key) {
 
     if (key === 1 || key === 2) {
       const pfx = key === 1 ? 'o1_' : 'o2_';
-      const isFlip = key === 1 ? flipLoad1 : flipLoad2;
-      const effL = (isFlip ? -1 : 1) * p[pfx + 'w'];
+      const effL = key === 1 ? p.effForce1 : p.effForce2;
       if (cfg.series.load) { if (effL < fMin) fMin = effL; if (effL > fMax) fMax = effL; }
 
       const checkM = (v, enabled) => { if (enabled) { if (v < mMin) mMin = v; if (v > mMax) mMax = v; } };
@@ -1390,8 +1698,8 @@ function redrawInteractiveChart(key) {
       checkM(p[pfx + 'gy'], cfg.series.gy);
       checkM(p[pfx + 'gz'], cfg.series.gz);
     } else {
-      const f1 = (flipLoad1 ? -1 : 1) * (p.o1_w - oar1.tareOffset);
-      const f2 = (flipLoad2 ? -1 : 1) * (p.o2_w - oar2.tareOffset) - tareAlignmentDelta;
+      const f1 = p.effForce1;
+      const f2 = p.effForce2 - tareAlignmentDelta;
 
       if (isRelativeDeltaMode) {
         const delta = f2 - f1;
@@ -1411,7 +1719,7 @@ function redrawInteractiveChart(key) {
     }
   }
 
-  if (!isFinite(fMin) || !isFinite(fMax)) { fMin = -50; fMax = 50; }
+  if (!isFinite(fMin) || !isFinite(fMax)) { fMin = -10; fMax = 10; }
   if (!isFinite(mMin) || !isFinite(mMax)) { mMin = -12; mMax = 12; }
 
   const fPad = Math.max(1.0, (fMax - fMin) * 0.12);
@@ -1440,7 +1748,7 @@ function redrawInteractiveChart(key) {
 
   cx.fillStyle = "#00ffcc";
   cx.textAlign = "left";
-  cx.fillText(key === 'master' ? (isRelativeDeltaMode ? "RELATIVE DELTA (O2 - O1)" : "FORCE (kg)") : "LOAD (raw)", 6, padTop - 12);
+  cx.fillText(key === 'master' ? (isRelativeDeltaMode ? "RELATIVE DELTA (O2 - O1) kg" : "FORCE (kg)") : "FORCE (kg)", 6, padTop - 12);
 
   cx.fillStyle = "#8899aa";
   cx.textAlign = "right";
@@ -1465,8 +1773,7 @@ function redrawInteractiveChart(key) {
 
   if (key === 1 || key === 2) {
     const pfx = key === 1 ? 'o1_' : 'o2_';
-    const isFlip = key === 1 ? flipLoad1 : flipLoad2;
-    if (cfg.series.load) drawLine(p => (isFlip ? -1 : 1) * p[pfx + 'w'], '#00ffcc', fMin, fMax);
+    if (cfg.series.load) drawLine(p => (key === 1 ? p.effForce1 : p.effForce2), '#00ffcc', fMin, fMax);
     if (cfg.series.ax)   drawLine(p => p[pfx + 'ax'], '#ff4444', mMin, mMax);
     if (cfg.series.ay)   drawLine(p => p[pfx + 'ay'], '#00ff66', mMin, mMax);
     if (cfg.series.az)   drawLine(p => p[pfx + 'az'], '#3399ff', mMin, mMax);
@@ -1475,14 +1782,10 @@ function redrawInteractiveChart(key) {
     if (cfg.series.gz)   drawLine(p => p[pfx + 'gz'], '#ffea00', mMin, mMax);
   } else {
     if (isRelativeDeltaMode) {
-      drawLine(p => {
-        const f1 = (flipLoad1 ? -1 : 1) * (p.o1_w - oar1.tareOffset);
-        const f2 = (flipLoad2 ? -1 : 1) * (p.o2_w - oar2.tareOffset) - tareAlignmentDelta;
-        return f2 - f1;
-      }, '#ff0077', fMin, fMax);
+      drawLine(p => (p.effForce2 - p.effForce1 - tareAlignmentDelta), '#ff0077', fMin, fMax);
     } else {
-      if (cfg.series.o1_load) drawLine(p => (flipLoad1 ? -1 : 1) * (p.o1_w - oar1.tareOffset), '#00ffcc', fMin, fMax);
-      if (cfg.series.o2_load) drawLine(p => (flipLoad2 ? -1 : 1) * (p.o2_w - oar2.tareOffset) - tareAlignmentDelta, '#ffbb00', fMin, fMax, true);
+      if (cfg.series.o1_load) drawLine(p => p.effForce1, '#00ffcc', fMin, fMax);
+      if (cfg.series.o2_load) drawLine(p => (p.effForce2 - tareAlignmentDelta), '#ffbb00', fMin, fMax, true);
     }
     if (cfg.series.o1_ax) drawLine(p => p.o1_ax, '#ff4444', mMin, mMax);
     if (cfg.series.o2_ax) drawLine(p => p.o2_ax, '#ff8888', mMin, mMax, true);
@@ -1498,12 +1801,29 @@ function redrawInteractiveChart(key) {
     if (cfg.series.o2_gz) drawLine(p => p.o2_gz, '#fff588', mMin, mMax, true);
   }
 
+  // Hover indicator
   if (cfg.hoverIdx !== null && cfg.hoverIdx >= sIdx && cfg.hoverIdx <= eIdx) {
     const hx = gutterL + ((cfg.hoverIdx - sIdx) / (eIdx - sIdx || 1)) * plotW;
     cx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     cx.setLineDash([3, 3]);
     cx.beginPath(); cx.moveTo(hx, padTop); cx.lineTo(hx, padTop + plotH); cx.stroke();
     cx.setLineDash([]);
+  }
+
+  // REPLAY PLAYHEAD TRACKER CURSOR
+  if (currentReplayIdx >= sIdx && currentReplayIdx <= eIdx) {
+    const rx = gutterL + ((currentReplayIdx - sIdx) / (eIdx - sIdx || 1)) * plotW;
+    cx.strokeStyle = '#00ffcc';
+    cx.lineWidth = 2.0;
+    cx.beginPath(); cx.moveTo(rx, padTop); cx.lineTo(rx, padTop + plotH); cx.stroke();
+    
+    cx.fillStyle = '#00ffcc';
+    cx.beginPath();
+    cx.moveTo(rx - 5, padTop);
+    cx.lineTo(rx + 5, padTop);
+    cx.lineTo(rx, padTop + 7);
+    cx.closePath();
+    cx.fill();
   }
 
   cx.fillStyle = "#667788";
@@ -1516,7 +1836,7 @@ function redrawInteractiveChart(key) {
 }
 
 // ==============================================================================
-// 7. LEAFLET SATELLITE GPS MAP
+// 9. LEAFLET SATELLITE GPS MAP
 // ==============================================================================
 const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.2888, -157.8237], 17);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -1536,7 +1856,7 @@ function recenterMap() {
 }
 
 // ==============================================================================
-// 8. FILE LOADER
+// 10. ROBUST FILE INGESTION & SESSION INITIALIZER
 // ==============================================================================
 function handleFileSelected(e) {
   const file = e.target.files[0];
@@ -1551,15 +1871,22 @@ function handleFileSelected(e) {
 }
 
 function parseAndLoadFile(content) {
-  const lines = content.split(/\r?\n/);
-  const rows = [];
-  const isHexLog = content.includes("Updated Value of Characteristic");
+  stopReplay();
+
+  // 1. Recover smashed / spliced rows embedded inside single lines
+  let preprocessed = content
+    .replace(/([^\n\r])\s+(\d{5,12}[\t ,]+["']?\d{4}-\d{2}-\d{2}T)/g, '$1\n$2')
+    .replace(/([0-9.-]+)(["']?\d{4}-\d{2}-\d{2}T)/g, '$1\t$2');
+
+  const lines = preprocessed.split(/\r?\n/);
+  const rawRecords = [];
+  let prevRec = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    if (isHexLog) {
+    if (line.includes("Updated Value of Characteristic")) {
       const match = line.match(/Updated Value of Characteristic.*?to\s+([0-9a-fA-F\s]+)/);
       if (match) {
         const hex = match[1].replace(/[^0-9a-fA-F]/g, '');
@@ -1567,44 +1894,78 @@ function parseAndLoadFile(content) {
         for (let j = 0; j < hex.length - 1; j += 2) {
           ascii += String.fromCharCode(parseInt(hex.substr(j, 2), 16));
         }
-        const clean = ascii.trim();
-        if (clean.length > 5) rows.push(clean);
+        const tokens = extractTokensFromLine(ascii);
+        const r = parseTokensToRecord(tokens, prevRec);
+        if (r) { rawRecords.push(r); prevRec = r; }
       }
-    } else {
-      if (line.includes('\tApplication\t') || line.includes('\t')) {
-        const parts = line.split('\t').map(p => p.trim());
-        const appIdx = parts.indexOf("Application");
-        const useful = appIdx !== -1 ? parts.slice(appIdx + 1) : parts;
-        if (useful.length >= 8 && !isNaN(parseFloat(useful[0]))) {
-          rows.push(`${useful[0]},"${useful[1]}",${useful.slice(2).join(',')}`);
-        }
-      } else if (line.includes(',')) {
-        const tokens = line.split(',');
-        if (tokens.length >= 8 && !isNaN(parseFloat(tokens[0]))) {
-          rows.push(line);
-        }
-      }
+      continue;
+    }
+
+    const tokens = extractTokensFromLine(line);
+    const r = parseTokensToRecord(tokens, prevRec);
+    if (r) {
+      rawRecords.push(r);
+      prevRec = r;
     }
   }
 
-  if (rows.length === 0) {
+  if (rawRecords.length === 0) {
     alert("Could not extract valid telemetry records from this file.");
     return;
   }
 
+  // 2. Clear previous session & compute kinematics across full piece
   dataset = [];
+  inMemoryLog = [];
   track.setLatLngs([]);
   const gpsCoords = [];
 
-  for (const r of rows) {
-    saveRowToStorage(r);
-    ingestTelemetryLine(r);
-    const p = dataset[dataset.length - 1];
-    if (p && p.lat && p.lng && Math.abs(p.lat) > 0.001) {
-      gpsCoords.push([p.lat, p.lng]);
+  oar1.tareOffset = rawRecords[0].o1_w;
+  oar2.tareOffset = rawRecords[0].o2_w;
+  oar1.pitch = 0; oar1.roll = 0; oar1.yaw = 0; oar1.baseline_w = rawRecords[0].o1_w;
+  oar2.pitch = 0; oar2.roll = 0; oar2.yaw = 0; oar2.baseline_w = rawRecords[0].o2_w;
+  boat.pitch = 0; boat.roll = 0; boat.yaw = 0;
+
+  lastGlobalTime = null;
+
+  for (let i = 0; i < rawRecords.length; i++) {
+    const r = rawRecords[i];
+    const t_sec = r.ms / 1000.0;
+    const dt = lastGlobalTime === null ? 0.025 : Math.min(0.2, Math.max(0.001, t_sec - lastGlobalTime));
+    lastGlobalTime = t_sec;
+
+    oar1.update(r.o1_w, r.o1_ax, r.o1_ay, r.o1_az, r.o1_gx, r.o1_gy, r.o1_gz, dt);
+    oar2.update(r.o2_w, r.o2_ax, r.o2_ay, r.o2_az, r.o2_gx, r.o2_gy, r.o2_gz, dt);
+    boat.update(0, r.boat_ax, r.boat_ay, r.boat_az, 0, 0, 0, dt);
+
+    const effForce1 = (flipLoad1 ? -1 : 1) * (r.o1_w - oar1.tareOffset);
+    const effForce2 = (flipLoad2 ? -1 : 1) * (r.o2_w - oar2.tareOffset);
+
+    const fullRec = {
+      ...r,
+      effForce1, effForce2,
+      o1_pitch: oar1.pitch, o1_roll: oar1.roll, o1_yaw: oar1.yaw,
+      o1_lin_ax: oar1.lin_ax, o1_lin_ay: oar1.lin_ay, o1_lin_az: oar1.lin_az,
+      o1_surge: oar1.planar_surge,
+      o2_pitch: oar2.pitch, o2_roll: oar2.roll, o2_yaw: oar2.yaw,
+      o2_lin_ax: oar2.lin_ax, o2_lin_ay: oar2.lin_ay, o2_lin_az: oar2.lin_az,
+      o2_surge: oar2.planar_surge,
+      boat_pitch: boat.pitch, boat_roll: boat.roll, boat_yaw: boat.yaw,
+      boat_lin_ax: boat.lin_ax, boat_lin_ay: boat.lin_ay, boat_lin_az: boat.lin_az,
+      boat_surge: boat.planar_surge
+    };
+
+    dataset.push(fullRec);
+    inMemoryLog.push(`${r.ms},"${r.timeStr}",${r.o1_w},${r.o1_ax},${r.o1_ay},${r.o1_az},${r.o1_gx},${r.o1_gy},${r.o1_gz},${r.lat},${r.lng},${r.alt},${r.spd},${r.sats},${r.o2_w},${r.o2_ax},${r.o2_ay},${r.o2_az},${r.o2_gx},${r.o2_gy},${r.o2_gz},${r.boat_ax},${r.boat_ay},${r.boat_az}`);
+
+    if (r.lat !== 0 && r.lng !== 0 && Math.abs(r.lat) > 0.001) {
+      gpsCoords.push([r.lat, r.lng]);
     }
   }
 
+  updateRecordCountDisplay();
+
+  // 3. Setup GPS Map
   if (gpsCoords.length > 0) {
     track.setLatLngs(gpsCoords);
     marker.setLatLng(gpsCoords[0]);
@@ -1612,13 +1973,33 @@ function parseAndLoadFile(content) {
       map.invalidateSize();
       map.fitBounds(L.latLngBounds(gpsCoords), { padding: [30, 30], maxZoom: 18 });
     }, 150);
+  } else {
+    document.getElementById('mapTitle').innerText = "GPS Track (No Satellite Coordinates in log)";
   }
 
-  redrawAllCharts();
+  initSessionAfterLoad();
+}
+
+function initSessionAfterLoad() {
+  setSystemMode("REPLAY");
+  currentReplayIdx = 0;
+
+  // Zoom interactive charts to fit full session by default
+  Object.keys(interConfigs).forEach(k => {
+    interConfigs[k].viewStart = 0.0;
+    interConfigs[k].viewEnd = 1.0;
+    interConfigs[k].autoFollow = false;
+    const btnId = k === 'master' ? 'btnFollowMaster' : `btnFollow${k}`;
+    document.getElementById(btnId).classList.remove('active');
+  });
+
+  applyReplayFrame(0);
+  updateReplayScrubberUI();
+  document.getElementById('debugBar').innerText = `Session Loaded: ${dataset.length} valid frames parsed. Ready for replay.`;
 }
 
 // ==============================================================================
-// 9. MASTER ANIMATION & RENDER LOOP
+// 11. MASTER ANIMATION & RENDER LOOP
 // ==============================================================================
 function redrawAllCharts() {
   drawScreenshotStripChart('chartForceOar1', forceHistory1, '#00ffcc', 'kg', 5.0);
@@ -1631,11 +2012,15 @@ function redrawAllCharts() {
   redrawInteractiveChart('master');
 }
 
-function masterLoop() {
-  renderPlateCanvas(1);
-  renderPlateCanvas(2);
-  renderPlateCanvas(3);
-  redrawAllCharts();
+function masterLoop(timestamp) {
+  if (isReplaying) {
+    updateReplayTick(timestamp);
+  } else {
+    renderPlateCanvas(1);
+    renderPlateCanvas(2);
+    renderPlateCanvas(3);
+    redrawAllCharts();
+  }
   requestAnimationFrame(masterLoop);
 }
 
